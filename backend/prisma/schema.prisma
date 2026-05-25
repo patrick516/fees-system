@@ -1,0 +1,315 @@
+// backend/prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // url      = env("DATABASE_URL")
+}
+
+
+
+enum StaffRole {
+  SUPER_ADMIN    
+  SCHOOL_ADMIN   
+  BURSAR        
+}
+
+enum PaymentMethod {
+  CASH
+  AIRTEL_MONEY
+  TNM_MPAMBA
+  NATIONAL_BANK
+  STANDARD_BANK
+  FDH_BANK
+  NBS_BANK
+  OTHER_BANK
+}
+
+enum PaymentStatus {
+  PENDING     
+  VERIFIED    
+  REJECTED   
+}
+
+enum SubmittedBy {
+  BURSAR      
+  PARENT      
+}
+
+enum Term {
+  TERM_1
+  TERM_2
+  TERM_3
+}
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+
+
+// YOUR platform - one record only
+model Platform {
+  id        String   @id @default(uuid())
+  name      String   @default("SchoolPay Malawi")
+  email     String
+  phone     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  schools School[]
+
+  @@map("platform")
+}
+
+// Each school that subscribes to your system
+model School {
+  id         String  @id @default(uuid())
+  platformId String
+  platform   Platform @relation(fields: [platformId], references: [id])
+
+  name       String
+  address    String
+  city       String
+  phone      String
+  email      String?
+  logo       String? 
+
+  // Subscription to YOUR platform
+  isActive         Boolean  @default(true)
+  subscriptionPaid Boolean  @default(false)
+  subscriptionDate DateTime?
+  nextPaymentDate  DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  staff      Staff[]
+  classes    Class[]
+  students   Student[]
+  payments   FeePayment[]
+  smsLogs    SmsLog[]
+  feeStructures FeeStructure[]
+
+  @@map("schools")
+}
+
+// Staff members - Admin and Bursar
+model Staff {
+  id       String    @id @default(uuid())
+  schoolId String
+  school   School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  fullName     String
+  email        String    @unique
+  phone        String
+  passwordHash String
+  role         StaffRole
+  avatar       String?
+  isActive     Boolean   @default(true)
+  lastLogin    DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  paymentsRecorded  FeePayment[] @relation("RecordedBy")
+  paymentsVerified  FeePayment[] @relation("VerifiedBy")
+  smsSent           SmsLog[]
+
+  @@map("staff")
+}
+
+// Classes eg Form 1, Grade 5, Standard 3
+model Class {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  name      String   // eg "Form 1", "Grade 5"
+  level     Int      // for ordering eg 1, 2, 3
+  isActive  Boolean  @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  students     Student[]
+  feeStructures FeeStructure[]
+
+  @@unique([schoolId, name])
+  @@map("classes")
+}
+
+// Fee structure per class per term per year
+model FeeStructure {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId  String
+  class    Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  academicYear String  
+  term         Term
+  totalAmount  Float   
+  currency     String  @default("MWK")
+
+  // Fee breakdown (optional detail)
+  tuitionFee   Float?
+  examFee      Float?
+  buildingLevy Float?
+  uniformFee   Float?
+  bookFee      Float?
+  otherFees    Float?
+  otherFeesDescription String?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, classId, academicYear, term])
+  @@map("fee_structures")
+}
+
+// Students
+model Student {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId  String
+  class    Class  @relation(fields: [classId], references: [id])
+
+  // Auto generated unique ID shown to parents
+  studentCode   String   @unique  // eg STP-2025-001
+
+  fullName      String
+  dateOfBirth   DateTime
+  gender        Gender
+  photo         String? 
+  isActive      Boolean  @default(true)
+
+  // Parent/Guardian info
+  parentName    String
+  parentPhone   String   
+  parentPhone2  String? 
+  parentEmail   String?
+
+  academicYear  String   @default("2025")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  payments FeePayment[]
+
+  @@map("students")
+}
+
+// Every fee payment - core of the system
+model FeePayment {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId String
+  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  // Payment details
+  amount        Float
+  currency      String        @default("MWK")
+  paymentMethod PaymentMethod
+  term          Term
+  academicYear  String
+
+  // Receipt
+  receiptNumber  String        @unique  
+  receiptImage   String?      
+  notes          String?
+
+  // Who submitted and status
+  submittedBy    SubmittedBy
+  status         PaymentStatus @default(PENDING)
+
+  // For parent submission
+  parentPhone    String?      
+  bankReference  String?      
+
+  // Staff tracking
+  recordedById   String?
+  recordedBy     Staff?        @relation("RecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  verifiedById   String?
+  verifiedBy     Staff?        @relation("VerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedAt     DateTime?
+  rejectionReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // SMS sent for this payment
+  smsLogs SmsLog[]
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([status])
+  @@index([term, academicYear])
+  @@map("fee_payments")
+}
+
+// Track every SMS sent
+model SmsLog {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  phone      String
+  message    String
+  type       String    
+  status     String    
+  paymentId  String?
+  payment    FeePayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  sentById   String?
+  sentBy     Staff?    @relation(fields: [sentById], references: [id], onDelete: SetNull)
+
+  // Africa's Talking response
+  messageId  String?
+  cost       String?
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+
+  @@map("sms_logs")
+}
+
+// OTP for parent login via phone
+model OtpCode {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+  @@map("otp_codes")
+}
+
+// Audit trail - track all important actions
+model AuditLog {
+  id        String   @id @default(uuid())
+  schoolId  String?
+  staffId   String?
+  action    String   
+  entity    String   
+  entityId  String?
+  changes   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
