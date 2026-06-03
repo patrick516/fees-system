@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import {
   Download,
   FileSpreadsheet,
@@ -8,8 +8,8 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
-  TrendingUp,
-  ChevronDown,
+  // TrendingUp,
+  // ChevronDown,
   Loader2,
   BarChart2,
 } from "lucide-react";

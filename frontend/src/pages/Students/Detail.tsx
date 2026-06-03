@@ -68,7 +68,7 @@ const StudentDetail = () => {
   const rejectedPayments = payments.filter((p: any) => p.status === "REJECTED");
   const creditBalance = student.creditBalance || 0;
   const isDebtor = summary?.isDebtor && creditBalance === 0;
-  const hasCreditAndOwes = summary?.isDebtor && creditBalance > 0;
+  // const hasCreditAndOwes = summary?.isDebtor && creditBalance > 0;
 
   // Group payments by term
   const paymentsByTerm: Record<string, any[]> = {};
