@@ -12,6 +12,7 @@ import RecordPayment from "./pages/Payments/Record";
 import PendingPayments from "./pages/Payments/Pending";
 import ClassesPage from "./pages/Classes/index";
 import SMSPage from "./pages/SMS/index";
+import ReportsPage from "./pages/Reports/index";
 
 // Layout
 import MainLayout from "./components/Layout/MainLayout";
@@ -49,6 +50,7 @@ function App() {
           <Route path="payments/pending" element={<PendingPayments />} />
           <Route path="classes" element={<ClassesPage />} />
           <Route path="sms" element={<SMSPage />} />
+          <Route path="reports" element={<ReportsPage />} />
         </Route>
 
         {/* Catch all */}

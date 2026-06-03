@@ -1,8 +1,9 @@
 const express = require("express");
 const router = express.Router();
+const { getFeesReport } = require("../controllers/report.controller");
+const { verifyStaff } = require("../middleware/auth");
+const { isBursar } = require("../middleware/role");
 
-router.get("/test", (req, res) => {
-  res.json({ success: true, message: "Report routes working" });
-});
+router.get("/fees", verifyStaff, isBursar, getFeesReport);
 
 module.exports = router;

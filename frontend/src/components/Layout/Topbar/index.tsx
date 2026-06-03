@@ -9,7 +9,8 @@ const pageTitles: Record<string, string> = {
   "/payments": "Payments",
   "/payments/record": "Record Payment",
   "/payments/pending": "Pending Payments",
-  "/classes": "Classes",
+  "/classes": "Classes & Fee Structures",
+  "/reports": "Reports",
   "/sms": "Send SMS",
 };
 

@@ -205,7 +205,7 @@ const PendingPayments = () => {
           onClick={() => setSelectedReceipt(null)}
         >
           <img
-            src={`http://localhost:5000/${selectedReceipt}`}
+            src={selectedReceipt}
             alt="Payment Receipt"
             className="max-w-full max-h-full rounded-xl"
           />

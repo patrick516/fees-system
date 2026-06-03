@@ -38,8 +38,40 @@ export interface Student {
   academicYear: string;
   class: Class;
   totalPaid?: number;
+  isDebtor?: boolean; // NEW
+  outstandingBalance?: number; // NEW
 }
 
+// Add new type for fee structure
+export interface FeeStructure {
+  id: string;
+  classId: string;
+  academicYear: string;
+  term: Term;
+  totalAmount: number;
+  tuitionFee?: number | null;
+  examFee?: number | null;
+  buildingLevy?: number | null;
+  uniformFee?: number | null;
+  bookFee?: number | null;
+  otherFees?: number | null;
+  isActive: boolean;
+  class?: { name: string };
+}
+
+// Add to PaymentSummary interface
+export interface PaymentSummary {
+  totalCollected: number;
+  todayCollected: number;
+  pendingCount: number;
+  verifiedCount: number;
+  rejectedCount: number;
+  totalStudents: number;
+  paidStudents: number;
+  unpaidStudents: number;
+  debtorCount: number; // NEW
+  outstandingBalance: number; // NEW
+}
 export type PaymentMethod =
   | "CASH"
   | "AIRTEL_MONEY"

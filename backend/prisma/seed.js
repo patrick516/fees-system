@@ -124,7 +124,7 @@ async function main() {
     update: {},
     create: {
       schoolId: school.id,
-      classId: classes[2].id, // Form 1
+      classId: classes[2].id, 
       studentCode: "STP-2025-001",
       fullName: "John Banda",
       dateOfBirth: new Date("2010-03-15"),

@@ -135,15 +135,16 @@ const getStudents = async (req, res) => {
       classId,
       academicYear,
       isActive,
+      isDebtor,
+      isPaidFull,
+      noPayment,
+      hasCredit,
       page = 1,
       limit = 20,
     } = req.query;
-
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
-    // Build filters
     const where = { schoolId: req.schoolId };
-
     if (classId) where.classId = classId;
     if (academicYear) where.academicYear = academicYear;
     if (isActive !== undefined) where.isActive = isActive === "true";
@@ -164,7 +165,15 @@ const getStudents = async (req, res) => {
           class: { select: { id: true, name: true } },
           payments: {
             where: { status: "VERIFIED" },
-            select: { amount: true, term: true, academicYear: true },
+            select: {
+              amount: true,
+              term: true,
+              academicYear: true,
+              isDebtor: true,
+              balance: true,
+              requiredAmount: true,
+            },
+            orderBy: { createdAt: "desc" },
           },
         },
         orderBy: { fullName: "asc" },
@@ -174,19 +183,53 @@ const getStudents = async (req, res) => {
       prisma.student.count({ where }),
     ]);
 
-    // Add payment summary to each student
     const studentsWithSummary = students.map((student) => {
-      const totalPaid = student.payments.reduce((sum, p) => sum + p.amount, 0);
+      const verifiedPayments = student.payments;
+      const totalPaid = verifiedPayments.reduce((sum, p) => sum + p.amount, 0);
+
+      // Student is debtor if their latest payment for any term shows isDebtor=true
+      const isDebtorStudent = verifiedPayments.some((p) => p.isDebtor);
+
+      // Total outstanding balance across all terms
+      const totalBalance = verifiedPayments
+        .filter((p) => p.isDebtor && p.balance)
+        .reduce((sum, p) => sum + (p.balance || 0), 0);
+
       return {
         ...student,
         totalPaid,
-        payments: undefined, // remove raw payments from response
+        isDebtor: isDebtorStudent,
+        outstandingBalance: totalBalance,
+        creditBalance: student.creditBalance || 0,
+        payments: undefined,
       };
     });
 
+    // If filtering by debtor status
+    // Apply status filters in memory after fetching
+    let filteredStudents = studentsWithSummary;
+
+    if (isDebtor === "true") {
+      // Students with balances
+      filteredStudents = studentsWithSummary.filter((s) => s.isDebtor);
+    } else if (isPaidFull === "true") {
+      // Students who finished paying
+      filteredStudents = studentsWithSummary.filter(
+        (s) => !s.isDebtor && s.totalPaid > 0 && s.outstandingBalance === 0,
+      );
+    } else if (noPayment === "true") {
+      // Students who never paid anything
+      filteredStudents = studentsWithSummary.filter((s) => s.totalPaid === 0);
+    } else if (hasCredit === "true") {
+      // Students with extra money/credit
+      filteredStudents = studentsWithSummary.filter(
+        (s) => (s.creditBalance || 0) > 0,
+      );
+    }
+
     return res.status(200).json({
       success: true,
-      data: studentsWithSummary,
+      data: filteredStudents,
       pagination: {
         total,
         page: parseInt(page),
@@ -196,10 +239,9 @@ const getStudents = async (req, res) => {
     });
   } catch (error) {
     console.error("Get students error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to get students",
-    });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to get students" });
   }
 };
 
@@ -225,13 +267,11 @@ const getStudent = async (req, res) => {
     });
 
     if (!student) {
-      return res.status(404).json({
-        success: false,
-        message: "Student not found",
-      });
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
     }
 
-    // Calculate payment summary
     const verifiedPayments = student.payments.filter(
       (p) => p.status === "VERIFIED",
     );
@@ -239,6 +279,20 @@ const getStudent = async (req, res) => {
     const pendingPayments = student.payments.filter(
       (p) => p.status === "PENDING",
     );
+    const isDebtor = verifiedPayments.some((p) => p.isDebtor);
+    const outstandingBalance = verifiedPayments
+      .filter((p) => p.isDebtor && p.balance)
+      .reduce((sum, p) => sum + (p.balance || 0), 0);
+
+    // Get fee structures for this student's class
+    const feeStructures = await prisma.feeStructure.findMany({
+      where: {
+        schoolId: req.schoolId,
+        classId: student.classId,
+        isActive: true,
+      },
+      orderBy: { term: "asc" },
+    });
 
     return res.status(200).json({
       success: true,
@@ -248,15 +302,17 @@ const getStudent = async (req, res) => {
           totalPaid,
           pendingCount: pendingPayments.length,
           verifiedCount: verifiedPayments.length,
+          isDebtor,
+          outstandingBalance,
         },
+        feeStructures,
       },
     });
   } catch (error) {
     console.error("Get student error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to get student",
-    });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to get student" });
   }
 };
 
@@ -362,13 +418,15 @@ const searchStudents = async (req, res) => {
         fullName: true,
         parentName: true,
         parentPhone: true,
+        classId: true,
+        creditBalance: true,
         class: { select: { name: true } },
         payments: {
           where: { status: "VERIFIED" },
           select: { amount: true },
         },
       },
-      take: 10, // max 10 results for quick search
+      take: 10,
     });
 
     const results = students.map((s) => ({
@@ -376,8 +434,10 @@ const searchStudents = async (req, res) => {
       studentCode: s.studentCode,
       fullName: s.fullName,
       className: s.class.name,
+      classId: s.classId,
       parentName: s.parentName,
       parentPhone: s.parentPhone,
+      creditBalance: s.creditBalance || 0,
       totalPaid: s.payments.reduce((sum, p) => sum + p.amount, 0),
     }));
 

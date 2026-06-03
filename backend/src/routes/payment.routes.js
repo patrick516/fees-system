@@ -17,19 +17,9 @@ const {
 const { verifyStaff, verifyParent } = require("../middleware/auth");
 const { isBursar } = require("../middleware/role");
 
-// Multer setup for receipt uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, "uploads/receipts/");
-  },
-  filename: (req, file, cb) => {
-    const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `receipt-${unique}${path.extname(file.originalname)}`);
-  },
-});
-
+// Multer — use memory storage so we can upload to Cloudinary
 const upload = multer({
-  storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB max
   fileFilter: (req, file, cb) => {
     const allowed = /jpeg|jpg|png|pdf/;
@@ -41,12 +31,6 @@ const upload = multer({
     }
   },
 });
-
-// Create uploads folder
-const fs = require("fs");
-if (!fs.existsSync("uploads/receipts")) {
-  fs.mkdirSync("uploads/receipts", { recursive: true });
-}
 
 // Staff routes
 router.get("/summary", verifyStaff, isBursar, getPaymentSummary);

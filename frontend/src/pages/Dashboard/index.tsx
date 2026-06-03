@@ -9,6 +9,7 @@ import {
   CheckCircle,
   XCircle,
   ArrowRight,
+  BadgeAlert,
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { PaymentSummary } from "../../types";
@@ -74,7 +75,7 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatCard
           title="Total Collected"
           value={formatMWK(summary?.totalCollected || 0)}
@@ -102,6 +103,20 @@ const Dashboard = () => {
           icon={Users}
           color="bg-purple-600"
           subtitle={`${summary?.unpaidStudents || 0} yet to pay`}
+        />
+        <StatCard
+          title="Debtors"
+          value={summary?.debtorCount || 0}
+          icon={BadgeAlert}
+          color="bg-red-600"
+          subtitle="Students with balance owing"
+        />
+        <StatCard
+          title="Outstanding Balance"
+          value={formatMWK(summary?.outstandingBalance || 0)}
+          icon={AlertCircle}
+          color="bg-orange-500"
+          subtitle="Total fees still owed"
         />
       </div>
 

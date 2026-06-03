@@ -6,15 +6,13 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  // url      = env("DATABASE_URL")
+  url      = env("DATABASE_URL")
 }
 
-
-
 enum StaffRole {
-  SUPER_ADMIN    
-  SCHOOL_ADMIN   
-  BURSAR        
+  SUPER_ADMIN
+  SCHOOL_ADMIN
+  BURSAR
 }
 
 enum PaymentMethod {
@@ -29,14 +27,14 @@ enum PaymentMethod {
 }
 
 enum PaymentStatus {
-  PENDING     
-  VERIFIED    
-  REJECTED   
+  PENDING
+  VERIFIED
+  REJECTED
 }
 
 enum SubmittedBy {
-  BURSAR      
-  PARENT      
+  BURSAR
+  PARENT
 }
 
 enum Term {
@@ -49,8 +47,6 @@ enum Gender {
   MALE
   FEMALE
 }
-
-
 
 // YOUR platform - one record only
 model Platform {
@@ -68,32 +64,41 @@ model Platform {
 
 // Each school that subscribes to your system
 model School {
-  id         String  @id @default(uuid())
+  id         String   @id @default(uuid())
   platformId String
   platform   Platform @relation(fields: [platformId], references: [id])
 
-  name       String
-  address    String
-  city       String
-  phone      String
-  email      String?
-  logo       String? 
+  name    String
+  address String
+  city    String
+  phone   String
+  email   String?
+  logo    String?
 
   // Subscription to YOUR platform
-  isActive         Boolean  @default(true)
-  subscriptionPaid Boolean  @default(false)
+  isActive         Boolean   @default(true)
+  subscriptionPaid Boolean   @default(false)
   subscriptionDate DateTime?
   nextPaymentDate  DateTime?
+
+  // Payment details for parents
+  bankAccounts        Json?
+  airtelMoneyNumber   String?
+  mpambaNumber        String?
+  paymentInstructions String?
+
+  activeTerm         Term?
+  activeAcademicYear String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  staff      Staff[]
-  classes    Class[]
-  students   Student[]
-  payments   FeePayment[]
-  smsLogs    SmsLog[]
+  staff         Staff[]
+  classes       Class[]
+  students      Student[]
+  payments      FeePayment[]
+  smsLogs       SmsLog[]
   feeStructures FeeStructure[]
 
   @@map("schools")
@@ -101,9 +106,9 @@ model School {
 
 // Staff members - Admin and Bursar
 model Staff {
-  id       String    @id @default(uuid())
+  id       String @id @default(uuid())
   schoolId String
-  school   School    @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   fullName     String
   email        String    @unique
@@ -118,9 +123,9 @@ model Staff {
   updatedAt DateTime @updatedAt
 
   // Relations
-  paymentsRecorded  FeePayment[] @relation("RecordedBy")
-  paymentsVerified  FeePayment[] @relation("VerifiedBy")
-  smsSent           SmsLog[]
+  paymentsRecorded FeePayment[] @relation("RecordedBy")
+  paymentsVerified FeePayment[] @relation("VerifiedBy")
+  smsSent          SmsLog[]
 
   @@map("staff")
 }
@@ -131,15 +136,15 @@ model Class {
   schoolId String
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  name      String   // eg "Form 1", "Grade 5"
-  level     Int      // for ordering eg 1, 2, 3
-  isActive  Boolean  @default(true)
+  name     String // eg "Form 1", "Grade 5"
+  level    Int // for ordering eg 1, 2, 3
+  isActive Boolean @default(true)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  students     Student[]
+  students      Student[]
   feeStructures FeeStructure[]
 
   @@unique([schoolId, name])
@@ -154,18 +159,18 @@ model FeeStructure {
   classId  String
   class    Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
 
-  academicYear String  
+  academicYear String
   term         Term
-  totalAmount  Float   
-  currency     String  @default("MWK")
+  totalAmount  Float
+  currency     String @default("MWK")
 
   // Fee breakdown (optional detail)
-  tuitionFee   Float?
-  examFee      Float?
-  buildingLevy Float?
-  uniformFee   Float?
-  bookFee      Float?
-  otherFees    Float?
+  tuitionFee           Float?
+  examFee              Float?
+  buildingLevy         Float?
+  uniformFee           Float?
+  bookFee              Float?
+  otherFees            Float?
   otherFeesDescription String?
 
   isActive  Boolean  @default(true)
@@ -185,21 +190,22 @@ model Student {
   class    Class  @relation(fields: [classId], references: [id])
 
   // Auto generated unique ID shown to parents
-  studentCode   String   @unique  // eg STP-2025-001
+  studentCode String @unique // eg STP-2025-001
 
-  fullName      String
-  dateOfBirth   DateTime
-  gender        Gender
-  photo         String? 
-  isActive      Boolean  @default(true)
+  fullName    String
+  dateOfBirth DateTime
+  gender      Gender
+  photo       String?
+  isActive    Boolean  @default(true)
 
   // Parent/Guardian info
-  parentName    String
-  parentPhone   String   
-  parentPhone2  String? 
-  parentEmail   String?
+  parentName   String
+  parentPhone  String
+  parentPhone2 String?
+  parentEmail  String?
 
-  academicYear  String   @default("2025")
+  academicYear  String @default("2025")
+  creditBalance Float  @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -212,11 +218,11 @@ model Student {
 
 // Every fee payment - core of the system
 model FeePayment {
-  id       String @id @default(uuid())
-  schoolId String
-  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  id        String  @id @default(uuid())
+  schoolId  String
+  school    School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   studentId String
-  student  Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   // Payment details
   amount        Float
@@ -226,25 +232,31 @@ model FeePayment {
   academicYear  String
 
   // Receipt
-  receiptNumber  String        @unique  
-  receiptImage   String?      
-  notes          String?
+  receiptNumber String  @unique
+  receiptImage  String?
+  notes         String?
 
   // Who submitted and status
-  submittedBy    SubmittedBy
-  status         PaymentStatus @default(PENDING)
+  submittedBy SubmittedBy
+  status      PaymentStatus @default(PENDING)
 
   // For parent submission
-  parentPhone    String?      
-  bankReference  String?      
+  parentPhone   String?
+  bankReference String?
 
   // Staff tracking
-  recordedById   String?
-  recordedBy     Staff?        @relation("RecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
-  verifiedById   String?
-  verifiedBy     Staff?        @relation("VerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
-  verifiedAt     DateTime?
+  recordedById    String?
+  recordedBy      Staff?    @relation("RecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  verifiedById    String?
+  verifiedBy      Staff?    @relation("VerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedAt      DateTime?
   rejectionReason String?
+  // Debtor tracking
+  requiredAmount  Float?
+  balance         Float?
+  isDebtor        Boolean   @default(false)
+  creditApplied   Float     @default(0)
+  overpayment     Float     @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -265,18 +277,18 @@ model SmsLog {
   schoolId String
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  phone      String
-  message    String
-  type       String    
-  status     String    
-  paymentId  String?
-  payment    FeePayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
-  sentById   String?
-  sentBy     Staff?    @relation(fields: [sentById], references: [id], onDelete: SetNull)
+  phone     String
+  message   String
+  type      String
+  status    String
+  paymentId String?
+  payment   FeePayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  sentById  String?
+  sentBy    Staff?      @relation(fields: [sentById], references: [id], onDelete: SetNull)
 
   // Africa's Talking response
-  messageId  String?
-  cost       String?
+  messageId    String?
+  cost         String?
   errorMessage String?
 
   createdAt DateTime @default(now())
@@ -302,8 +314,8 @@ model AuditLog {
   id        String   @id @default(uuid())
   schoolId  String?
   staffId   String?
-  action    String   
-  entity    String   
+  action    String
+  entity    String
   entityId  String?
   changes   Json?
   ipAddress String?

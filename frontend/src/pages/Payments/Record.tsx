@@ -32,15 +32,84 @@ const RecordPayment = () => {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState<any>(null);
   const [error, setError] = useState("");
+  const [termStatus, setTermStatus] = useState<any>(null);
+  const [termStatusLoading, setTermStatusLoading] = useState(false);
+  const [overpaymentWarning, setOverpaymentWarning] = useState<number>(0);
 
   const [form, setForm] = useState({
     amount: "",
     paymentMethod: "CASH",
     term: "TERM_1",
-    academicYear: new Date().getFullYear().toString(),
+    academicYear: "2025",
     notes: "",
   });
 
+  // Fetch term status when student or term changes
+  useEffect(() => {
+    if (!selectedStudent?.id || !form.term || !form.academicYear) {
+      setTermStatus(null);
+      return;
+    }
+    const fetch = async () => {
+      setTermStatusLoading(true);
+      try {
+        const res = await api.get(
+          `/schools/student-term-status/${selectedStudent.id}?term=${form.term}&academicYear=${form.academicYear}`,
+        );
+        setTermStatus(res.data.data);
+      } catch {
+        setTermStatus(null);
+      } finally {
+        setTermStatusLoading(false);
+      }
+    };
+    fetch();
+  }, [selectedStudent, form.term, form.academicYear]);
+
+  // Calculate overpayment warning when amount changes
+  useEffect(() => {
+    if (!termStatus || !form.amount) {
+      setOverpaymentWarning(0);
+      return;
+    }
+    const entered = parseFloat(form.amount) || 0;
+    const balance = termStatus.termStatus.balanceRemaining;
+    if (balance !== null && entered > balance && balance > 0) {
+      setOverpaymentWarning(entered - balance);
+    } else if (balance === 0) {
+      setOverpaymentWarning(0);
+    } else {
+      setOverpaymentWarning(0);
+    }
+  }, [form.amount, termStatus]);
+
+  const [feeStructure, setFeeStructure] = useState<any>(null);
+  const [feeLoading, setFeeLoading] = useState(false);
+
+  // Lookup fee structure when student + term + year changes
+  useEffect(() => {
+    if (!selectedStudent || !form.term || !form.academicYear) return;
+
+    const lookupFee = async () => {
+      setFeeLoading(true);
+      try {
+        // Get the student's classId first
+        const studentRes = await api.get(`/students/${selectedStudent.id}`);
+        const classId = studentRes.data.data.classId;
+
+        const res = await api.get(
+          `/schools/fee-structures/lookup?classId=${classId}&term=${form.term}&academicYear=${form.academicYear}`,
+        );
+        setFeeStructure(res.data.data);
+      } catch {
+        setFeeStructure(null);
+      } finally {
+        setFeeLoading(false);
+      }
+    };
+
+    lookupFee();
+  }, [selectedStudent, form.term, form.academicYear]);
   // If navigated from student detail
   useEffect(() => {
     if (location.state?.studentId) {
@@ -119,6 +188,49 @@ const RecordPayment = () => {
             <span className="font-medium">{success.student?.fullName}</span>
           </div>
           <div className="flex justify-between">
+            {/* Fee Structure Info */}
+            {selectedStudent && (
+              <div
+                className={`p-4 rounded-lg border ${
+                  feeStructure
+                    ? "bg-blue-50 border-blue-200"
+                    : "bg-yellow-50 border-yellow-200"
+                }`}
+              >
+                {feeLoading ? (
+                  <p className="text-sm text-gray-500">
+                    Loading fee information...
+                  </p>
+                ) : feeStructure ? (
+                  <div>
+                    <p className="text-sm font-medium text-blue-800">
+                      Required Fee: MWK{" "}
+                      {feeStructure.totalAmount.toLocaleString()}
+                    </p>
+                    {feeStructure.tuitionFee && (
+                      <p className="text-xs text-blue-600 mt-1">
+                        Tuition: MWK {feeStructure.tuitionFee.toLocaleString()}
+                        {feeStructure.examFee
+                          ? ` • Exam: MWK ${feeStructure.examFee.toLocaleString()}`
+                          : ""}
+                        {feeStructure.buildingLevy
+                          ? ` • Building: MWK ${feeStructure.buildingLevy.toLocaleString()}`
+                          : ""}
+                      </p>
+                    )}
+                    <p className="text-xs text-blue-500 mt-1">
+                      Paying less than the required amount will mark this
+                      student as a debtor
+                    </p>
+                  </div>
+                ) : (
+                  <p className="text-sm text-yellow-700">
+                    No fee structure set for this class and term. Contact admin
+                    to set fees first.
+                  </p>
+                )}
+              </div>
+            )}
             <span className="text-gray-500">Amount</span>
             <span className="font-medium text-green-600">
               MWK {success.amount?.toLocaleString()}
@@ -264,6 +376,131 @@ const RecordPayment = () => {
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-4">
             <h3 className="font-medium text-gray-800">Payment Details</h3>
+
+            {/* Fee Status Panel */}
+            {termStatusLoading && (
+              <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <p className="text-sm text-gray-500">
+                  Loading fee information...
+                </p>
+              </div>
+            )}
+
+            {termStatus && !termStatusLoading && (
+              <div className="space-y-3">
+                {/* Fee Structure Info */}
+                {termStatus.termStatus.hasFeeStructure ? (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-sm font-semibold text-blue-900">
+                        Term Fee Breakdown
+                      </p>
+                      <span className="text-sm font-bold text-blue-900">
+                        MWK{" "}
+                        {termStatus.termStatus.requiredAmount?.toLocaleString()}
+                      </span>
+                    </div>
+                    {termStatus.feeStructure?.tuitionFee && (
+                      <div className="space-y-1 text-xs text-blue-700">
+                        {termStatus.feeStructure.tuitionFee && (
+                          <div className="flex justify-between">
+                            <span>Tuition</span>
+                            <span>
+                              MWK{" "}
+                              {termStatus.feeStructure.tuitionFee.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        {termStatus.feeStructure.examFee && (
+                          <div className="flex justify-between">
+                            <span>Exam Fee</span>
+                            <span>
+                              MWK{" "}
+                              {termStatus.feeStructure.examFee.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                        {termStatus.feeStructure.buildingLevy && (
+                          <div className="flex justify-between">
+                            <span>Building Levy</span>
+                            <span>
+                              MWK{" "}
+                              {termStatus.feeStructure.buildingLevy.toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    <div className="border-t border-blue-200 mt-2 pt-2 grid grid-cols-3 gap-2 text-center">
+                      <div>
+                        <p className="text-xs text-blue-600">Already Paid</p>
+                        <p className="text-sm font-bold text-blue-900">
+                          MWK{" "}
+                          {termStatus.termStatus.totalPaidThisTerm.toLocaleString()}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-blue-600">Balance Due</p>
+                        <p
+                          className={`text-sm font-bold ${termStatus.termStatus.balanceRemaining === 0 ? "text-green-600" : "text-red-600"}`}
+                        >
+                          {termStatus.termStatus.balanceRemaining === 0
+                            ? "✓ Fully Paid"
+                            : `MWK ${termStatus.termStatus.balanceRemaining?.toLocaleString()}`}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-blue-600">Credit Balance</p>
+                        <p
+                          className={`text-sm font-bold ${termStatus.termStatus.creditBalance > 0 ? "text-purple-600" : "text-gray-400"}`}
+                        >
+                          {termStatus.termStatus.creditBalance > 0
+                            ? `MWK ${termStatus.termStatus.creditBalance.toLocaleString()}`
+                            : "None"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+                    <p className="text-sm text-yellow-800">
+                      ⚠️ No fee structure set for this class and term. Admin
+                      must set fees first.
+                    </p>
+                  </div>
+                )}
+
+                {/* Overpayment Warning */}
+                {overpaymentWarning > 0 && (
+                  <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
+                    <p className="text-sm font-medium text-purple-800">
+                      💡 Overpayment Detected
+                    </p>
+                    <p className="text-xs text-purple-600 mt-1">
+                      MWK{" "}
+                      {termStatus.termStatus.balanceRemaining?.toLocaleString()}{" "}
+                      will clear the balance. MWK{" "}
+                      {overpaymentWarning.toLocaleString()} will be saved as
+                      credit for the next term.
+                    </p>
+                  </div>
+                )}
+
+                {/* Already fully paid warning */}
+                {termStatus.termStatus.isFullyPaid && (
+                  <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <p className="text-sm font-medium text-green-800">
+                      ✅ This student has already paid in full for{" "}
+                      {form.term.replace("_", " ")}.
+                    </p>
+                    <p className="text-xs text-green-600 mt-1">
+                      Any additional payment will be saved as credit for the
+                      next term.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
 
             <div className="grid grid-cols-2 gap-4">
               <div>
