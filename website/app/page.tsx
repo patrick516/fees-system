@@ -1,10 +1,9 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { School, Eye, EyeOff, Loader2, ChevronRight } from "lucide-react";
 import api from "../lib/axios";
 import { useAuthStore } from "../store/authStore";
-
 type LoginMethod = "student-id" | "phone";
 
 export default function LoginPage() {
@@ -23,6 +22,19 @@ export default function LoginPage() {
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
+
+  const [schoolBranding, setSchoolBranding] = useState<{
+    name: string;
+    logo: string | null;
+    motto?: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    api
+      .get("/schools/public")
+      .then((res) => setSchoolBranding(res.data.data))
+      .catch(() => setSchoolBranding(null));
+  }, []);
 
   const handleStudentIdLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,10 +97,23 @@ export default function LoginPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 flex flex-col items-center justify-center p-4">
       {/* Logo */}
       <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
-          <School size={32} className="text-blue-900" />
+        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg overflow-hidden">
+          {schoolBranding?.logo ? (
+            <img
+              src={schoolBranding.logo}
+              alt={schoolBranding.name}
+              className="w-full h-full object-contain"
+            />
+          ) : (
+            <School size={32} className="text-blue-900" />
+          )}
         </div>
         <h1 className="text-2xl font-bold text-white">SchoolPay</h1>
+        {schoolBranding?.name && (
+          <p className="text-blue-100 text-sm font-medium mt-1">
+            {schoolBranding.name}
+          </p>
+        )}
         <p className="text-blue-200 text-sm mt-1">Parent & Guardian Portal</p>
       </div>
 

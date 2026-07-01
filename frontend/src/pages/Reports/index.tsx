@@ -16,6 +16,7 @@ import {
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import api from "../../lib/axios";
+import { useSchoolSettings } from "../../hooks/useSchoolSettings";
 
 const termOptions = [
   { value: "", label: "All Terms" },
@@ -41,6 +42,7 @@ const statusLabels: Record<string, string> = {
 const formatMWK = (amount: number) => `MWK ${(amount || 0).toLocaleString()}`;
 
 export default function ReportsPage() {
+  const { settings } = useSchoolSettings();
   const [classes, setClasses] = useState<any[]>([]);
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -85,7 +87,8 @@ export default function ReportsPage() {
 
     // Sheet 1 — Summary
     const summaryData = [
-      ["SCHOOL FEES REPORT"],
+      [settings?.name || "SCHOOL FEES REPORT"],
+      ...(settings?.motto ? [[settings.motto]] : []),
       [`Generated: ${new Date().toLocaleDateString("en-GB")}`],
       [`Academic Year: ${filters.academicYear}`],
       [`Term: ${filters.term ? filters.term.replace("_", " ") : "All Terms"}`],
@@ -232,7 +235,9 @@ export default function ReportsPage() {
 </head>
 <body>
   <div class="header">
-    <h1>School Fees Report</h1>
+    ${settings?.logo ? `<img src="${settings.logo}" alt="Logo" style="width:56px;height:56px;object-fit:contain;margin-bottom:8px;" />` : ""}
+    <h1>${settings?.name || "School Fees Report"}</h1>
+    ${settings?.motto ? `<p style="font-style:italic;color:#1e3a5f;">"${settings.motto}"</p>` : ""}
     <p>Academic Year: ${filters.academicYear} &nbsp;|&nbsp; ${termLabel} &nbsp;|&nbsp; ${classLabel}</p>
     <p>Generated: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })}</p>
   </div>
@@ -356,8 +361,8 @@ export default function ReportsPage() {
     </tbody>
   </table>
 
-  <div class="footer">
-    SchoolPay Malawi &nbsp;|&nbsp; Confidential &nbsp;|&nbsp; ${new Date().toLocaleDateString("en-GB")}
+ <div class="footer">
+    ${settings?.name || "SchoolPay Malawi"} &nbsp;|&nbsp; Confidential &nbsp;|&nbsp; ${new Date().toLocaleDateString("en-GB")}
   </div>
 </body>
 </html>`;
@@ -775,8 +780,8 @@ export default function ReportsPage() {
 
           {/* Report footer */}
           <div className="text-center text-xs text-gray-400 py-2">
-            Report generated on {new Date().toLocaleString("en-GB")} • SchoolPay
-            Malawi
+            Report generated on {new Date().toLocaleString("en-GB")} •{" "}
+            {settings?.name || "SchoolPay Malawi"}
           </div>
         </>
       )}

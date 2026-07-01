@@ -93,14 +93,27 @@ export default function DashboardPage() {
         <div className="max-w-lg mx-auto px-4 py-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center">
-                <School size={16} />
+              <div className="w-8 h-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center overflow-hidden">
+                {student?.school?.logo ? (
+                  <img
+                    src={student.school.logo}
+                    alt={student.school.name}
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <School size={16} />
+                )}
               </div>
               <div>
                 <p className="text-xs text-blue-200 leading-tight">SchoolPay</p>
                 <p className="text-xs font-medium truncate max-w-[150px] leading-tight">
                   {student?.school?.name}
                 </p>
+                {student?.school?.motto && (
+                  <p className="text-[9px] italic text-blue-300 truncate max-w-[150px] leading-tight">
+                    "{student.school.motto}"
+                  </p>
+                )}
               </div>
             </div>
             <button

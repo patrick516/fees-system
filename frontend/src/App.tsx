@@ -13,6 +13,7 @@ import PendingPayments from "./pages/Payments/Pending";
 import ClassesPage from "./pages/Classes/index";
 import SMSPage from "./pages/SMS/index";
 import ReportsPage from "./pages/Reports/index";
+import SettingsPage from "./pages/Settings/index";
 
 // Layout
 import MainLayout from "./components/Layout/MainLayout";
@@ -30,6 +31,7 @@ function App() {
       <Routes>
         {/* Public */}
         <Route path="/login" element={<Login />} />
+        <Route path="/login/:slug" element={<Login />} />
 
         {/* Protected */}
         <Route
@@ -51,6 +53,7 @@ function App() {
           <Route path="classes" element={<ClassesPage />} />
           <Route path="sms" element={<SMSPage />} />
           <Route path="reports" element={<ReportsPage />} />
+          <Route path="settings" element={<SettingsPage />} />
         </Route>
 
         {/* Catch all */}

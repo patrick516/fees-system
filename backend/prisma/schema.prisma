@@ -69,11 +69,13 @@ model School {
   platform   Platform @relation(fields: [platformId], references: [id])
 
   name    String
+  slug    String? @unique
   address String
   city    String
   phone   String
   email   String?
   logo    String?
+  motto   String?
 
   // Subscription to YOUR platform
   isActive         Boolean   @default(true)

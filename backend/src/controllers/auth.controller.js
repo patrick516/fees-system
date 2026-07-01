@@ -2,7 +2,7 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const prisma = require("../config/db");
 
-// ==================== HELPERS ====================
+//  HELPERS
 
 const generateToken = (payload) => {
   return jwt.sign(payload, process.env.JWT_SECRET, {
@@ -14,7 +14,7 @@ const generateOTP = () => {
   return Math.floor(100000 + Math.random() * 900000).toString();
 };
 
-// ==================== STAFF AUTH ====================
+//  STAFF AUTH
 
 // POST /api/auth/staff/login
 const staffLogin = async (req, res) => {
@@ -40,6 +40,7 @@ const staffLogin = async (req, res) => {
             address: true,
             phone: true,
             logo: true,
+            motto: true,
             isActive: true,
           },
         },
@@ -140,6 +141,7 @@ const getStaffProfile = async (req, res) => {
             address: true,
             phone: true,
             logo: true,
+            motto: true,
           },
         },
       },
@@ -239,6 +241,7 @@ const parentLoginWithStudentId = async (req, res) => {
             address: true,
             phone: true,
             logo: true,
+            motto: true,
           },
         },
         class: {
@@ -459,6 +462,7 @@ const verifyOTP = async (req, res) => {
             address: true,
             phone: true,
             logo: true,
+            motto: true,
           },
         },
         class: {

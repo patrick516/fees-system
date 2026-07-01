@@ -7,9 +7,9 @@ interface AuthState {
   staff: Staff | null;
   isAuthenticated: boolean;
   login: (token: string, staff: Staff) => void;
+  setStaff: (staff: Staff) => void;
   logout: () => void;
 }
-
 export const useAuthStore = create<AuthState>()(
   persist(
     (set) => ({
@@ -20,6 +20,9 @@ export const useAuthStore = create<AuthState>()(
       login: (token, staff) => {
         localStorage.setItem("token", token);
         set({ token, staff, isAuthenticated: true });
+      },
+      setStaff: (staff) => {
+        set({ staff });
       },
 
       logout: () => {

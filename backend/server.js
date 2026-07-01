@@ -62,6 +62,7 @@ const schoolRoutes = require("./src/routes/school.routes");
 const smsRoutes = require("./src/routes/sms.routes");
 const reportRoutes = require("./src/routes/report.routes");
 
+// MOUNT ROUTES WITH /api PREFIX (as frontend expects)
 app.use("/api/auth", authRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/payments", paymentRoutes);
@@ -77,7 +78,7 @@ app.use((req, res) => {
   });
 });
 
-// errorr handling middleware
+// error handling middleware
 app.use((err, req, res, next) => {
   console.error("Error:", err.message);
   res.status(err.status || 500).json({
@@ -89,8 +90,7 @@ app.use((err, req, res, next) => {
 
 //starting the server
 const PORT = process.env.PORT || 5000;
-
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`
   ================================
   SchoolPay API Server Running
@@ -98,6 +98,22 @@ app.listen(PORT, () => {
   Environment: ${process.env.NODE_ENV}
   ================================
   `);
+});
+
+server.on("close", () => {
+  console.log("SERVER CLOSED");
+});
+
+process.on("exit", (code) => {
+  console.log("PROCESS EXITED WITH CODE:", code);
+});
+
+process.on("uncaughtException", (err) => {
+  console.error("UNCAUGHT EXCEPTION:", err);
+});
+
+process.on("unhandledRejection", (err) => {
+  console.error("UNHANDLED REJECTION:", err);
 });
 
 module.exports = app;

@@ -1,9 +1,12 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
 const { verifyStaff, verifyParent } = require("../middleware/auth");
 const { isAdmin, isBursar } = require("../middleware/role");
 const prisma = require("../config/db");
+const schoolController = require("../controllers/school.controller");
 
+const upload = multer({ storage: multer.memoryStorage() });
 // ==================== CLASSES ====================
 
 // GET /api/schools/classes
@@ -746,5 +749,21 @@ router.get("/payment-info/:schoolId", async (req, res) => {
       .json({ success: false, message: "Failed to get payment info" });
   }
 });
+
+// ==================== SETTINGS (school identity: name, motto, logo) ====================
+
+router.get("/settings", verifyStaff, schoolController.getSettings);
+router.put("/settings", verifyStaff, isAdmin, schoolController.updateSettings);
+router.post(
+  "/settings/logo",
+  verifyStaff,
+  isAdmin,
+  upload.single("logo"),
+  schoolController.uploadLogo,
+);
+router.get("/public", schoolController.getPublicSchool);
+router.get("/public/:schoolId", schoolController.getPublicInfo);
+router.get("/lookup-by-email", schoolController.lookupByEmail);
+router.get("/by-slug/:slug", schoolController.getBySlug);
 
 module.exports = router;

@@ -2,8 +2,11 @@ export interface School {
   id: string;
   name: string;
   address: string;
+  city?: string;
   phone: string;
+  email?: string | null;
   logo: string | null;
+  motto?: string | null;
   isActive: boolean;
 }
 

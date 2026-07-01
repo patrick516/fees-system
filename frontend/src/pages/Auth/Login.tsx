@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import api from "../../lib/axios";
 import { School, Eye, EyeOff, Loader2 } from "lucide-react";
@@ -8,10 +8,38 @@ const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuthStore();
 
+  const { slug } = useParams();
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [schoolBranding, setSchoolBranding] = useState<{
+    name: string;
+    logo: string | null;
+    motto: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    // 1. If a slug is in the URL, that always takes priority (e.g. shared
+    //    branded links, or a different school signing in on a shared device).
+    if (slug) {
+      api
+        .get(`/schools/by-slug/${slug}`)
+        .then((res) => setSchoolBranding(res.data.data))
+        .catch(() => setSchoolBranding(null));
+      return;
+    }
+
+    // 2. Otherwise, fall back to whatever school last logged in on this device.
+    const stored = localStorage.getItem("lastSchoolBranding");
+    if (stored) {
+      try {
+        setSchoolBranding(JSON.parse(stored));
+      } catch {
+        setSchoolBranding(null);
+      }
+    }
+  }, [slug]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,6 +50,20 @@ const Login = () => {
       const res = await api.post("/auth/staff/login", form);
       const { token, staff } = res.data.data;
       login(token, staff);
+
+      // Remember this school's branding on this device so /login shows it
+      // automatically next time, without needing the slug in the URL.
+      if (staff.school) {
+        localStorage.setItem(
+          "lastSchoolBranding",
+          JSON.stringify({
+            name: staff.school.name,
+            logo: staff.school.logo,
+            motto: staff.school.motto,
+          }),
+        );
+      }
+
       navigate("/dashboard");
     } catch (err: any) {
       setError(
@@ -37,13 +79,31 @@ const Login = () => {
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
         {/* Logo */}
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-900 rounded-2xl flex items-center justify-center mx-auto mb-4">
-            <School size={32} className="text-white" />
+          <div className="w-16 h-16 bg-blue-900 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden">
+            {schoolBranding?.logo ? (
+              <img
+                src={schoolBranding.logo}
+                alt={schoolBranding.name}
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <School size={32} className="text-white" />
+            )}
           </div>
           <h1 className="text-2xl font-bold text-gray-900">SchoolPay</h1>
+          {schoolBranding?.name && (
+            <p className="text-gray-700 text-sm font-medium mt-1">
+              {schoolBranding.name}
+            </p>
+          )}
           <p className="text-gray-500 text-sm mt-1">
             Staff Portal — Sign in to continue
           </p>
+          {schoolBranding?.motto && (
+            <p className="text-blue-700 text-xs italic mt-1">
+              "{schoolBranding.motto}"
+            </p>
+          )}
         </div>
 
         {/* Error */}
