@@ -17,9 +17,34 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 
 app.use(
   cors({
-    origin: [process.env.FRONTEND_URL, process.env.WEBSITE_URL],
+    origin: function (origin, callback) {
+      // Allow requests with no origin (curl, mobile, server-to-server)
+      if (!origin) return callback(null, true);
+
+      const allowed = [
+        process.env.FRONTEND_URL,
+        process.env.WEBSITE_URL,
+        "http://localhost:5173",
+        "http://localhost:3000",
+      ]
+        .filter(Boolean)
+        .map((u) => u.replace(/\/$/, "")); // strip trailing slash
+
+      const cleanOrigin = origin.replace(/\/$/, "");
+
+      // Exact match OR any *.vercel.app preview URL for your projects
+      if (
+        allowed.includes(cleanOrigin) ||
+        /^https:\/\/fees-system-[a-z0-9]+-.*\.vercel\.app$/.test(cleanOrigin) ||
+        cleanOrigin === "https://fees-system-8z3u.vercel.app"
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(new Error(`CORS blocked: ${cleanOrigin}`));
+    },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
   }),
 );

@@ -8,7 +8,6 @@
     "types": ["vite/client"],
     "skipLibCheck": true,
 
-    /* ✅ ADD THESE TWO */
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"]
