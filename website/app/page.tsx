@@ -6,6 +6,9 @@ import api from "../lib/axios";
 import { useAuthStore } from "../store/authStore";
 type LoginMethod = "student-id" | "phone";
 
+const NAVY = "#0B1F44";
+const NAVY_HOVER = "#0A1A3A";
+
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuthStore();
@@ -94,55 +97,70 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 via-blue-800 to-blue-700 flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
       {/* Logo */}
-      <div className="text-center mb-8">
-        <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg overflow-hidden">
+      <div className="mb-6 flex flex-col items-center animate-fade-in">
+        <div className="w-16 h-16 bg-[#0B1F44] rounded-2xl flex items-center justify-center mb-4 overflow-hidden shadow-sm">
           {schoolBranding?.logo ? (
             <img
               src={schoolBranding.logo}
-              alt={schoolBranding.name}
-              className="w-full h-full object-contain"
+              alt={schoolBranding.name || "School"}
+              className="w-full h-full object-contain bg-white"
             />
           ) : (
-            <School size={32} className="text-blue-900" />
+            <School size={30} className="text-white" />
           )}
         </div>
-        <h1 className="text-2xl font-bold text-white">SchoolPay</h1>
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+          SchoolPay
+        </h1>
         {schoolBranding?.name && (
-          <p className="text-blue-100 text-sm font-medium mt-1">
+          <p className="text-sm text-gray-500 font-medium mt-1">
             {schoolBranding.name}
           </p>
         )}
-        <p className="text-blue-200 text-sm mt-1">Parent & Guardian Portal</p>
+        <p className="text-sm text-gray-400 mt-1">
+          Parent &amp; Guardian Portal
+        </p>
       </div>
 
       {/* Card */}
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+      <div className="w-full max-w-sm bg-white border border-gray-200 rounded-2xl p-6 animate-fade-in-up">
         {/* Method Toggle */}
-        <div className="flex bg-gray-100 rounded-xl p-1 mb-6">
+        <div className="relative flex bg-gray-100 rounded-xl p-1 mb-6">
+          {/* Sliding pill */}
+          <span
+            className={`absolute top-1 bottom-1 w-[calc(50%-0.25rem)] rounded-lg bg-white shadow-sm transition-transform duration-300 ease-out ${
+              method === "student-id"
+                ? "translate-x-0"
+                : "translate-x-[calc(100%+0.5rem)]"
+            }`}
+            aria-hidden
+          />
           <button
+            type="button"
             onClick={() => {
               setMethod("student-id");
               setError("");
             }}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+            className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
               method === "student-id"
-                ? "bg-white text-blue-900 shadow-sm"
-                : "text-gray-500"
+                ? "text-[#0B1F44]"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
             Student ID
           </button>
           <button
+            type="button"
             onClick={() => {
               setMethod("phone");
               setError("");
             }}
-            className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all ${
+            className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
               method === "phone"
-                ? "bg-white text-blue-900 shadow-sm"
-                : "text-gray-500"
+                ? "text-[#0B1F44]"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
             Phone Number
@@ -150,15 +168,23 @@ export default function LoginPage() {
         </div>
 
         {/* Error */}
-        {error && (
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm mb-4">
+        <div
+          className={`overflow-hidden transition-all duration-300 ease-out ${
+            error ? "max-h-40 opacity-100 mb-4" : "max-h-0 opacity-0 mb-0"
+          }`}
+        >
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
             {error}
           </div>
-        )}
+        </div>
 
         {/* Student ID Form */}
         {method === "student-id" && (
-          <form onSubmit={handleStudentIdLogin} className="space-y-4">
+          <form
+            onSubmit={handleStudentIdLogin}
+            className="space-y-4 animate-fade-in"
+            key="student-id"
+          >
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Student ID
@@ -169,28 +195,28 @@ export default function LoginPage() {
                 onChange={(e) => setStudentCode(e.target.value.toUpperCase())}
                 placeholder="eg. STP-2025-001"
                 required
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm font-mono text-gray-900 placeholder-gray-400 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent"
               />
-              <p className="text-xs text-gray-400 mt-1">
-                Found on your child's admission letter
+              <p className="text-xs text-gray-400 mt-1.5">
+                Found on your child&apos;s admission letter
               </p>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Child's Date of Birth
+                Child&apos;s Date of Birth
               </label>
               <input
                 type="date"
                 value={dateOfBirth}
                 onChange={(e) => setDateOfBirth(e.target.value)}
                 required
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm text-gray-900 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent"
               />
             </div>
             <button
               type="submit"
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-blue-900 text-white py-3 rounded-xl font-medium text-sm hover:bg-blue-800 disabled:bg-blue-300 transition-colors"
+              className="group w-full flex items-center justify-center gap-2 bg-[#0B1F44] text-white py-3 rounded-xl font-medium text-sm transition-all duration-300 hover:bg-[#0A1A3A] disabled:bg-[#0B1F44]/50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
@@ -198,7 +224,11 @@ export default function LoginPage() {
                 </>
               ) : (
                 <>
-                  View My Child's Account <ChevronRight size={16} />
+                  View My Child&apos;s Account
+                  <ChevronRight
+                    size={16}
+                    className="transition-transform duration-300 group-hover:translate-x-0.5"
+                  />
                 </>
               )}
             </button>
@@ -207,7 +237,7 @@ export default function LoginPage() {
 
         {/* Phone OTP Form */}
         {method === "phone" && (
-          <div className="space-y-4">
+          <div className="space-y-4 animate-fade-in" key="phone">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Phone Number
@@ -219,13 +249,14 @@ export default function LoginPage() {
                   onChange={(e) => setPhone(e.target.value)}
                   placeholder="+265999123456"
                   disabled={otpSent}
-                  className="flex-1 px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-50"
+                  className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
                 />
                 {!otpSent && (
                   <button
+                    type="button"
                     onClick={handleRequestOTP}
                     disabled={otpLoading || !phone.trim()}
-                    className="px-4 py-3 bg-blue-900 text-white rounded-xl text-sm font-medium disabled:opacity-40 hover:bg-blue-800 whitespace-nowrap"
+                    className="px-4 py-3 bg-[#0B1F44] text-white rounded-xl text-sm font-medium transition-all duration-300 hover:bg-[#0A1A3A] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap flex items-center justify-center min-w-[92px]"
                   >
                     {otpLoading ? (
                       <Loader2 size={16} className="animate-spin" />
@@ -235,13 +266,17 @@ export default function LoginPage() {
                   </button>
                 )}
               </div>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-gray-400 mt-1.5">
                 Use the phone number registered with the school
               </p>
             </div>
 
-            {otpSent && (
-              <form onSubmit={handleVerifyOTP} className="space-y-4">
+            <div
+              className={`overflow-hidden transition-all duration-500 ease-out ${
+                otpSent ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+              }`}
+            >
+              <form onSubmit={handleVerifyOTP} className="space-y-4 pt-2">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1.5">
                     Verification Code
@@ -249,21 +284,21 @@ export default function LoginPage() {
                   <input
                     type="text"
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value)}
+                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
                     placeholder="Enter 6-digit code"
                     maxLength={6}
                     required
                     autoFocus
-                    className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-center text-lg font-mono tracking-widest"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-center text-lg font-mono tracking-[0.5em] text-gray-900 placeholder-gray-300 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent"
                   />
-                  <p className="text-xs text-gray-400 mt-1 text-center">
+                  <p className="text-xs text-gray-400 mt-1.5 text-center">
                     Code sent to {phone}
                   </p>
                 </div>
                 <button
                   type="submit"
                   disabled={loading || otp.length < 6}
-                  className="w-full flex items-center justify-center gap-2 bg-blue-900 text-white py-3 rounded-xl font-medium text-sm hover:bg-blue-800 disabled:bg-blue-300 transition-colors"
+                  className="group w-full flex items-center justify-center gap-2 bg-[#0B1F44] text-white py-3 rounded-xl font-medium text-sm transition-all duration-300 hover:bg-[#0A1A3A] disabled:bg-[#0B1F44]/50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <>
@@ -272,7 +307,11 @@ export default function LoginPage() {
                     </>
                   ) : (
                     <>
-                      Verify & Continue <ChevronRight size={16} />
+                      Verify &amp; Continue
+                      <ChevronRight
+                        size={16}
+                        className="transition-transform duration-300 group-hover:translate-x-0.5"
+                      />
                     </>
                   )}
                 </button>
@@ -283,12 +322,12 @@ export default function LoginPage() {
                     setOtp("");
                     setPhone("");
                   }}
-                  className="w-full text-sm text-gray-500 hover:text-gray-700"
+                  className="w-full text-sm text-gray-500 hover:text-gray-800 transition-colors duration-300"
                 >
                   Use a different number
                 </button>
               </form>
-            )}
+            </div>
           </div>
         )}
 
@@ -297,7 +336,7 @@ export default function LoginPage() {
         </p>
       </div>
 
-      <p className="text-blue-300 text-xs mt-6">
+      <p className="text-xs text-gray-400 mt-6">
         SchoolPay Malawi © {new Date().getFullYear()}
       </p>
     </div>
