@@ -7,8 +7,8 @@ import { School, Eye, EyeOff, Loader2 } from "lucide-react";
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuthStore();
-
   const { slug } = useParams();
+
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -20,8 +20,6 @@ const Login = () => {
   } | null>(null);
 
   useEffect(() => {
-    // 1. If a slug is in the URL, that always takes priority (e.g. shared
-    //    branded links, or a different school signing in on a shared device).
     if (slug) {
       api
         .get(`/schools/by-slug/${slug}`)
@@ -29,8 +27,6 @@ const Login = () => {
         .catch(() => setSchoolBranding(null));
       return;
     }
-
-    // 2. Otherwise, fall back to whatever school last logged in on this device.
     const stored = localStorage.getItem("lastSchoolBranding");
     if (stored) {
       try {
@@ -51,8 +47,6 @@ const Login = () => {
       const { token, staff } = res.data.data;
       login(token, staff);
 
-      // Remember this school's branding on this device so /login shows it
-      // automatically next time, without needing the slug in the URL.
       if (staff.school) {
         localStorage.setItem(
           "lastSchoolBranding",
@@ -63,7 +57,6 @@ const Login = () => {
           }),
         );
       }
-
       navigate("/dashboard");
     } catch (err: any) {
       setError(
@@ -75,57 +68,50 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
-        {/* Logo */}
-        <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-blue-900 rounded-2xl flex items-center justify-center mx-auto mb-4 overflow-hidden">
-            {schoolBranding?.logo ? (
-              <img
-                src={schoolBranding.logo}
-                alt={schoolBranding.name}
-                className="w-full h-full object-contain"
-              />
-            ) : (
-              <School size={32} className="text-white" />
-            )}
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
+      {/* Logo (kept as-is, just centered above the card) */}
+      <div className="mb-6 flex items-center justify-center">
+        {schoolBranding?.logo ? (
+          <img
+            src={schoolBranding.logo}
+            alt={schoolBranding.name || "School"}
+            className="h-16 w-auto object-contain"
+          />
+        ) : (
+          <div className="w-14 h-14 bg-[#0B1F44] rounded-2xl flex items-center justify-center">
+            <School size={28} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">SchoolPay</h1>
-          {schoolBranding?.name && (
-            <p className="text-gray-700 text-sm font-medium mt-1">
-              {schoolBranding.name}
-            </p>
-          )}
-          <p className="text-gray-500 text-sm mt-1">
-            Staff Portal — Sign in to continue
-          </p>
-          {schoolBranding?.motto && (
-            <p className="text-blue-700 text-xs italic mt-1">
-              "{schoolBranding.motto}"
-            </p>
-          )}
-        </div>
+        )}
+      </div>
 
-        {/* Error */}
+      {/* Heading */}
+      <h1 className="text-3xl font-bold text-gray-900 text-center tracking-tight">
+        Welcome back
+      </h1>
+      <p className="text-sm text-gray-500 mt-2 mb-8 text-center">
+        Welcome back. Let&apos;s get your work done.
+      </p>
+
+      {/* Card */}
+      <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl p-8">
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-6">
             {error}
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email Address
+              Username
             </label>
             <input
               type="email"
               value={form.email}
               onChange={(e) => setForm({ ...form, email: e.target.value })}
-              placeholder="your@email.com"
+              placeholder="stAndrews"
               required
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent transition-all duration-300"
             />
           </div>
 
@@ -138,14 +124,15 @@ const Login = () => {
                 type={showPassword ? "text" : "password"}
                 value={form.password}
                 onChange={(e) => setForm({ ...form, password: e.target.value })}
-                placeholder="Enter your password"
+                placeholder="••••••••"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm pr-12"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent transition-all duration-300 pr-12"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors duration-300"
+                aria-label={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
               </button>
@@ -155,17 +142,36 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-blue-900 hover:bg-blue-800 disabled:bg-blue-300 text-white font-medium py-3 rounded-lg transition-colors flex items-center justify-center gap-2"
+            className="w-full bg-[#0B1F44] hover:bg-[#0a1a3a] disabled:bg-[#0B1F44]/50 text-white font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
           >
             {loading && <Loader2 size={18} className="animate-spin" />}
-            {loading ? "Signing in..." : "Sign In"}
+            {loading ? "Signing in..." : "Sign in"}
           </button>
         </form>
-
-        <p className="text-center text-gray-400 text-xs mt-8">
-          SchoolPay Malawi © {new Date().getFullYear()}
-        </p>
       </div>
+
+      {/* Divider with "Contact IT if you need help" */}
+      <div className="w-full max-w-md mt-8 flex items-center gap-4">
+        <div className="flex-1 h-px bg-gray-200" />
+        <span className="text-xs text-gray-500 whitespace-nowrap">
+          Contact{" "}
+          <a
+            href="mailto:it@standrews.mw"
+            className="text-[#0B1F44] font-medium hover:underline transition-colors duration-300"
+          >
+            IT
+          </a>{" "}
+          if you need help
+        </span>
+        <div className="flex-1 h-px bg-gray-200" />
+      </div>
+
+      {/* Footer */}
+      <p className="text-xs text-gray-400 mt-8 text-center">
+        © {new Date().getFullYear()}{" "}
+        {schoolBranding?.name || "St. Andrew's International High School"}. All
+        rights reserved.
+      </p>
     </div>
   );
 };
