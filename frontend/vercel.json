@@ -1,0 +1,21 @@
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/(.*)",
+      "has": [
+        {
+          "type": "host",
+          "value": "admin-cinematicsystems.vercel.app"
+        }
+      ],
+      "destination": "https://admin.cinematicsystems.co.za/$1",
+      "permanent": true
+    }
+  ]
+}
