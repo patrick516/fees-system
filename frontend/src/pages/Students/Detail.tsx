@@ -15,6 +15,7 @@ import {
   TrendingUp,
   Receipt,
   BadgeAlert,
+  Cake,
 } from "lucide-react";
 import api from "../../lib/axios";
 
@@ -167,6 +168,17 @@ const StudentDetail = () => {
               <span>
                 {student.gender === "MALE" ? "Male" : "Female"} • Academic Year{" "}
                 {student.academicYear}
+              </span>
+            </div>
+            <div className="flex items-center gap-3 text-gray-600">
+              <Cake size={15} className="text-gray-400 shrink-0" />
+              <span>
+                Born{" "}
+                {new Date(student.dateOfBirth).toLocaleDateString("en-GB", {
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })}
               </span>
             </div>
             <div className="flex items-center gap-3 text-gray-600">
