@@ -1,9 +1,23 @@
 "use client";
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { School, Eye, EyeOff, Loader2, ChevronRight } from "lucide-react";
+import {
+  School,
+  Eye,
+  EyeOff,
+  Loader2,
+  ChevronRight,
+  CalendarIcon,
+} from "lucide-react";
+import { format } from "date-fns";
 import api from "../lib/axios";
 import { useAuthStore } from "../store/authStore";
+import { Calendar } from "../components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../components/ui/popover";
 type LoginMethod = "student-id" | "phone";
 
 const NAVY = "#0B1F44";
@@ -29,7 +43,8 @@ export default function LoginPage() {
 
   // Student ID login
   const [studentCode, setStudentCode] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState("");
+  const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>(undefined);
+  const [dobOpen, setDobOpen] = useState(false);
 
   // Phone OTP login
   const [phone, setPhone] = useState("");
@@ -83,11 +98,17 @@ export default function LoginPage() {
   const handleStudentIdLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!dateOfBirth) {
+      setError("Please select your child's date of birth");
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await api.post("/auth/parent/login-student-id", {
         studentCode: studentCode.toUpperCase().trim(),
-        dateOfBirth,
+        dateOfBirth: format(dateOfBirth, "yyyy-MM-dd"),
       });
       const { token, student } = res.data.data;
       login(token, student);
@@ -244,18 +265,54 @@ export default function LoginPage() {
                 Found on your child&apos;s admission letter
               </p>
             </div>
+
+            {/* Child's DOB — shadcn DatePicker */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Child&apos;s Date of Birth
               </label>
-              <input
-                type="date"
-                value={dateOfBirth}
-                onChange={(e) => setDateOfBirth(e.target.value)}
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm text-gray-900 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent"
-              />
+              <Popover open={dobOpen} onOpenChange={setDobOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-xl text-sm text-left outline-none transition-all duration-300 focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent"
+                  >
+                    <span
+                      className={
+                        dateOfBirth ? "text-gray-900" : "text-gray-400"
+                      }
+                    >
+                      {dateOfBirth
+                        ? format(dateOfBirth, "dd/MM/yyyy")
+                        : "dd/mm/yyyy"}
+                    </span>
+                    <CalendarIcon size={16} className="text-gray-400" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[300px] p-0 bg-white border border-gray-200 rounded-xl shadow-lg"
+                  align="start"
+                >
+                  <Calendar
+                    mode="single"
+                    selected={dateOfBirth}
+                    onSelect={(d) => {
+                      setDateOfBirth(d);
+                      setDobOpen(false);
+                    }}
+                    disabled={(d) =>
+                      d > new Date() || d < new Date("1950-01-01")
+                    }
+                    captionLayout="dropdown"
+                    startMonth={new Date(1950, 0)}
+                    endMonth={new Date(new Date().getFullYear(), 11)}
+                    defaultMonth={dateOfBirth || new Date(2015, 0, 1)}
+                    autoFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
+
             <button
               type="submit"
               disabled={loading}
