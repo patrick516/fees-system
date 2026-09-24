@@ -4,6 +4,8 @@
 const TUMASEND_BASE = "https://gateway.tumasend.com";
 
 const tumaSendPost = async (path, body) => {
+  console.log("→ TumaSend Request:", path, JSON.stringify(body, null, 2));
+
   const res = await fetch(`${TUMASEND_BASE}${path}`, {
     method: "POST",
     headers: {
@@ -12,10 +14,18 @@ const tumaSendPost = async (path, body) => {
     },
     body: JSON.stringify(body),
   });
+
   const data = await res.json();
+
+  console.log("← TumaSend Response Status:", res.status);
+  console.log("← TumaSend Response Body:", JSON.stringify(data, null, 2));
+
   if (!res.ok) {
-    throw new Error(data.message || data.error || "TumaSend request failed");
+    const errorMsg =
+      data.message || data.error || data.detail || JSON.stringify(data);
+    throw new Error(errorMsg);
   }
+
   return data;
 };
 
@@ -33,24 +43,27 @@ const sendSMS = async (phone, message) => {
   };
 };
 
-// Request an OTP — TumaSend generates, stores, and sends it
-// Returns { otpId, expiresAt }
 const sendOtp = async (phone) => {
+  const requestId = `otp_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+
   const data = await tumaSendPost("/api/v1/otp/send", {
-    recipient: phone,
+    request_id: requestId,
+    phone_number: phone,
     channel: "sms",
     length: 6,
-    expiry_seconds: 600, // 10 minutes, matches your old expiry
+    expiry_seconds: 600,
   });
-  return { otpId: data.otp_id, expiresAt: data.expires_at };
-};
 
-// Verify an OTP code against TumaSend's stored copy
-// Returns { verified: boolean }
+  // TumaSend returns request_id (not otp_id)
+  return {
+    otpId: data.request_id, // ← use request_id
+    expiresAt: data.expires_at,
+  };
+};
 const verifyOtp = async (otpId, code) => {
   const data = await tumaSendPost("/api/v1/otp/verify", {
-    otp_id: otpId,
-    code,
+    request_id: otpId,
+    code: code,
   });
   return { verified: !!data.verified };
 };

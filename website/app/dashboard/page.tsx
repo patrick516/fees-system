@@ -91,479 +91,507 @@ export default function DashboardPage() {
     if (payments.some((p: any) => p.isDebtor)) return "from-red-600 to-red-500";
     return "from-green-600 to-green-500";
   };
-
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Compact Header */}
-      <div
-        className={`bg-gradient-to-r from-blue-900 to-blue-700 text-white sticky top-0 z-10`}
-      >
-        <div className="max-w-lg mx-auto px-4 py-3">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-white bg-opacity-20 rounded-lg flex items-center justify-center overflow-hidden">
-                {student?.school?.logo ? (
-                  <img
-                    src={student.school.logo}
-                    alt={student.school.name}
-                    className="w-full h-full object-contain"
-                  />
-                ) : (
-                  <School size={16} />
-                )}
-              </div>
-              <div>
-                <p className="text-xs text-blue-200 leading-tight">SchoolPay</p>
-                <p className="text-xs font-medium truncate max-w-[150px] leading-tight">
-                  {student?.school?.name}
-                </p>
-                {student?.school?.motto && (
-                  <p className="text-[9px] italic text-blue-300 truncate max-w-[150px] leading-tight">
-                    "{student.school.motto}"
-                  </p>
-                )}
-              </div>
-            </div>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 text-blue-200 hover:text-white text-sm transition-colors"
-            >
-              <LogOut size={14} />
-              <span className="text-xs">Logout</span>
-            </button>
-          </div>
-
-          {/* Student Info Compact */}
-          <div className="flex items-center gap-3 mt-3 pt-1">
-            <div className="w-10 h-10 bg-white bg-opacity-20 rounded-xl flex items-center justify-center text-lg font-bold">
-              {student?.fullName?.charAt(0)}
-            </div>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-base font-bold truncate">
-                {student?.fullName}
-              </h1>
-              <p className="text-blue-200 text-xs">
-                {student?.class} • {student?.academicYear}
-              </p>
-              <p className="text-blue-300 text-[10px] font-mono">
-                {student?.studentCode}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Tab Navigation */}
-        <div className="flex border-b border-blue-800">
-          <button
-            onClick={() => setActiveTab("overview")}
-            className={`flex-1 py-2.5 text-xs font-medium transition-all ${
-              activeTab === "overview"
-                ? "text-white border-b-2 border-white"
-                : "text-blue-200"
-            }`}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => setActiveTab("payments")}
-            className={`flex-1 py-2.5 text-xs font-medium transition-all ${
-              activeTab === "payments"
-                ? "text-white border-b-2 border-white"
-                : "text-blue-200"
-            }`}
-          >
-            Payment History
-          </button>
-          <button
-            onClick={() => setActiveTab("info")}
-            className={`flex-1 py-2.5 text-xs font-medium transition-all ${
-              activeTab === "info"
-                ? "text-white border-b-2 border-white"
-                : "text-blue-200"
-            }`}
-          >
-            Payment Info
-          </button>
-          {resultsAvailable && (
-            <button
-              onClick={() => setActiveTab("results")}
-              className={`flex-1 py-2.5 text-xs font-medium transition-all ${
-                activeTab === "results"
-                  ? "text-white border-b-2 border-white"
-                  : "text-blue-200"
-              }`}
-            >
-              Results
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
-        {/* OVERVIEW TAB */}
-        {activeTab === "overview" && (
-          <>
-            {/* Quick Stats Cards */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-white rounded-xl shadow-sm p-3 border border-gray-100">
-                <p className="text-xs text-gray-500 mb-1">Total Paid</p>
-                <p className="text-xl font-bold text-green-600">
-                  MWK {(summary.totalPaid || 0).toLocaleString()}
-                </p>
-              </div>
-              <div
-                className={`bg-white rounded-xl shadow-sm p-3 border border-gray-100`}
-              >
-                <p className="text-xs text-gray-500 mb-1">Pending</p>
-                <p
-                  className={`text-xl font-bold ${summary.pendingAmount > 0 ? "text-yellow-600" : "text-gray-400"}`}
-                >
-                  MWK {(summary.pendingAmount || 0).toLocaleString()}
-                </p>
-              </div>
-            </div>
-
-            {/* Notices - Compact */}
-            {pendingPayments.length > 0 && (
-              <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-200 rounded-xl p-2.5">
-                <Clock size={14} className="text-yellow-600 shrink-0" />
-                <p className="text-xs text-yellow-800">
-                  {pendingPayments.length} payment(s) awaiting verification
-                </p>
-              </div>
-            )}
-
-            {verifiedPayments.some((p: any) => p.isDebtor) && (
-              <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-xl p-2.5">
-                <AlertCircle size={14} className="text-red-600 shrink-0" />
-                <p className="text-xs text-red-800 font-medium">
-                  Outstanding balance! Please pay soon.
-                </p>
-              </div>
-            )}
-
-            {verifiedPayments.some((p: any) => p.overpayment > 0) && (
-              <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl p-2.5">
-                <Star size={14} className="text-purple-600 shrink-0" />
-                <p className="text-xs text-purple-800">
-                  Credit balance available
-                </p>
-              </div>
-            )}
-
-            {verifiedPayments.length > 0 &&
-              !verifiedPayments.some((p: any) => p.isDebtor) &&
-              pendingPayments.length === 0 && (
-                <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl p-2.5">
-                  <CheckCircle size={14} className="text-green-600 shrink-0" />
-                  <p className="text-xs font-medium text-green-800">
-                    All fees paid! 🎉
-                  </p>
-                </div>
-              )}
-
-            {/* Quick Actions */}
-            <div
-              className={`grid gap-3 ${resultsAvailable ? "grid-cols-3" : "grid-cols-2"}`}
-            >
-              <button
-                onClick={() => router.push("/pay")}
-                className="bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl p-3 shadow-sm"
-              >
-                <CreditCard size={18} className="mx-auto mb-1" />
-                <p className="text-xs font-semibold">Pay Fees</p>
-              </button>
-              <button
-                onClick={() => router.push("/history")}
-                className="bg-blue-50 text-blue-700 rounded-xl p-3 border border-blue-100"
-              >
-                <History size={18} className="mx-auto mb-1" />
-                <p className="text-xs font-semibold">View History</p>
-              </button>
-              {resultsAvailable && (
-                <button
-                  onClick={() => setActiveTab("results")}
-                  className="bg-purple-50 text-purple-700 rounded-xl p-3 border border-purple-100"
-                >
-                  <Star size={18} className="mx-auto mb-1" />
-                  <p className="text-xs font-semibold">View Results</p>
-                </button>
-              )}
-            </div>
-
-            {/* Recent Activity */}
-            {payments.length > 0 && (
-              <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                <div className="px-4 py-3 border-b border-gray-100">
-                  <h2 className="text-sm font-semibold text-gray-800">
-                    Recent Activity
-                  </h2>
-                </div>
-                <div className="divide-y divide-gray-50">
-                  {payments.slice(0, 2).map((payment: any) => (
-                    <div
-                      key={payment.id}
-                      className="px-4 py-3 flex items-center justify-between"
-                    >
-                      <div className="flex items-center gap-2">
-                        <div
-                          className={`w-7 h-7 rounded-lg flex items-center justify-center ${
-                            payment.status === "VERIFIED"
-                              ? "bg-green-100"
-                              : "bg-yellow-100"
-                          }`}
-                        >
-                          {payment.status === "VERIFIED" ? (
-                            <CheckCircle size={12} className="text-green-600" />
-                          ) : (
-                            <Clock size={12} className="text-yellow-600" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-800">
-                            MWK {payment.amount.toLocaleString()}
-                          </p>
-                          <p className="text-xs text-gray-400">
-                            {termLabel(payment.term)} {payment.academicYear}
-                          </p>
-                        </div>
-                      </div>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          payment.status === "VERIFIED"
-                            ? "bg-green-100 text-green-700"
-                            : "bg-yellow-100 text-yellow-700"
-                        }`}
-                      >
-                        {payment.status === "VERIFIED" ? "Verified" : "Pending"}
-                      </span>
-                    </div>
-                  ))}
-                  {payments.length > 2 && (
-                    <button
-                      onClick={() => setActiveTab("payments")}
-                      className="w-full px-4 py-2 text-xs text-blue-600 font-medium hover:bg-gray-50"
-                    >
-                      View all {payments.length} payments →
-                    </button>
+    <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50 py-4 px-3 sm:py-6 sm:px-6 lg:py-10 lg:px-10">
+      <div className="max-w-4xl mx-auto w-full lg:max-w-6xl">
+        {/* Main Card */}
+        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
+          {/* Blue Header Section */}
+          <div className="bg-gradient-to-r from-blue-800 to-blue-600 text-white px-5 pt-5 pb-4">
+            {/* Top row: Logo + School name + Logout */}
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 bg-white/20 rounded-xl flex items-center justify-center overflow-hidden shrink-0">
+                  {student?.school?.logo ? (
+                    <img
+                      src={student.school.logo}
+                      alt={student.school.name}
+                      className="w-full h-full object-contain"
+                    />
+                  ) : (
+                    <School size={18} />
                   )}
                 </div>
+                <div className="min-w-0">
+                  <p className="text-[11px] text-blue-200 font-medium leading-none">
+                    SchoolPay
+                  </p>
+                  <p className="text-sm font-semibold truncate leading-tight mt-0.5">
+                    {student?.school?.name}
+                  </p>
+                </div>
               </div>
-            )}
 
-            {/* School Contact Quick */}
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-3">
-              <div className="flex items-center gap-2 text-gray-600">
-                <Phone size={14} />
-                <p className="text-xs text-gray-500">School Contact</p>
-              </div>
-              <p className="text-sm font-medium text-gray-800 mt-1">
-                {student?.school?.phone}
-              </p>
-              <p className="text-xs text-gray-500 mt-0.5 truncate">
-                {student?.school?.address}
-              </p>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-1.5 text-blue-100 hover:text-white text-xs font-medium transition-colors"
+              >
+                <LogOut size={14} />
+                <span>Logout</span>
+              </button>
             </div>
-          </>
-        )}
 
-        {/* PAYMENTS TAB */}
-        {activeTab === "payments" && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="px-4 py-3 bg-gray-50 border-b border-gray-100">
-              <h2 className="text-sm font-semibold text-gray-800">
-                All Payments
-              </h2>
-            </div>
-            {payments.length === 0 ? (
-              <div className="p-8 text-center text-gray-400">
-                <Receipt size={32} className="mx-auto mb-2 opacity-50" />
-                <p className="text-sm">No payment history</p>
+            {/* Student Info */}
+            <div className="flex items-center gap-3">
+              <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center text-lg font-bold shrink-0">
+                {student?.fullName?.charAt(0)}
               </div>
-            ) : (
-              <div className="divide-y divide-gray-100">
-                {payments.map((payment: any) => (
-                  <div key={payment.id} className="px-4 py-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="font-semibold text-gray-800">
-                        MWK {payment.amount.toLocaleString()}
-                      </span>
-                      <span
-                        className={`text-xs px-2 py-0.5 rounded-full ${
-                          payment.status === "VERIFIED"
-                            ? "bg-green-100 text-green-700"
-                            : payment.status === "PENDING"
-                              ? "bg-yellow-100 text-yellow-700"
-                              : "bg-red-100 text-red-700"
-                        }`}
-                      >
-                        {payment.status === "VERIFIED"
-                          ? "Verified"
-                          : payment.status === "PENDING"
-                            ? "Pending"
-                            : "Rejected"}
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between text-xs text-gray-500">
-                      <span>
-                        {termLabel(payment.term)} • {payment.academicYear}
-                      </span>
-                      <span>
-                        {new Date(payment.createdAt).toLocaleDateString(
-                          "en-GB",
-                        )}
-                      </span>
-                    </div>
-                    {payment.reference && (
-                      <p className="text-xs text-gray-400 mt-1 font-mono">
-                        Ref: {payment.reference}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* INFO TAB */}
-        {activeTab === "info" &&
-          paymentInfo &&
-          (paymentInfo.airtelMoneyNumber ||
-            paymentInfo.mpambaNumber ||
-            (paymentInfo.bankAccounts &&
-              paymentInfo.bankAccounts.length > 0)) && (
-            <div className="space-y-3">
-              {/* Reference Number - Always show */}
-              <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3 border border-blue-200">
-                <p className="text-xs font-medium text-blue-800">
-                  Your Reference Number
+              <div className="min-w-0">
+                <h1 className="text-base font-bold truncate leading-tight">
+                  {student?.fullName}
+                </h1>
+                <p className="text-blue-200 text-xs mt-0.5">
+                  {student?.class} • {student?.academicYear}
                 </p>
-                <p className="text-base font-bold text-blue-900 font-mono mt-0.5">
+                <p className="text-blue-300 text-[11px] font-mono mt-0.5">
                   {student?.studentCode}
                 </p>
-                <p className="text-[10px] text-blue-600 mt-0.5">
-                  Use this for all payments
-                </p>
               </div>
+            </div>
+          </div>
 
-              {/* Bank Accounts */}
-              {paymentInfo.bankAccounts &&
-                paymentInfo.bankAccounts.length > 0 && (
-                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                    <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-                      <p className="text-xs font-semibold text-gray-700">
-                        Bank Accounts
+          {/* Tabs */}
+          <div className="flex border-b border-slate-200 bg-slate-50">
+            <button
+              onClick={() => setActiveTab("overview")}
+              className={`flex-1 py-3 text-xs font-semibold transition-all ${
+                activeTab === "overview"
+                  ? "text-blue-700 border-b-2 border-blue-600 bg-white"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Overview
+            </button>
+            <button
+              onClick={() => setActiveTab("payments")}
+              className={`flex-1 py-3 text-xs font-semibold transition-all ${
+                activeTab === "payments"
+                  ? "text-blue-700 border-b-2 border-blue-600 bg-white"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Payment History
+            </button>
+            <button
+              onClick={() => setActiveTab("info")}
+              className={`flex-1 py-3 text-xs font-semibold transition-all ${
+                activeTab === "info"
+                  ? "text-blue-700 border-b-2 border-blue-600 bg-white"
+                  : "text-slate-500 hover:text-slate-700"
+              }`}
+            >
+              Payment Info
+            </button>
+            {resultsAvailable && (
+              <button
+                onClick={() => setActiveTab("results")}
+                className={`flex-1 py-3 text-xs font-semibold transition-all ${
+                  activeTab === "results"
+                    ? "text-blue-700 border-b-2 border-blue-600 bg-white"
+                    : "text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                Results
+              </button>
+            )}
+          </div>
+
+          {/* Content Area */}
+          <div className="p-4 lg:p-6 space-y-4">
+            {/* ==================== OVERVIEW TAB ==================== */}
+            {activeTab === "overview" && (
+              <div className="lg:grid lg:grid-cols-3 lg:gap-5 space-y-4 lg:space-y-0">
+                <div className="lg:col-span-2 space-y-4">
+                  {/* Stats Cards */}
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-emerald-50 rounded-xl p-3.5 border border-emerald-100">
+                      <p className="text-[11px] text-emerald-700 font-medium mb-1">
+                        Total Paid
+                      </p>
+                      <p className="text-lg font-bold text-emerald-700">
+                        MWK {(summary.totalPaid || 0).toLocaleString()}
                       </p>
                     </div>
-                    {paymentInfo.bankAccounts.map(
-                      (bank: any, index: number) => (
-                        <div
-                          key={index}
-                          className="p-3 border-b border-gray-50"
-                        >
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <p className="text-sm font-semibold text-gray-800">
-                                {bank.bankName}
-                              </p>
-                              <p className="text-xs text-gray-500">
-                                {bank.accountName}
-                              </p>
-                            </div>
-                            <button
-                              onClick={() =>
-                                navigator.clipboard?.writeText(
-                                  bank.accountNumber,
-                                )
-                              }
-                              className="text-xs text-blue-600 font-medium px-2 py-1 bg-blue-50 rounded-lg"
-                            >
-                              Copy
-                            </button>
-                          </div>
-                          <p className="text-xs font-mono text-gray-700 mt-1">
-                            {bank.accountNumber}
-                          </p>
-                        </div>
-                      ),
+                    <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200">
+                      <p className="text-[11px] text-slate-500 font-medium mb-1">
+                        Pending
+                      </p>
+                      <p
+                        className={`text-lg font-bold ${
+                          summary.pendingAmount > 0
+                            ? "text-amber-600"
+                            : "text-slate-400"
+                        }`}
+                      >
+                        MWK {(summary.pendingAmount || 0).toLocaleString()}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Notices */}
+                  {pendingPayments.length > 0 && (
+                    <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3">
+                      <Clock size={15} className="text-amber-600 shrink-0" />
+                      <p className="text-xs text-amber-800">
+                        {pendingPayments.length} payment(s) awaiting
+                        verification
+                      </p>
+                    </div>
+                  )}
+
+                  {verifiedPayments.some((p: any) => p.isDebtor) && (
+                    <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 rounded-xl p-3">
+                      <AlertCircle
+                        size={15}
+                        className="text-red-600 shrink-0"
+                      />
+                      <p className="text-xs text-red-800 font-medium">
+                        Outstanding balance! Please pay soon.
+                      </p>
+                    </div>
+                  )}
+
+                  {verifiedPayments.some((p: any) => p.overpayment > 0) && (
+                    <div className="flex items-center gap-2.5 bg-purple-50 border border-purple-200 rounded-xl p-3">
+                      <Star size={15} className="text-purple-600 shrink-0" />
+                      <p className="text-xs text-purple-800">
+                        Credit balance available
+                      </p>
+                    </div>
+                  )}
+
+                  {verifiedPayments.length > 0 &&
+                    !verifiedPayments.some((p: any) => p.isDebtor) &&
+                    pendingPayments.length === 0 && (
+                      <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
+                        <CheckCircle
+                          size={15}
+                          className="text-emerald-600 shrink-0"
+                        />
+                        <p className="text-xs font-medium text-emerald-800">
+                          All fees paid! 🎉
+                        </p>
+                      </div>
+                    )}
+
+                  {/* Action Buttons */}
+                  <div
+                    className={`grid gap-4 ${
+                      resultsAvailable ? "grid-cols-3" : "grid-cols-2"
+                    }`}
+                  >
+                    <button
+                      onClick={() => router.push("/pay")}
+                      className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white rounded-xl py-3.5 px-3 shadow-sm transition-all active:scale-[0.98]"
+                    >
+                      <CreditCard size={18} className="mx-auto mb-1" />
+                      <p className="text-xs font-semibold">Pay Fees</p>
+                    </button>
+
+                    <button
+                      onClick={() => router.push("/history")}
+                      className="bg-slate-50 hover:bg-slate-100 text-slate-700 rounded-xl py-3.5 px-3 border border-slate-200 transition-all active:scale-[0.98]"
+                    >
+                      <History size={18} className="mx-auto mb-1" />
+                      <p className="text-xs font-semibold">View History</p>
+                    </button>
+
+                    {resultsAvailable && (
+                      <button
+                        onClick={() => setActiveTab("results")}
+                        className="bg-purple-50 hover:bg-purple-100 text-purple-700 rounded-xl py-3.5 px-3 border border-purple-100 transition-all active:scale-[0.98]"
+                      >
+                        <Star size={18} className="mx-auto mb-1" />
+                        <p className="text-xs font-semibold">View Results</p>
+                      </button>
                     )}
                   </div>
-                )}
+                </div>
 
-              {/* Mobile Money */}
-              {(paymentInfo.airtelMoneyNumber || paymentInfo.mpambaNumber) && (
-                <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                  <div className="px-4 py-2 bg-gray-50 border-b border-gray-100">
-                    <p className="text-xs font-semibold text-gray-700">
-                      Mobile Money
+                <div className="space-y-4">
+                  {/* Recent Activity */}
+                  {payments.length > 0 && (
+                    <div className="bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                      <div className="px-4 py-2.5 border-b border-slate-200">
+                        <h2 className="text-xs font-semibold text-slate-700">
+                          Recent Activity
+                        </h2>
+                      </div>
+                      <div className="divide-y divide-slate-100">
+                        {payments.slice(0, 2).map((payment: any) => (
+                          <div
+                            key={payment.id}
+                            className="px-4 py-3 flex items-center justify-between"
+                          >
+                            <div className="flex items-center gap-2.5">
+                              <div
+                                className={`w-7 h-7 rounded-lg flex items-center justify-center ${
+                                  payment.status === "VERIFIED"
+                                    ? "bg-emerald-100"
+                                    : "bg-amber-100"
+                                }`}
+                              >
+                                {payment.status === "VERIFIED" ? (
+                                  <CheckCircle
+                                    size={13}
+                                    className="text-emerald-600"
+                                  />
+                                ) : (
+                                  <Clock size={13} className="text-amber-600" />
+                                )}
+                              </div>
+                              <div>
+                                <p className="text-sm font-semibold text-slate-800">
+                                  MWK {payment.amount.toLocaleString()}
+                                </p>
+                                <p className="text-[11px] text-slate-400">
+                                  {termLabel(payment.term)}{" "}
+                                  {payment.academicYear}
+                                </p>
+                              </div>
+                            </div>
+                            <span
+                              className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                                payment.status === "VERIFIED"
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-amber-100 text-amber-700"
+                              }`}
+                            >
+                              {payment.status === "VERIFIED"
+                                ? "Verified"
+                                : "Pending"}
+                            </span>
+                          </div>
+                        ))}
+                        {payments.length > 2 && (
+                          <button
+                            onClick={() => setActiveTab("payments")}
+                            className="w-full px-4 py-2.5 text-xs text-blue-600 font-medium hover:bg-slate-100 transition-colors"
+                          >
+                            View all {payments.length} payments →
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* School Contact */}
+                  <div className="bg-slate-50 rounded-xl border border-slate-200 p-3.5">
+                    <div className="flex items-center gap-2 text-slate-500 mb-1">
+                      <Phone size={14} />
+                      <p className="text-xs font-medium">School Contact</p>
+                    </div>
+                    <p className="text-sm font-semibold text-slate-800">
+                      {student?.school?.phone}
+                    </p>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate">
+                      {student?.school?.address}
                     </p>
                   </div>
-                  {paymentInfo.airtelMoneyNumber && (
-                    <div className="p-3 border-b border-gray-50 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-red-600">
-                          Airtel Money
-                        </p>
-                        <p className="text-xs font-mono text-gray-700">
-                          {paymentInfo.airtelMoneyNumber}
+                </div>
+              </div>
+            )}
+
+            {/* ==================== PAYMENTS TAB ==================== */}
+            {activeTab === "payments" && (
+              <div className="lg:max-w-2xl lg:mx-auto bg-slate-50 rounded-xl border border-slate-200 overflow-hidden">
+                <div className="px-4 py-2.5 bg-white border-b border-slate-200">
+                  <h2 className="text-xs font-semibold text-slate-700">
+                    All Payments
+                  </h2>
+                </div>
+                {payments.length === 0 ? (
+                  <div className="p-10 text-center text-slate-400">
+                    <Receipt size={32} className="mx-auto mb-2 opacity-50" />
+                    <p className="text-sm">No payment history</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100">
+                    {payments.map((payment: any) => (
+                      <div key={payment.id} className="px-4 py-3 bg-white">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-slate-800">
+                            MWK {payment.amount.toLocaleString()}
+                          </span>
+                          <span
+                            className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${
+                              payment.status === "VERIFIED"
+                                ? "bg-emerald-100 text-emerald-700"
+                                : payment.status === "PENDING"
+                                  ? "bg-amber-100 text-amber-700"
+                                  : "bg-red-100 text-red-700"
+                            }`}
+                          >
+                            {payment.status === "VERIFIED"
+                              ? "Verified"
+                              : payment.status === "PENDING"
+                                ? "Pending"
+                                : "Rejected"}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px] text-slate-500">
+                          <span>
+                            {termLabel(payment.term)} • {payment.academicYear}
+                          </span>
+                          <span>
+                            {new Date(payment.createdAt).toLocaleDateString(
+                              "en-GB",
+                            )}
+                          </span>
+                        </div>
+                        {payment.reference && (
+                          <p className="text-[11px] text-slate-400 mt-1 font-mono">
+                            Ref: {payment.reference}
+                          </p>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ==================== INFO TAB ==================== */}
+            {activeTab === "info" &&
+              paymentInfo &&
+              (paymentInfo.airtelMoneyNumber ||
+                paymentInfo.mpambaNumber ||
+                (paymentInfo.bankAccounts &&
+                  paymentInfo.bankAccounts.length > 0)) && (
+                <div className="lg:max-w-2xl lg:mx-auto space-y-3">
+                  {/* Reference Number */}
+                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3.5 border border-blue-200">
+                    <p className="text-xs font-medium text-blue-800">
+                      Your Reference Number
+                    </p>
+                    <p className="text-base font-bold text-blue-900 font-mono mt-0.5">
+                      {student?.studentCode}
+                    </p>
+                    <p className="text-[10px] text-blue-600 mt-0.5">
+                      Use this for all payments
+                    </p>
+                  </div>
+
+                  {/* Bank Accounts */}
+                  {paymentInfo.bankAccounts &&
+                    paymentInfo.bankAccounts.length > 0 && (
+                      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                        <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                          <p className="text-xs font-semibold text-slate-700">
+                            Bank Accounts
+                          </p>
+                        </div>
+                        {paymentInfo.bankAccounts.map(
+                          (bank: any, index: number) => (
+                            <div
+                              key={index}
+                              className="p-3.5 border-b border-slate-100 last:border-0"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <p className="text-sm font-semibold text-slate-800">
+                                    {bank.bankName}
+                                  </p>
+                                  <p className="text-xs text-slate-500">
+                                    {bank.accountName}
+                                  </p>
+                                </div>
+                                <button
+                                  onClick={() =>
+                                    navigator.clipboard?.writeText(
+                                      bank.accountNumber,
+                                    )
+                                  }
+                                  className="text-xs text-blue-600 font-medium px-2.5 py-1 bg-blue-50 rounded-lg"
+                                >
+                                  Copy
+                                </button>
+                              </div>
+                              <p className="text-xs font-mono text-slate-700 mt-1">
+                                {bank.accountNumber}
+                              </p>
+                            </div>
+                          ),
+                        )}
+                      </div>
+                    )}
+
+                  {/* Mobile Money */}
+                  {(paymentInfo.airtelMoneyNumber ||
+                    paymentInfo.mpambaNumber) && (
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                      <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200">
+                        <p className="text-xs font-semibold text-slate-700">
+                          Mobile Money
                         </p>
                       </div>
-                      <button
-                        onClick={() =>
-                          navigator.clipboard?.writeText(
-                            paymentInfo.airtelMoneyNumber,
-                          )
-                        }
-                        className="text-xs text-red-600 font-medium px-2 py-1 bg-red-50 rounded-lg"
-                      >
-                        Copy
-                      </button>
+                      {paymentInfo.airtelMoneyNumber && (
+                        <div className="p-3.5 border-b border-slate-100 flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-red-600">
+                              Airtel Money
+                            </p>
+                            <p className="text-xs font-mono text-slate-700">
+                              {paymentInfo.airtelMoneyNumber}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() =>
+                              navigator.clipboard?.writeText(
+                                paymentInfo.airtelMoneyNumber,
+                              )
+                            }
+                            className="text-xs text-red-600 font-medium px-2.5 py-1 bg-red-50 rounded-lg"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      )}
+                      {paymentInfo.mpambaNumber && (
+                        <div className="p-3.5 flex items-center justify-between">
+                          <div>
+                            <p className="text-sm font-semibold text-amber-600">
+                              TNM Mpamba
+                            </p>
+                            <p className="text-xs font-mono text-slate-700">
+                              {paymentInfo.mpambaNumber}
+                            </p>
+                          </div>
+                          <button
+                            onClick={() =>
+                              navigator.clipboard?.writeText(
+                                paymentInfo.mpambaNumber,
+                              )
+                            }
+                            className="text-xs text-amber-600 font-medium px-2.5 py-1 bg-amber-50 rounded-lg"
+                          >
+                            Copy
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
-                  {paymentInfo.mpambaNumber && (
-                    <div className="p-3 flex items-center justify-between">
-                      <div>
-                        <p className="text-sm font-semibold text-yellow-600">
-                          TNM Mpamba
-                        </p>
-                        <p className="text-xs font-mono text-gray-700">
-                          {paymentInfo.mpambaNumber}
-                        </p>
-                      </div>
-                      <button
-                        onClick={() =>
-                          navigator.clipboard?.writeText(
-                            paymentInfo.mpambaNumber,
-                          )
-                        }
-                        className="text-xs text-yellow-600 font-medium px-2 py-1 bg-yellow-50 rounded-lg"
-                      >
-                        Copy
-                      </button>
+
+                  {/* Instructions */}
+                  {paymentInfo.paymentInstructions && (
+                    <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200">
+                      <p className="text-xs font-medium text-slate-600 mb-1">
+                        📋 Instructions
+                      </p>
+                      <p className="text-xs text-slate-600 leading-relaxed">
+                        {paymentInfo.paymentInstructions}
+                      </p>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Instructions */}
-              {paymentInfo.paymentInstructions && (
-                <div className="bg-gray-50 rounded-xl p-3 border border-gray-200">
-                  <p className="text-xs font-medium text-gray-600 mb-1">
-                    📋 Instructions
-                  </p>
-                  <p className="text-xs text-gray-600 leading-relaxed">
-                    {paymentInfo.paymentInstructions}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-        {/* RESULTS TAB */}
-        {activeTab === "results" && student?.id && (
-          <ResultsView studentId={student.id} />
-        )}
+            {/* ==================== RESULTS TAB ==================== */}
+            {activeTab === "results" && student?.id && (
+              <ResultsView studentId={student.id} />
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

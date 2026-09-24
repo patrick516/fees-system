@@ -130,7 +130,7 @@ async function main() {
       dateOfBirth: new Date("2010-03-15"),
       gender: "MALE",
       parentName: "Mary Banda",
-      parentPhone: "+265999123456",
+      parentPhone: "+265995049331",
       academicYear: "2025",
     },
   });
@@ -146,7 +146,7 @@ async function main() {
       dateOfBirth: new Date("2009-07-22"),
       gender: "FEMALE",
       parentName: "James Phiri",
-      parentPhone: "+265888654321",
+      parentPhone: "+265882781930",
       academicYear: "2025",
     },
   });
