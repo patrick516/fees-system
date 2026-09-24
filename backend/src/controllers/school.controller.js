@@ -24,6 +24,7 @@ const getSettings = async (req, res) => {
         email: true,
         logo: true,
         motto: true,
+        primaryColor: true,
       },
     });
 
@@ -40,11 +41,9 @@ const getSettings = async (req, res) => {
   }
 };
 
-// PUT /api/schools/settings
-// PUT /api/schools/settings
 const updateSettings = async (req, res) => {
   try {
-    const { name, address, city, phone, email, motto } = req.body;
+    const { name, address, city, phone, email, motto, primaryColor } = req.body;
 
     // Auto-generate a slug the first time a school is saved, if it doesn't have one yet
     const existing = await prisma.school.findUnique({
@@ -78,6 +77,7 @@ const updateSettings = async (req, res) => {
         ...(phone && { phone }),
         ...(email !== undefined && { email }),
         ...(motto !== undefined && { motto }),
+        ...(primaryColor !== undefined && { primaryColor }),
         ...slugUpdate,
       },
     });
@@ -89,7 +89,7 @@ const updateSettings = async (req, res) => {
         action: "SCHOOL_SETTINGS_UPDATED",
         entity: "School",
         entityId: req.schoolId,
-        changes: { name, address, city, phone, email, motto },
+        changes: { name, address, city, phone, email, motto, primaryColor },
       },
     });
 
@@ -155,7 +155,7 @@ const getBySlug = async (req, res) => {
 
     const school = await prisma.school.findUnique({
       where: { slug },
-      select: { name: true, logo: true, motto: true },
+      select: { name: true, logo: true, motto: true, primaryColor: true },
     });
 
     if (!school) {
@@ -185,7 +185,7 @@ const lookupByEmail = async (req, res) => {
       where: { email: email.toLowerCase().trim() },
       select: {
         school: {
-          select: { name: true, logo: true },
+          select: { name: true, logo: true, primaryColor: true },
         },
       },
     });
@@ -231,7 +231,7 @@ const getPublicInfo = async (req, res) => {
   try {
     const school = await prisma.school.findUnique({
       where: { id: req.params.schoolId },
-      select: { name: true, logo: true, motto: true },
+      select: { name: true, logo: true, motto: true, primaryColor: true },
     });
 
     if (!school) {

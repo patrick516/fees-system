@@ -1,7 +1,22 @@
 import { useState, useEffect } from "react";
-import { Upload, Plus, Loader2, CheckCircle2, Save } from "lucide-react";
+import {
+  Upload,
+  Plus,
+  Loader2,
+  CheckCircle2,
+  Save,
+  Pencil,
+  X,
+} from "lucide-react";
 import { useExamResults } from "../../hooks/useExamResults";
 import { useClasses } from "../../hooks/useStudents";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 const ResultsPage = () => {
   const {
@@ -17,6 +32,7 @@ const ResultsPage = () => {
 
   const [periods, setPeriods] = useState<any[]>([]);
   const [boundaries, setBoundaries] = useState<any[]>([]);
+  const [editingBoundaries, setEditingBoundaries] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState("");
   const [selectedClass, setSelectedClass] = useState("");
   const [file, setFile] = useState<File | null>(null);
@@ -38,7 +54,6 @@ const ResultsPage = () => {
       if (b.success && b.data.length > 0) {
         setBoundaries(b.data);
       } else {
-        // Sensible default 1-9 point scale, editable before saving
         setBoundaries([
           { minPercent: 80, maxPercent: 100, gradePoint: 1, gradeLabel: "" },
           { minPercent: 70, maxPercent: 79, gradePoint: 2, gradeLabel: "" },
@@ -69,6 +84,7 @@ const ResultsPage = () => {
     const res = await setGradeBoundaries(boundaries);
     setMessage(res.success ? "Grade boundaries saved" : res.message);
     setSavingBoundaries(false);
+    if (res.success) setEditingBoundaries(false); // exit edit mode on save
   };
 
   const handleCreatePeriod = async () => {
@@ -107,56 +123,106 @@ const ResultsPage = () => {
 
       {/* Grade Boundaries */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <h3 className="font-medium text-gray-800 mb-4">
-          Grade Boundaries (1 = best, 9 = fail)
-        </h3>
-        <div className="space-y-2">
-          {boundaries.map((b, i) => (
-            <div key={i} className="grid grid-cols-4 gap-2 items-center">
-              <span className="text-sm font-medium text-gray-600">
-                Point {b.gradePoint}
-              </span>
-              <input
-                type="number"
-                value={b.minPercent}
-                onChange={(e) =>
-                  handleBoundaryChange(i, "minPercent", e.target.value)
-                }
-                placeholder="Min %"
-                className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
-              />
-              <input
-                type="number"
-                value={b.maxPercent}
-                onChange={(e) =>
-                  handleBoundaryChange(i, "maxPercent", e.target.value)
-                }
-                placeholder="Max %"
-                className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
-              />
-              <input
-                value={b.gradeLabel || ""}
-                onChange={(e) =>
-                  handleBoundaryChange(i, "gradeLabel", e.target.value)
-                }
-                placeholder="Label (optional)"
-                className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
-              />
-            </div>
-          ))}
-        </div>
-        <button
-          onClick={handleSaveBoundaries}
-          disabled={savingBoundaries}
-          className="mt-4 flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 disabled:opacity-40"
-        >
-          {savingBoundaries ? (
-            <Loader2 size={14} className="animate-spin" />
-          ) : (
-            <Save size={14} />
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-medium text-gray-800">
+            Grade Boundaries (1 = best, 9 = fail)
+          </h3>
+          {!editingBoundaries && (
+            <button
+              onClick={() => setEditingBoundaries(true)}
+              className="flex items-center gap-1.5 text-sm font-medium text-blue-900 hover:text-blue-700 transition-colors"
+            >
+              <Pencil size={14} /> Edit
+            </button>
           )}
-          Save Grade Boundaries
-        </button>
+        </div>
+
+        {editingBoundaries ? (
+          <>
+            <div className="space-y-2">
+              {boundaries.map((b, i) => (
+                <div key={i} className="grid grid-cols-4 gap-2 items-center">
+                  <span className="text-sm font-medium text-gray-600">
+                    Point {b.gradePoint}
+                  </span>
+                  <input
+                    type="number"
+                    value={b.minPercent}
+                    onChange={(e) =>
+                      handleBoundaryChange(i, "minPercent", e.target.value)
+                    }
+                    placeholder="Min %"
+                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
+                  />
+                  <input
+                    type="number"
+                    value={b.maxPercent}
+                    onChange={(e) =>
+                      handleBoundaryChange(i, "maxPercent", e.target.value)
+                    }
+                    placeholder="Max %"
+                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
+                  />
+                  <input
+                    value={b.gradeLabel || ""}
+                    onChange={(e) =>
+                      handleBoundaryChange(i, "gradeLabel", e.target.value)
+                    }
+                    placeholder="Label (optional)"
+                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-sm"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-4 flex gap-2">
+              <button
+                onClick={handleSaveBoundaries}
+                disabled={savingBoundaries}
+                className="flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 disabled:opacity-40"
+              >
+                {savingBoundaries ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Save size={14} />
+                )}
+                Save
+              </button>
+              <button
+                onClick={() => setEditingBoundaries(false)}
+                className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200"
+              >
+                <X size={14} /> Cancel
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-gray-100">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr className="text-left text-gray-500">
+                  <th className="px-4 py-2 font-medium">Point</th>
+                  <th className="px-4 py-2 font-medium">Min %</th>
+                  <th className="px-4 py-2 font-medium">Max %</th>
+                  <th className="px-4 py-2 font-medium">Label</th>
+                </tr>
+              </thead>
+              <tbody>
+                {boundaries.map((b, i) => (
+                  <tr key={i} className="border-t border-gray-100">
+                    <td className="px-4 py-2 font-medium text-gray-700">
+                      Point {b.gradePoint}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">{b.minPercent}%</td>
+                    <td className="px-4 py-2 text-gray-600">{b.maxPercent}%</td>
+                    <td className="px-4 py-2 text-gray-500">
+                      {b.gradeLabel || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Exam Periods */}
@@ -171,17 +237,19 @@ const ResultsPage = () => {
             }
             className="px-3 py-2 border border-gray-200 rounded-lg text-sm col-span-2"
           />
-          <select
+          <Select
             value={newPeriod.term}
-            onChange={(e) =>
-              setNewPeriod({ ...newPeriod, term: e.target.value })
-            }
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+            onValueChange={(v) => setNewPeriod({ ...newPeriod, term: v })}
           >
-            <option value="TERM_1">Term 1</option>
-            <option value="TERM_2">Term 2</option>
-            <option value="TERM_3">Term 3</option>
-          </select>
+            <SelectTrigger className="w-full bg-transparent border-gray-200 rounded-lg text-sm h-auto py-2">
+              <SelectValue placeholder="Term" />
+            </SelectTrigger>
+            <SelectContent className="bg-white">
+              <SelectItem value="TERM_1">Term 1</SelectItem>
+              <SelectItem value="TERM_2">Term 2</SelectItem>
+              <SelectItem value="TERM_3">Term 3</SelectItem>
+            </SelectContent>
+          </Select>
           <input
             placeholder="Academic Year"
             value={newPeriod.academicYear}
@@ -198,58 +266,81 @@ const ResultsPage = () => {
           <Plus size={14} /> Create Exam Period
         </button>
 
-        <div className="mt-4 space-y-2">
-          {periods.map((p) => (
-            <div
-              key={p.id}
-              className="flex items-center justify-between p-3 border border-gray-100 rounded-lg"
-            >
-              <span className="text-sm">
-                {p.name} — {p.term.replace("_", " ")} {p.academicYear}
-              </span>
-              <button
-                onClick={() => handleToggleActive(p.id, p.isActive)}
-                className={`text-xs px-3 py-1 rounded-full font-medium ${
-                  p.isActive
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-100 text-gray-500"
-                }`}
-              >
-                {p.isActive ? "Visible to parents" : "Hidden"}
-              </button>
-            </div>
-          ))}
-        </div>
+        {periods.length > 0 && (
+          <div className="mt-4 overflow-hidden rounded-lg border border-gray-100">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50">
+                <tr className="text-left text-gray-500">
+                  <th className="px-4 py-2 font-medium">Name</th>
+                  <th className="px-4 py-2 font-medium">Term</th>
+                  <th className="px-4 py-2 font-medium">Year</th>
+                  <th className="px-4 py-2 font-medium text-right">
+                    Visibility
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {periods.map((p) => (
+                  <tr key={p.id} className="border-t border-gray-100">
+                    <td className="px-4 py-2 font-medium text-gray-700">
+                      {p.name}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {p.term.replace("_", " ")}
+                    </td>
+                    <td className="px-4 py-2 text-gray-600">
+                      {p.academicYear}
+                    </td>
+                    <td className="px-4 py-2 text-right">
+                      <button
+                        onClick={() => handleToggleActive(p.id, p.isActive)}
+                        className={`text-xs px-3 py-1 rounded-full font-medium ${
+                          p.isActive
+                            ? "bg-green-100 text-green-700"
+                            : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {p.isActive ? "Visible to parents" : "Hidden"}
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
 
       {/* Upload */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <h3 className="font-medium text-gray-800 mb-4">Upload Class Results</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-          >
-            <option value="">Select exam period</option>
-            {periods.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.name}
-              </option>
-            ))}
-          </select>
-          <select
-            value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-          >
-            <option value="">Select class</option>
-            {classes.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
-          </select>
+          <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+            <SelectTrigger className="w-full bg-transparent border-gray-200 rounded-lg text-sm h-auto py-2">
+              <SelectValue placeholder="Select exam period" />
+            </SelectTrigger>
+            <SelectContent className="bg-white">
+              {periods.map((p) => (
+                <SelectItem key={p.id} value={p.id}>
+                  {p.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedClass} onValueChange={setSelectedClass}>
+            <SelectTrigger className="w-full bg-transparent border-gray-200 rounded-lg text-sm h-auto py-2">
+              <SelectValue placeholder="Select class" />
+            </SelectTrigger>
+            <SelectContent className="bg-white">
+              {classes.map((c) => (
+                <SelectItem key={c.id} value={c.id}>
+                  {c.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <input
             type="file"
             accept=".xlsx,.xls,.csv"

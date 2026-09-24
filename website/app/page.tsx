@@ -128,7 +128,7 @@ export default function LoginPage() {
     setError("");
     setOtpLoading(true);
     try {
-      await api.post("/auth/parent/request-otp", { phone });
+      await api.post("/auth/parent/request-otp", { phone: `+265${phone}` });
       setOtpSent(true);
     } catch (err: any) {
       setError(
@@ -145,7 +145,10 @@ export default function LoginPage() {
     setError("");
     setLoading(true);
     try {
-      const res = await api.post("/auth/parent/verify-otp", { phone, otp });
+      const res = await api.post("/auth/parent/verify-otp", {
+        phone: `+265${phone}`,
+        otp,
+      });
       const { token, student } = res.data.data;
       login(token, student);
       router.push("/dashboard");
@@ -343,19 +346,42 @@ export default function LoginPage() {
                 Phone Number
               </label>
               <div className="flex gap-2">
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="+265999123456"
-                  disabled={otpSent}
-                  className="flex-1 px-4 py-3 border border-gray-300 rounded-xl text-sm text-gray-900 placeholder-gray-400 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent disabled:bg-gray-50 disabled:text-gray-500"
-                />
+                <div
+                  className={`flex-1 flex items-stretch border rounded-xl overflow-hidden transition-all duration-200 ${
+                    otpSent
+                      ? "bg-gray-50 border-gray-200"
+                      : "bg-white border-gray-300 focus-within:border-[#0B1F44] focus-within:shadow-[0_0_0_3px_rgba(11,31,68,0.12)]"
+                  }`}
+                >
+                  {/* Fixed +265 prefix */}
+                  <span
+                    className={`flex items-center pl-4 pr-1 text-sm font-medium select-none ${
+                      otpSent ? "text-gray-500" : "text-gray-700"
+                    }`}
+                  >
+                    +265
+                  </span>
+                  <input
+                    type="tel"
+                    inputMode="numeric"
+                    value={phone}
+                    onChange={(e) =>
+                      setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))
+                    }
+                    placeholder="991234567"
+                    disabled={otpSent}
+                    className={`flex-1 pr-4 py-3 bg-transparent text-sm outline-none ring-0 focus:ring-0 focus:outline-none rounded-none ${
+                      otpSent
+                        ? "text-gray-500 cursor-not-allowed"
+                        : "text-gray-900 placeholder-gray-300"
+                    }`}
+                  />
+                </div>
                 {!otpSent && (
                   <button
                     type="button"
                     onClick={handleRequestOTP}
-                    disabled={otpLoading || !phone.trim()}
+                    disabled={otpLoading || phone.length < 9}
                     className="px-4 py-3 bg-[#0B1F44] text-white rounded-xl text-sm font-medium transition-all duration-300 hover:bg-[#0A1A3A] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap flex items-center justify-center min-w-[92px]"
                   >
                     {otpLoading ? (
@@ -392,7 +418,7 @@ export default function LoginPage() {
                     className="w-full px-4 py-3 border border-gray-300 rounded-xl text-center text-lg font-mono tracking-[0.5em] text-gray-900 placeholder-gray-300 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent"
                   />
                   <p className="text-xs text-gray-400 mt-1.5 text-center">
-                    Code sent to {phone}
+                    Code sent to +265{phone}
                   </p>
                 </div>
                 <button

@@ -80,8 +80,9 @@ model School {
   city    String
   phone   String
   email   String?
-  logo    String?
-  motto   String?
+  logo         String?
+  motto        String?
+  primaryColor String  @default("#1e3a8a")
 
   // Subscription to YOUR platform
   isActive         Boolean   @default(true)

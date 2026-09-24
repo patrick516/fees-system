@@ -1,9 +1,23 @@
 "use client";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Upload, CheckCircle, Loader2, X } from "lucide-react";
+import {
+  ArrowLeft,
+  Upload,
+  CheckCircle,
+  Loader2,
+  X,
+  FileText,
+} from "lucide-react";
 import api from "../../lib/axios";
 import { useAuthStore } from "../../store/authStore";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 
 const paymentMethods = [
   { value: "AIRTEL_MONEY", label: "Airtel Money" },
@@ -149,8 +163,8 @@ export default function PayPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-blue-900 text-white">
-        <div className="max-w-lg mx-auto px-4 py-5">
+      <div className="bg-blue-900 text-white sticky top-0 z-20 shadow-md">
+        <div className="max-w-lg mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/dashboard")}
@@ -163,9 +177,9 @@ export default function PayPage() {
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-5 space-y-4">
+      <div className="max-w-lg mx-auto px-4 py-3 space-y-3 pb-24">
         {/* Student Info */}
-        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+        <div className="bg-white rounded-2xl p-3.5 shadow-sm border border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-900 font-bold">
               {student?.fullName?.charAt(0)}
@@ -179,27 +193,37 @@ export default function PayPage() {
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form id="payment-form" onSubmit={handleSubmit} className="space-y-3">
           {/* Term Selection */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100 space-y-4">
-            <h2 className="font-medium text-gray-800">Payment Details</h2>
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <h2 className="font-medium text-gray-800 text-sm">
+              Payment Details
+            </h2>
 
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">
                   Term *
                 </label>
-                <select
+                <Select
                   value={form.term}
-                  onChange={(e) => setForm({ ...form, term: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onValueChange={(v) => setForm({ ...form, term: v })}
                 >
-                  {terms.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full bg-transparent border-gray-200 rounded-xl text-sm h-[42px] focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <SelectValue placeholder="Select term" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white w-auto min-w-[110px]">
+                    {terms.map((t) => (
+                      <SelectItem
+                        key={t.value}
+                        value={t.value}
+                        className="cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-2 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900"
+                      >
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">
@@ -318,8 +342,8 @@ export default function PayPage() {
             (paymentInfo.airtelMoneyNumber ||
               paymentInfo.mpambaNumber ||
               paymentInfo.nationalBankAccount) && (
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-                <h2 className="font-medium text-gray-800 mb-3">
+              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                <h2 className="font-medium text-gray-800 text-sm mb-2.5">
                   Pay To These Accounts
                 </h2>
                 <div className="space-y-2">
@@ -400,15 +424,17 @@ export default function PayPage() {
               </div>
             )}
           {/* Receipt Upload */}
-          <div className="bg-white rounded-2xl p-5 shadow-sm border border-gray-100">
-            <h2 className="font-medium text-gray-800 mb-3">Upload Receipt *</h2>
-            <p className="text-xs text-gray-400 mb-4">
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+            <h2 className="font-medium text-gray-800 text-sm mb-1">
+              Upload Receipt *
+            </h2>
+            <p className="text-xs text-gray-400 mb-3">
               Take a photo of your Airtel Money/Mpamba/bank receipt and upload
               it here.
             </p>
 
             {!receiptPreview ? (
-              <label className="flex flex-col items-center justify-center w-full h-36 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all">
+              <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all">
                 <Upload size={24} className="text-gray-400 mb-2" />
                 <p className="text-sm font-medium text-gray-600">
                   Tap to upload receipt
@@ -426,11 +452,21 @@ export default function PayPage() {
               </label>
             ) : (
               <div className="relative">
-                <img
-                  src={receiptPreview}
-                  alt="Receipt preview"
-                  className="w-full h-48 object-cover rounded-xl border border-gray-200"
-                />
+                {receiptFile?.type === "application/pdf" ? (
+                  <div className="w-full h-64 rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+                    <embed
+                      src={receiptPreview || undefined}
+                      type="application/pdf"
+                      className="w-full h-full"
+                    />
+                  </div>
+                ) : (
+                  <img
+                    src={receiptPreview}
+                    alt="Receipt preview"
+                    className="w-full h-48 object-cover rounded-xl border border-gray-200"
+                  />
+                )}
                 <button
                   type="button"
                   onClick={() => {
@@ -441,7 +477,7 @@ export default function PayPage() {
                 >
                   <X size={14} />
                 </button>
-                <p className="text-xs text-gray-500 mt-2 text-center">
+                <p className="text-xs text-gray-500 mt-2 text-center truncate px-6">
                   {receiptFile?.name}
                 </p>
               </div>
@@ -454,25 +490,30 @@ export default function PayPage() {
             </div>
           )}
 
-          <button
-            type="submit"
-            disabled={loading || !receiptFile}
-            className="w-full flex items-center justify-center gap-2 bg-blue-900 text-white py-4 rounded-xl font-medium text-sm hover:bg-blue-800 disabled:bg-blue-300 transition-colors"
-          >
-            {loading ? (
-              <>
-                <Loader2 size={16} className="animate-spin" /> Submitting...
-              </>
-            ) : (
-              `Submit Payment — MWK ${form.amount ? parseFloat(form.amount).toLocaleString() : "0"}`
-            )}
-          </button>
-
           <p className="text-center text-xs text-gray-400">
             After submitting, the school will verify your receipt and confirm
             your payment.
           </p>
         </form>
+      </div>
+
+      {/* Sticky submit bar — always visible, no scrolling needed to pay */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 max-w-lg mx-auto shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+        <button
+          type="submit"
+          form="payment-form"
+          disabled={loading || !receiptFile}
+          onClick={handleSubmit}
+          className="w-full flex items-center justify-center gap-2 bg-blue-900 text-white py-3.5 rounded-xl font-medium text-sm hover:bg-blue-800 disabled:bg-blue-300 transition-colors"
+        >
+          {loading ? (
+            <>
+              <Loader2 size={16} className="animate-spin" /> Submitting...
+            </>
+          ) : (
+            `Submit Payment — MWK ${form.amount ? parseFloat(form.amount).toLocaleString() : "0"}`
+          )}
+        </button>
       </div>
     </div>
   );
