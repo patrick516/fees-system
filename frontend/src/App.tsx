@@ -14,6 +14,7 @@ import ClassesPage from "./pages/Classes/index";
 import SMSPage from "./pages/SMS/index";
 import ReportsPage from "./pages/Reports/index";
 import SettingsPage from "./pages/Settings/index";
+import ResultsPage from "./pages/Results/index";
 
 // Layout
 import MainLayout from "./components/Layout/MainLayout";
@@ -54,6 +55,7 @@ function App() {
           <Route path="sms" element={<SMSPage />} />
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
+          <Route path="results" element={<ResultsPage />} />
         </Route>
 
         {/* Catch all */}

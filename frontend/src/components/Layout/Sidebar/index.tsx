@@ -11,8 +11,9 @@ import {
   School,
   BarChart2,
   Settings,
-  X, // ← Add this
-  Menu, // ← Add this
+  FileText,
+  X,
+  Menu,
 } from "lucide-react";
 import { useAuthStore } from "../../../store/authStore";
 
@@ -24,6 +25,7 @@ const navItems = [
   { to: "/classes", icon: GraduationCap, label: "Classes" },
   { to: "/reports", icon: BarChart2, label: "Reports" },
   { to: "/sms", icon: MessageSquare, label: "Send SMS" },
+  { to: "/results", icon: FileText, label: "Exam Results" },
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 

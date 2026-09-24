@@ -48,6 +48,12 @@ enum Gender {
   FEMALE
 }
 
+enum ExamType {
+  MID_TERM
+  END_TERM
+  MOCK
+}
+
 // YOUR platform - one record only
 model Platform {
   id        String   @id @default(uuid())
@@ -96,12 +102,16 @@ model School {
   updatedAt DateTime @updatedAt
 
   // Relations
-  staff         Staff[]
-  classes       Class[]
-  students      Student[]
-  payments      FeePayment[]
-  smsLogs       SmsLog[]
-  feeStructures FeeStructure[]
+    staff          Staff[]
+  classes        Class[]
+  students       Student[]
+  payments       FeePayment[]
+  smsLogs        SmsLog[]
+  feeStructures  FeeStructure[]
+  examPeriods    ExamPeriod[]
+  subjects       Subject[]
+  gradeBoundaries GradeBoundary[]
+  examResults    ExamResult[]
 
   @@map("schools")
 }
@@ -146,8 +156,10 @@ model Class {
   updatedAt DateTime @updatedAt
 
   // Relations
+ 
   students      Student[]
   feeStructures FeeStructure[]
+  subjects      Subject[]
 
   @@unique([schoolId, name])
   @@map("classes")
@@ -212,8 +224,9 @@ model Student {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
-  payments FeePayment[]
+   // Relations
+  payments    FeePayment[]
+  examResults ExamResult[]
 
   @@map("students")
 }
@@ -326,4 +339,89 @@ model AuditLog {
   @@index([schoolId])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+// A specific exam sitting - eg "End of Term 2 Exams, 2026"
+// isActive controls whether parents can see results in the portal
+model ExamPeriod {
+  id           String   @id @default(uuid())
+  schoolId     String
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  name         String
+  term         Term
+  academicYear String
+  examType     ExamType @default(END_TERM)
+  isActive     Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  examResults ExamResult[]
+
+  @@unique([schoolId, term, academicYear, examType])
+  @@map("exam_periods")
+}
+
+// Subjects taken by a specific class eg "Mathematics" for Form 1
+model Subject {
+  id       String  @id @default(uuid())
+  schoolId String
+  school   School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId  String
+  class    Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  name     String
+  code     String?
+  isActive Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  examResults ExamResult[]
+
+  @@unique([schoolId, classId, name])
+  @@map("subjects")
+}
+
+// School-configurable mark-to-point mapping eg 80-100% = point 1
+model GradeBoundary {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  minPercent Float
+  maxPercent Float
+  gradePoint Int
+  gradeLabel String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, gradePoint])
+  @@map("grade_boundaries")
+}
+
+// One student's mark for one subject in one exam period
+model ExamResult {
+  id           String     @id @default(uuid())
+  schoolId     String
+  school       School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student    @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId    String
+  subject      Subject    @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  examPeriodId String
+  examPeriod   ExamPeriod @relation(fields: [examPeriodId], references: [id], onDelete: Cascade)
+
+  mark       Float
+  gradePoint Int?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, subjectId, examPeriodId])
+  @@index([schoolId])
+  @@index([examPeriodId])
+  @@map("exam_results")
 }

@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import api from "../../lib/axios";
 import { useAuthStore } from "../../store/authStore";
+import ResultsView from "./ResultsView";
 
 const termLabel = (term: string) => term.replace("_", " ");
 
@@ -28,9 +29,11 @@ export default function DashboardPage() {
   const [data, setData] = useState<any>(null);
   const [paymentInfo, setPaymentInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "payments" | "info">(
-    "overview",
-  );
+  const [activeTab, setActiveTab] = useState<
+    "overview" | "payments" | "info" | "results"
+  >("overview");
+
+  const [resultsAvailable, setResultsAvailable] = useState(false);
 
   useEffect(() => {
     if (!_hasHydrated) return;
@@ -54,6 +57,11 @@ export default function DashboardPage() {
           setPaymentInfo(infoRes.data.data);
         } catch {}
       }
+
+      try {
+        const activePeriodRes = await api.get("/exams/active-period");
+        setResultsAvailable(!!activePeriodRes.data.data);
+      } catch {}
     } catch {
       console.error("Failed to load data");
     } finally {
@@ -176,6 +184,18 @@ export default function DashboardPage() {
           >
             Payment Info
           </button>
+          {resultsAvailable && (
+            <button
+              onClick={() => setActiveTab("results")}
+              className={`flex-1 py-2.5 text-xs font-medium transition-all ${
+                activeTab === "results"
+                  ? "text-white border-b-2 border-white"
+                  : "text-blue-200"
+              }`}
+            >
+              Results
+            </button>
+          )}
         </div>
       </div>
 
@@ -243,7 +263,9 @@ export default function DashboardPage() {
               )}
 
             {/* Quick Actions */}
-            <div className="grid grid-cols-2 gap-3">
+            <div
+              className={`grid gap-3 ${resultsAvailable ? "grid-cols-3" : "grid-cols-2"}`}
+            >
               <button
                 onClick={() => router.push("/pay")}
                 className="bg-gradient-to-r from-green-600 to-green-500 text-white rounded-xl p-3 shadow-sm"
@@ -258,6 +280,15 @@ export default function DashboardPage() {
                 <History size={18} className="mx-auto mb-1" />
                 <p className="text-xs font-semibold">View History</p>
               </button>
+              {resultsAvailable && (
+                <button
+                  onClick={() => setActiveTab("results")}
+                  className="bg-purple-50 text-purple-700 rounded-xl p-3 border border-purple-100"
+                >
+                  <Star size={18} className="mx-auto mb-1" />
+                  <p className="text-xs font-semibold">View Results</p>
+                </button>
+              )}
             </div>
 
             {/* Recent Activity */}
@@ -528,6 +559,11 @@ export default function DashboardPage() {
               )}
             </div>
           )}
+
+        {/* RESULTS TAB */}
+        {activeTab === "results" && student?.id && (
+          <ResultsView studentId={student.id} />
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const prisma = require("../config/db");
+const { sendOtp, verifyOtp } = require("../lib/sms");
 
 //  HELPERS
 
@@ -10,9 +11,9 @@ const generateToken = (payload) => {
   });
 };
 
-const generateOTP = () => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
+// const generateOTP = () => {
+//   return Math.floor(100000 + Math.random() * 900000).toString();
+// };
 
 //  STAFF AUTH
 
@@ -329,7 +330,7 @@ const parentLoginWithStudentId = async (req, res) => {
 };
 
 // POST /api/auth/parent/request-otp
-// Parent requests OTP via their phone number
+// Parent requests OTP via their phone number — TumaSend generates & sends it
 const requestOTP = async (req, res) => {
   try {
     const { phone } = req.body;
@@ -368,45 +369,35 @@ const requestOTP = async (req, res) => {
       });
     }
 
-    // Generate OTP
-    const otp = generateOTP();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+    // Ask TumaSend to generate, store, and send the OTP
+    const { otpId, expiresAt } = await sendOtp(cleanPhone);
 
-    // Delete any existing OTP for this phone
+    // Delete any existing OTP session for this phone
     await prisma.otpCode.deleteMany({
       where: { phone: cleanPhone },
     });
 
-    // Save new OTP
+    // Save TumaSend's otp_id (not a 6-digit code — TumaSend holds that)
     await prisma.otpCode.create({
       data: {
         phone: cleanPhone,
-        code: otp,
-        expiresAt,
+        code: otpId,
+        expiresAt: new Date(expiresAt),
       },
     });
-
-    // TODO: Send OTP via Africa's Talking SMS
-    // For now log to console in development
-    if (process.env.NODE_ENV === "development") {
-      console.log(`📱 OTP for ${cleanPhone}: ${otp}`);
-    }
 
     return res.status(200).json({
       success: true,
       message: `Verification code sent to ${phone}`,
-      // Only return OTP in development for testing
-      ...(process.env.NODE_ENV === "development" && { otp }),
     });
   } catch (error) {
-    console.error("Request OTP error:", error);
+    console.error("Request OTP error:", error.message);
     return res.status(500).json({
       success: false,
       message: "Failed to send OTP. Please try again.",
     });
   }
 };
-
 // POST /api/auth/parent/verify-otp
 const verifyOTP = async (req, res) => {
   try {
@@ -421,14 +412,14 @@ const verifyOTP = async (req, res) => {
 
     const cleanPhone = phone.replace(/\s/g, "").replace(/^0/, "+265");
 
-    // Find OTP record
+    // Find the pending OTP session for this phone (code field holds TumaSend's otp_id)
     const otpRecord = await prisma.otpCode.findFirst({
       where: {
         phone: cleanPhone,
-        code: otp,
         used: false,
         expiresAt: { gt: new Date() },
       },
+      orderBy: { createdAt: "desc" },
     });
 
     if (!otpRecord) {
@@ -438,7 +429,23 @@ const verifyOTP = async (req, res) => {
       });
     }
 
-    // Mark OTP as used
+    // Ask TumaSend to verify the code against that otp_id
+    let verified = false;
+    try {
+      const result = await verifyOtp(otpRecord.code, otp);
+      verified = result.verified;
+    } catch (verifyErr) {
+      console.error("TumaSend verify error:", verifyErr.message);
+    }
+
+    if (!verified) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid or expired code. Please request a new one.",
+      });
+    }
+
+    // Mark OTP session as used
     await prisma.otpCode.update({
       where: { id: otpRecord.id },
       data: { used: true },
