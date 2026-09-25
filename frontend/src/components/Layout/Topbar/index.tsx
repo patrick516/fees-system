@@ -19,6 +19,8 @@ const Topbar = () => {
   const { staff } = useAuthStore();
   const title = pageTitles[location.pathname] || "SchoolPay";
 
+  const greeting = new Date().getHours() < 12 ? "morning" : "afternoon";
+
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
       <h1 className="text-xl font-semibold text-gray-800">{title}</h1>
@@ -27,9 +29,9 @@ const Topbar = () => {
           <Bell size={20} />
         </button>
         <div className="text-sm text-gray-600">
-          Good {new Date().getHours() < 12 ? "morning" : "afternoon"},{" "}
+          Good {greeting},{" "}
           <span className="font-medium text-gray-800">
-            {staff?.fullName.split(" ")[0]}
+            {staff?.fullName || "there"}
           </span>
         </div>
       </div>
