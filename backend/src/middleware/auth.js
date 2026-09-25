@@ -86,4 +86,66 @@ const verifyParent = async (req, res, next) => {
   }
 };
 
-module.exports = { verifyStaff, verifyParent };
+// Accepts EITHER a staff token OR a parent token.
+// Populates req.schoolId in both cases so school-scoped reads work for both roles.
+const verifyStaffOrParent = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({
+        success: false,
+        message: "Access denied. No token provided.",
+      });
+    }
+
+    const token = authHeader.split(" ")[1];
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+
+    // Parent path
+    if (decoded.type === "PARENT") {
+      const student = await prisma.student.findUnique({
+        where: { id: decoded.studentId },
+        include: { school: true, class: true },
+      });
+
+      if (!student || !student.isActive) {
+        return res.status(401).json({
+          success: false,
+          message: "Student not found or inactive.",
+        });
+      }
+
+      req.student = student;
+      req.parentPhone = decoded.phone;
+      req.schoolId = student.schoolId;
+      req.userType = "PARENT";
+      return next();
+    }
+
+    // Staff path
+    const staff = await prisma.staff.findUnique({
+      where: { id: decoded.id },
+      include: { school: true },
+    });
+
+    if (!staff || !staff.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid token or account deactivated.",
+      });
+    }
+
+    req.staff = staff;
+    req.schoolId = staff.schoolId;
+    req.userType = "STAFF";
+    next();
+  } catch (error) {
+    return res.status(401).json({
+      success: false,
+      message: "Invalid or expired token.",
+    });
+  }
+};
+
+module.exports = { verifyStaff, verifyParent, verifyStaffOrParent };

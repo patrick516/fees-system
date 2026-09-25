@@ -8,8 +8,6 @@ import {
   CheckCircle,
   AlertCircle,
   Clock,
-  // TrendingUp,
-  // ChevronDown,
   Loader2,
   BarChart2,
 } from "lucide-react";
@@ -17,6 +15,15 @@ import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
 import api from "../../lib/axios";
 import { useSchoolSettings } from "../../hooks/useSchoolSettings";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { getCurrentAcademicYear } from "../../lib/utils";
+import { useActiveTerm } from "../../hooks/useActiveTerm";
 
 const termOptions = [
   { value: "", label: "All Terms" },
@@ -41,6 +48,9 @@ const statusLabels: Record<string, string> = {
 
 const formatMWK = (amount: number) => `MWK ${(amount || 0).toLocaleString()}`;
 
+const ITEM_CLASS =
+  "cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900";
+
 export default function ReportsPage() {
   const { settings } = useSchoolSettings();
   const [classes, setClasses] = useState<any[]>([]);
@@ -48,11 +58,21 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(false);
 
+  // Active term — single source of truth for academic year
+  const { academicYear: activeYear } = useActiveTerm();
+
   const [filters, setFilters] = useState({
     term: "",
     classId: "",
-    academicYear: new Date().getFullYear().toString(),
+    academicYear: getCurrentAcademicYear(),
   });
+
+  // Sync filter's academic year once the activated value loads
+  useEffect(() => {
+    if (activeYear) {
+      setFilters((prev) => ({ ...prev, academicYear: activeYear }));
+    }
+  }, [activeYear]);
 
   useEffect(() => {
     api
@@ -423,7 +443,7 @@ export default function ReportsPage() {
               onChange={(e) =>
                 setFilters({ ...filters, academicYear: e.target.value })
               }
-              placeholder="eg. 2025"
+              placeholder="eg. 2025-2026"
               className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
@@ -431,36 +451,52 @@ export default function ReportsPage() {
             <label className="block text-xs font-medium text-gray-600 mb-1.5">
               Term
             </label>
-            <select
-              value={filters.term}
-              onChange={(e) => setFilters({ ...filters, term: e.target.value })}
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            <Select
+              value={filters.term || "ALL"}
+              onValueChange={(v) =>
+                setFilters({ ...filters, term: v === "ALL" ? "" : v })
+              }
             >
-              {termOptions.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full bg-transparent border-gray-200 rounded-lg text-sm h-[42px]">
+                <SelectValue placeholder="All Terms" />
+              </SelectTrigger>
+              <SelectContent className="bg-white w-auto min-w-[140px]">
+                {termOptions.map((t) => (
+                  <SelectItem
+                    key={t.value || "ALL"}
+                    value={t.value || "ALL"}
+                    className={ITEM_CLASS}
+                  >
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1.5">
               Class
             </label>
-            <select
-              value={filters.classId}
-              onChange={(e) =>
-                setFilters({ ...filters, classId: e.target.value })
+            <Select
+              value={filters.classId || "ALL"}
+              onValueChange={(v) =>
+                setFilters({ ...filters, classId: v === "ALL" ? "" : v })
               }
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">All Classes</option>
-              {classes.map((c: any) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              <SelectTrigger className="w-full bg-transparent border-gray-200 rounded-lg text-sm h-[42px]">
+                <SelectValue placeholder="All Classes" />
+              </SelectTrigger>
+              <SelectContent className="bg-white w-auto min-w-[140px]">
+                <SelectItem value="ALL" className={ITEM_CLASS}>
+                  All Classes
+                </SelectItem>
+                {classes.map((c: any) => (
+                  <SelectItem key={c.id} value={c.id} className={ITEM_CLASS}>
+                    {c.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="flex items-end">
             <button

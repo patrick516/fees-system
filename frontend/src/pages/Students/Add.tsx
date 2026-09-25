@@ -1,8 +1,24 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
 import api from "../../lib/axios";
 import type { Class } from "../../types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Calendar } from "../../components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "../../components/ui/popover";
+import { getCurrentAcademicYear } from "../../lib/utils";
+import { useActiveTerm } from "../../hooks/useActiveTerm";
 
 const AddStudent = () => {
   const navigate = useNavigate();
@@ -11,17 +27,31 @@ const AddStudent = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>(undefined);
+  const [dobOpen, setDobOpen] = useState(false);
+
+  // Active term from admin — single source of truth for academic year
+  const { academicYear: activeYear } = useActiveTerm();
+
   const [form, setForm] = useState({
-    fullName: "",
-    dateOfBirth: "",
+    firstName: "",
+    middleName: "",
+    lastName: "",
     gender: "",
     classId: "",
     parentName: "",
     parentPhone: "",
     parentPhone2: "",
     parentEmail: "",
-    academicYear: new Date().getFullYear().toString(),
+    academicYear: getCurrentAcademicYear(),
   });
+
+  // Sync the form's academic year once the activated value loads
+  useEffect(() => {
+    if (activeYear) {
+      setForm((prev) => ({ ...prev, academicYear: activeYear }));
+    }
+  }, [activeYear]);
 
   useEffect(() => {
     api
@@ -35,11 +65,28 @@ const AddStudent = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+
+    if (!form.firstName.trim() || !form.lastName.trim()) {
+      setError("First name and last name are required");
+      return;
+    }
+
+    if (!form.gender || !form.classId) {
+      setError("Please select gender and class");
+      return;
+    }
+
+    if (!dateOfBirth) {
+      setError("Please select the date of birth");
+      return;
+    }
+
     setLoading(true);
 
     try {
       const payload = {
         ...form,
+        dateOfBirth: format(dateOfBirth, "yyyy-MM-dd"),
         parentPhone2: form.parentPhone2 || undefined,
         parentEmail: form.parentEmail || undefined,
       };
@@ -55,9 +102,7 @@ const AddStudent = () => {
     }
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>,
-  ) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
   };
 
@@ -90,67 +135,133 @@ const AddStudent = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Full Name *
+                Student Name *
               </label>
-              <input
-                name="fullName"
-                value={form.fullName}
-                onChange={handleChange}
-                required
-                placeholder="eg. John Banda"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <input
+                  name="firstName"
+                  value={form.firstName}
+                  onChange={handleChange}
+                  required
+                  placeholder="First name"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  name="middleName"
+                  value={form.middleName}
+                  onChange={handleChange}
+                  placeholder="Middle name (optional)"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+                <input
+                  name="lastName"
+                  value={form.lastName}
+                  onChange={handleChange}
+                  required
+                  placeholder="Last name"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
             </div>
 
+            {/* Date of Birth — shadcn DatePicker */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Date of Birth *
               </label>
-              <input
-                name="dateOfBirth"
-                type="date"
-                value={form.dateOfBirth}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <Popover open={dobOpen} onOpenChange={setDobOpen}>
+                <PopoverTrigger asChild>
+                  <button
+                    type="button"
+                    className="w-full flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg text-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  >
+                    <span
+                      className={
+                        dateOfBirth ? "text-gray-900" : "text-gray-400"
+                      }
+                    >
+                      {dateOfBirth
+                        ? format(dateOfBirth, "dd/MM/yyyy")
+                        : "dd/mm/yyyy"}
+                    </span>
+                    <CalendarIcon size={16} className="text-gray-400" />
+                  </button>
+                </PopoverTrigger>
+                <PopoverContent
+                  className="w-[300px] p-0 bg-white border border-gray-200 rounded-xl shadow-lg"
+                  align="start"
+                >
+                  <Calendar
+                    mode="single"
+                    selected={dateOfBirth}
+                    onSelect={(d) => {
+                      setDateOfBirth(d);
+                      setDobOpen(false);
+                    }}
+                    disabled={(d) =>
+                      d > new Date() || d < new Date("1950-01-01")
+                    }
+                    captionLayout="dropdown"
+                    startMonth={new Date(1950, 0)}
+                    endMonth={new Date()}
+                    defaultMonth={dateOfBirth || new Date(2015, 0, 1)}
+                    autoFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Gender *
               </label>
-              <select
-                name="gender"
+              <Select
                 value={form.gender}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onValueChange={(v) => setForm({ ...form, gender: v })}
               >
-                <option value="">Select gender</option>
-                <option value="MALE">Male</option>
-                <option value="FEMALE">Female</option>
-              </select>
+                <SelectTrigger className="w-full bg-transparent border-gray-300 rounded-lg text-sm h-[38px]">
+                  <SelectValue placeholder="Select gender" />
+                </SelectTrigger>
+                <SelectContent className="bg-white w-auto min-w-[140px]">
+                  <SelectItem
+                    value="MALE"
+                    className="cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900"
+                  >
+                    Male
+                  </SelectItem>
+                  <SelectItem
+                    value="FEMALE"
+                    className="cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900"
+                  >
+                    Female
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Class *
               </label>
-              <select
-                name="classId"
+              <Select
                 value={form.classId}
-                onChange={handleChange}
-                required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                onValueChange={(v) => setForm({ ...form, classId: v })}
               >
-                <option value="">Select class</option>
-                {classes.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+                <SelectTrigger className="w-full bg-transparent border-gray-300 rounded-lg text-sm h-[38px]">
+                  <SelectValue placeholder="Select class" />
+                </SelectTrigger>
+                <SelectContent className="bg-white w-auto min-w-[140px]">
+                  {classes.map((c) => (
+                    <SelectItem
+                      key={c.id}
+                      value={c.id}
+                      className="cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900"
+                    >
+                      {c.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <div>
@@ -162,7 +273,7 @@ const AddStudent = () => {
                 value={form.academicYear}
                 onChange={handleChange}
                 required
-                placeholder="eg. 2025"
+                placeholder="eg. 2025-2026"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
             </div>

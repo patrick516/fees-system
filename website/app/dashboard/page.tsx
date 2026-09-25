@@ -19,9 +19,10 @@ import {
 } from "lucide-react";
 import api from "../../lib/axios";
 import { useAuthStore } from "../../store/authStore";
+import { useActiveTerm } from "../../hooks/useActiveTerm";
 import ResultsView from "./ResultsView";
 
-const termLabel = (term: string) => term.replace("_", " ");
+const termLabel = (term?: string | null) => (term || "").replace("_", " ");
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -34,6 +35,10 @@ export default function DashboardPage() {
   >("overview");
 
   const [resultsAvailable, setResultsAvailable] = useState(false);
+  const [termStatus, setTermStatus] = useState<any>(null);
+
+  // Active term — same source of truth as admin
+  const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
 
   useEffect(() => {
     if (!_hasHydrated) return;
@@ -43,6 +48,17 @@ export default function DashboardPage() {
     }
     fetchData();
   }, [_hasHydrated, isAuthenticated]);
+
+  // Fetch term status (required fee + balance) whenever the student or active term is known
+  useEffect(() => {
+    if (!student?.id || !currentTerm || !activeYear) return;
+    api
+      .get(
+        `/schools/student-term-status/${student.id}?term=${currentTerm}&academicYear=${activeYear}`,
+      )
+      .then((res) => setTermStatus(res.data.data))
+      .catch(() => setTermStatus(null));
+  }, [student?.id, currentTerm, activeYear]);
 
   const fetchData = async () => {
     try {
@@ -86,11 +102,15 @@ export default function DashboardPage() {
   const verifiedPayments = payments.filter((p: any) => p.status === "VERIFIED");
   const pendingPayments = payments.filter((p: any) => p.status === "PENDING");
 
-  const getStatusColor = () => {
-    if (summary.totalPaid === 0) return "from-gray-600 to-gray-500";
-    if (payments.some((p: any) => p.isDebtor)) return "from-red-600 to-red-500";
-    return "from-green-600 to-green-500";
-  };
+  // Pull values from termStatus — the amount required, what's been paid for the
+  // active term, and the remaining balance
+  const requiredAmount = termStatus?.termStatus?.requiredAmount || 0;
+  const paidThisTerm = termStatus?.termStatus?.totalPaidThisTerm || 0;
+  const balanceRemaining = termStatus?.termStatus?.balanceRemaining || 0;
+  const creditBalance = termStatus?.termStatus?.creditBalance || 0;
+  const hasFeeStructure = termStatus?.termStatus?.hasFeeStructure === true;
+  const isClear = hasFeeStructure && balanceRemaining === 0;
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-100 to-slate-50 py-4 px-3 sm:py-6 sm:px-6 lg:py-10 lg:px-10">
       <div className="max-w-4xl mx-auto w-full lg:max-w-6xl">
@@ -202,31 +222,80 @@ export default function DashboardPage() {
             {activeTab === "overview" && (
               <div className="lg:grid lg:grid-cols-3 lg:gap-5 space-y-4 lg:space-y-0">
                 <div className="lg:col-span-2 space-y-4">
-                  {/* Stats Cards */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-emerald-50 rounded-xl p-3.5 border border-emerald-100">
-                      <p className="text-[11px] text-emerald-700 font-medium mb-1">
-                        Total Paid
+                  {/* Fee Summary — Required / Paid / Balance */}
+                  {hasFeeStructure && currentTerm && (
+                    <div>
+                      <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                        {termLabel(currentTerm)} • {activeYear}
                       </p>
-                      <p className="text-lg font-bold text-emerald-700">
-                        MWK {(summary.totalPaid || 0).toLocaleString()}
-                      </p>
+                      <div className="grid grid-cols-3 gap-3">
+                        <div className="bg-blue-50 rounded-xl p-3.5 border border-blue-100">
+                          <p className="text-[11px] text-blue-700 font-medium mb-1">
+                            Required
+                          </p>
+                          <p className="text-base font-bold text-blue-900">
+                            MWK {requiredAmount.toLocaleString()}
+                          </p>
+                        </div>
+                        <div className="bg-emerald-50 rounded-xl p-3.5 border border-emerald-100">
+                          <p className="text-[11px] text-emerald-700 font-medium mb-1">
+                            Paid
+                          </p>
+                          <p className="text-base font-bold text-emerald-700">
+                            MWK {paidThisTerm.toLocaleString()}
+                          </p>
+                        </div>
+                        <div
+                          className={`rounded-xl p-3.5 border ${
+                            isClear
+                              ? "bg-emerald-50 border-emerald-100"
+                              : "bg-red-50 border-red-100"
+                          }`}
+                        >
+                          <p className="text-[11px] font-medium mb-1 text-slate-500">
+                            Balance
+                          </p>
+                          <p
+                            className={`text-base font-bold ${
+                              isClear ? "text-emerald-600" : "text-red-600"
+                            }`}
+                          >
+                            {isClear
+                              ? "✓ Clear"
+                              : `MWK ${balanceRemaining.toLocaleString()}`}
+                          </p>
+                        </div>
+                      </div>
                     </div>
-                    <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200">
-                      <p className="text-[11px] text-slate-500 font-medium mb-1">
-                        Pending
-                      </p>
-                      <p
-                        className={`text-lg font-bold ${
-                          summary.pendingAmount > 0
-                            ? "text-amber-600"
-                            : "text-slate-400"
-                        }`}
-                      >
-                        MWK {(summary.pendingAmount || 0).toLocaleString()}
-                      </p>
+                  )}
+
+                  {/* Fallback when no fee structure or active term yet */}
+                  {!hasFeeStructure && (
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="bg-emerald-50 rounded-xl p-3.5 border border-emerald-100">
+                        <p className="text-[11px] text-emerald-700 font-medium mb-1">
+                          Total Paid
+                        </p>
+                        <p className="text-lg font-bold text-emerald-700">
+                          MWK {(summary.totalPaid || 0).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-200">
+                        <p className="text-[11px] text-slate-500 font-medium mb-1">
+                          Pending
+                        </p>
+                        <p
+                          className={`text-lg font-bold ${
+                            summary.pendingAmount > 0
+                              ? "text-amber-600"
+                              : "text-slate-400"
+                          }`}
+                        >
+                          MWK {(summary.pendingAmount || 0).toLocaleString()}
+                        </p>
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Notices */}
                   {pendingPayments.length > 0 && (
@@ -239,29 +308,31 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {verifiedPayments.some((p: any) => p.isDebtor) && (
+                  {hasFeeStructure && !isClear && (
                     <div className="flex items-center gap-2.5 bg-red-50 border border-red-200 rounded-xl p-3">
                       <AlertCircle
                         size={15}
                         className="text-red-600 shrink-0"
                       />
                       <p className="text-xs text-red-800 font-medium">
-                        Outstanding balance! Please pay soon.
+                        Outstanding balance of MWK{" "}
+                        {balanceRemaining.toLocaleString()}. Please pay soon.
                       </p>
                     </div>
                   )}
 
-                  {verifiedPayments.some((p: any) => p.overpayment > 0) && (
+                  {creditBalance > 0 && (
                     <div className="flex items-center gap-2.5 bg-purple-50 border border-purple-200 rounded-xl p-3">
                       <Star size={15} className="text-purple-600 shrink-0" />
                       <p className="text-xs text-purple-800">
-                        Credit balance available
+                        Credit balance: MWK {creditBalance.toLocaleString()} —
+                        will apply to next term
                       </p>
                     </div>
                   )}
 
-                  {verifiedPayments.length > 0 &&
-                    !verifiedPayments.some((p: any) => p.isDebtor) &&
+                  {hasFeeStructure &&
+                    isClear &&
                     pendingPayments.length === 0 && (
                       <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-200 rounded-xl p-3">
                         <CheckCircle
@@ -269,7 +340,7 @@ export default function DashboardPage() {
                           className="text-emerald-600 shrink-0"
                         />
                         <p className="text-xs font-medium text-emerald-800">
-                          All fees paid! 🎉
+                          All fees paid for {termLabel(currentTerm)}! 🎉
                         </p>
                       </div>
                     )}

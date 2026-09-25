@@ -3,6 +3,15 @@ import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Search, Loader2, CheckCircle } from "lucide-react";
 import api from "../../lib/axios";
 import type { Student } from "../../types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { getCurrentAcademicYear } from "../../lib/utils";
+import { useActiveTerm } from "../../hooks/useActiveTerm";
 
 const paymentMethods = [
   { value: "CASH", label: "Cash" },
@@ -21,6 +30,9 @@ const terms = [
   { value: "TERM_3", label: "Term 3" },
 ];
 
+const ITEM_CLASS =
+  "cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900";
+
 const RecordPayment = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -36,13 +48,25 @@ const RecordPayment = () => {
   const [termStatusLoading, setTermStatusLoading] = useState(false);
   const [overpaymentWarning, setOverpaymentWarning] = useState<number>(0);
 
+  // Active term — same source of truth as everything else
+  const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
+
   const [form, setForm] = useState({
     amount: "",
     paymentMethod: "CASH",
     term: "TERM_1",
-    academicYear: "2025",
+    academicYear: getCurrentAcademicYear(),
     notes: "",
   });
+
+  // Sync form.term and form.academicYear with the activated values
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      academicYear: activeYear || prev.academicYear,
+      term: currentTerm || prev.term,
+    }));
+  }, [activeYear, currentTerm]);
 
   // Fetch term status when student or term changes
   useEffect(() => {
@@ -66,7 +90,7 @@ const RecordPayment = () => {
     fetch();
   }, [selectedStudent, form.term, form.academicYear]);
 
-  // Calculate overpayment warning when amount changes
+  // Overpayment warning
   useEffect(() => {
     if (!termStatus || !form.amount) {
       setOverpaymentWarning(0);
@@ -76,40 +100,38 @@ const RecordPayment = () => {
     const balance = termStatus.termStatus.balanceRemaining;
     if (balance !== null && entered > balance && balance > 0) {
       setOverpaymentWarning(entered - balance);
-    } else if (balance === 0) {
-      setOverpaymentWarning(0);
     } else {
       setOverpaymentWarning(0);
     }
   }, [form.amount, termStatus]);
 
-  const [feeStructure, setFeeStructure] = useState<any>(null);
-  const [feeLoading, setFeeLoading] = useState(false);
+  // const [feeStructure, setFeeStructure] = useState<any>(null);
+  // const [feeLoading, setFeeLoading] = useState(false);
 
   // Lookup fee structure when student + term + year changes
-  useEffect(() => {
-    if (!selectedStudent || !form.term || !form.academicYear) return;
+  // useEffect(() => {
+  //   if (!selectedStudent || !form.term || !form.academicYear) return;
 
-    const lookupFee = async () => {
-      setFeeLoading(true);
-      try {
-        // Get the student's classId first
-        const studentRes = await api.get(`/students/${selectedStudent.id}`);
-        const classId = studentRes.data.data.classId;
+  //   const lookupFee = async () => {
+  //     setFeeLoading(true);
+  //     try {
+  //       const studentRes = await api.get(`/students/${selectedStudent.id}`);
+  //       const classId = studentRes.data.data.classId;
 
-        const res = await api.get(
-          `/schools/fee-structures/lookup?classId=${classId}&term=${form.term}&academicYear=${form.academicYear}`,
-        );
-        setFeeStructure(res.data.data);
-      } catch {
-        setFeeStructure(null);
-      } finally {
-        setFeeLoading(false);
-      }
-    };
+  //       const res = await api.get(
+  //         `/schools/fee-structures/lookup?classId=${classId}&term=${form.term}&academicYear=${form.academicYear}`,
+  //       );
+  //       setFeeStructure(res.data.data);
+  //     } catch {
+  //       setFeeStructure(null);
+  //     } finally {
+  //       setFeeLoading(false);
+  //     }
+  //   };
 
-    lookupFee();
-  }, [selectedStudent, form.term, form.academicYear]);
+  //   lookupFee();
+  // }, [selectedStudent, form.term, form.academicYear]);
+
   // If navigated from student detail
   useEffect(() => {
     if (location.state?.studentId) {
@@ -188,49 +210,6 @@ const RecordPayment = () => {
             <span className="font-medium">{success.student?.fullName}</span>
           </div>
           <div className="flex justify-between">
-            {/* Fee Structure Info */}
-            {selectedStudent && (
-              <div
-                className={`p-4 rounded-lg border ${
-                  feeStructure
-                    ? "bg-blue-50 border-blue-200"
-                    : "bg-yellow-50 border-yellow-200"
-                }`}
-              >
-                {feeLoading ? (
-                  <p className="text-sm text-gray-500">
-                    Loading fee information...
-                  </p>
-                ) : feeStructure ? (
-                  <div>
-                    <p className="text-sm font-medium text-blue-800">
-                      Required Fee: MWK{" "}
-                      {feeStructure.totalAmount.toLocaleString()}
-                    </p>
-                    {feeStructure.tuitionFee && (
-                      <p className="text-xs text-blue-600 mt-1">
-                        Tuition: MWK {feeStructure.tuitionFee.toLocaleString()}
-                        {feeStructure.examFee
-                          ? ` • Exam: MWK ${feeStructure.examFee.toLocaleString()}`
-                          : ""}
-                        {feeStructure.buildingLevy
-                          ? ` • Building: MWK ${feeStructure.buildingLevy.toLocaleString()}`
-                          : ""}
-                      </p>
-                    )}
-                    <p className="text-xs text-blue-500 mt-1">
-                      Paying less than the required amount will mark this
-                      student as a debtor
-                    </p>
-                  </div>
-                ) : (
-                  <p className="text-sm text-yellow-700">
-                    No fee structure set for this class and term. Contact admin
-                    to set fees first.
-                  </p>
-                )}
-              </div>
-            )}
             <span className="text-gray-500">Amount</span>
             <span className="font-medium text-green-600">
               MWK {success.amount?.toLocaleString()}
@@ -239,7 +218,7 @@ const RecordPayment = () => {
           <div className="flex justify-between">
             <span className="text-gray-500">Term</span>
             <span className="font-medium">
-              {success.term?.replace("_", " ")}
+              {success.term?.replace("_", " ")} — {success.academicYear}
             </span>
           </div>
         </div>
@@ -388,7 +367,6 @@ const RecordPayment = () => {
 
             {termStatus && !termStatusLoading && (
               <div className="space-y-3">
-                {/* Fee Structure Info */}
                 {termStatus.termStatus.hasFeeStructure ? (
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
@@ -470,7 +448,6 @@ const RecordPayment = () => {
                   </div>
                 )}
 
-                {/* Overpayment Warning */}
                 {overpaymentWarning > 0 && (
                   <div className="p-4 bg-purple-50 border border-purple-200 rounded-lg">
                     <p className="text-sm font-medium text-purple-800">
@@ -486,7 +463,6 @@ const RecordPayment = () => {
                   </div>
                 )}
 
-                {/* Already fully paid warning */}
                 {termStatus.termStatus.isFullyPaid && (
                   <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                     <p className="text-sm font-medium text-green-800">
@@ -522,36 +498,50 @@ const RecordPayment = () => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Term *
                 </label>
-                <select
+                <Select
                   value={form.term}
-                  onChange={(e) => setForm({ ...form, term: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onValueChange={(v) => setForm({ ...form, term: v })}
                 >
-                  {terms.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full bg-transparent border-gray-300 rounded-lg text-sm h-[38px]">
+                    <SelectValue placeholder="Select term" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white w-auto min-w-[140px]">
+                    {terms.map((t) => (
+                      <SelectItem
+                        key={t.value}
+                        value={t.value}
+                        className={ITEM_CLASS}
+                      >
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Payment Method *
                 </label>
-                <select
+                <Select
                   value={form.paymentMethod}
-                  onChange={(e) =>
-                    setForm({ ...form, paymentMethod: e.target.value })
-                  }
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  onValueChange={(v) => setForm({ ...form, paymentMethod: v })}
                 >
-                  {paymentMethods.map((m) => (
-                    <option key={m.value} value={m.value}>
-                      {m.label}
-                    </option>
-                  ))}
-                </select>
+                  <SelectTrigger className="w-full bg-transparent border-gray-300 rounded-lg text-sm h-[38px]">
+                    <SelectValue placeholder="Select method" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white w-auto min-w-[160px]">
+                    {paymentMethods.map((m) => (
+                      <SelectItem
+                        key={m.value}
+                        value={m.value}
+                        className={ITEM_CLASS}
+                      >
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div>
@@ -563,6 +553,7 @@ const RecordPayment = () => {
                   onChange={(e) =>
                     setForm({ ...form, academicYear: e.target.value })
                   }
+                  placeholder="eg. 2025-2026"
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>

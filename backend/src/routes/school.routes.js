@@ -1,7 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const { verifyStaff, verifyParent } = require("../middleware/auth");
+const {
+  verifyStaff,
+  verifyParent,
+  verifyStaffOrParent,
+} = require("../middleware/auth");
 const { isAdmin, isBursar } = require("../middleware/role");
 const prisma = require("../config/db");
 const schoolController = require("../controllers/school.controller");
@@ -348,7 +352,7 @@ router.delete("/fee-structures/:id", verifyStaff, isAdmin, async (req, res) => {
 
 // GET /api/schools/active-term
 // Returns the currently active term for this school
-router.get("/active-term", verifyStaff, async (req, res) => {
+router.get("/active-term", verifyStaffOrParent, async (req, res) => {
   try {
     const school = await prisma.school.findUnique({
       where: { id: req.schoolId },
@@ -518,10 +522,9 @@ router.post("/activate-term", verifyStaff, isAdmin, async (req, res) => {
       .json({ success: false, message: "Failed to activate term" });
   }
 });
-
 router.get(
   "/student-term-status/:studentId",
-  verifyParent,
+  verifyStaffOrParent,
   async (req, res) => {
     try {
       const { studentId } = req.params;
@@ -534,7 +537,7 @@ router.get(
         });
       }
       const student = await prisma.student.findFirst({
-        where: { id: studentId, schoolId: req.student.schoolId },
+        where: { id: studentId, schoolId: req.schoolId }, // ← set by both middlewares
         include: { class: true },
       });
 

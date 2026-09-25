@@ -86,6 +86,9 @@ const getFeesReport = async (req, res) => {
       return {
         studentId: student.id,
         studentCode: student.studentCode,
+        firstName: student.firstName,
+        middleName: student.middleName,
+        lastName: student.lastName,
         fullName: student.fullName,
         gender: student.gender,
         className: student.class.name,

@@ -30,6 +30,9 @@ export interface Class {
 export interface Student {
   id: string;
   studentCode: string;
+  firstName: string;
+  middleName?: string | null;
+  lastName: string;
   fullName: string;
   dateOfBirth: string;
   gender: "MALE" | "FEMALE";

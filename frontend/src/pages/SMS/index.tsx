@@ -8,6 +8,13 @@ import {
   XCircle,
 } from "lucide-react";
 import api from "../../lib/axios";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 
 const smsTypes = [
   {
@@ -35,6 +42,15 @@ const smsTypes = [
     iconColor: "text-red-600",
   },
 ];
+
+const termOptions = [
+  { value: "TERM_1", label: "Term 1" },
+  { value: "TERM_2", label: "Term 2" },
+  { value: "TERM_3", label: "Term 3" },
+];
+
+const ITEM_CLASS =
+  "cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900";
 
 const SMSPage = () => {
   const [selectedType, setSelectedType] = useState("");
@@ -104,15 +120,22 @@ const SMSPage = () => {
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Term
             </label>
-            <select
-              value={term}
-              onChange={(e) => setTerm(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="TERM_1">Term 1</option>
-              <option value="TERM_2">Term 2</option>
-              <option value="TERM_3">Term 3</option>
-            </select>
+            <Select value={term} onValueChange={setTerm}>
+              <SelectTrigger className="w-full bg-transparent border-gray-300 rounded-lg text-sm h-[42px]">
+                <SelectValue placeholder="Select term" />
+              </SelectTrigger>
+              <SelectContent className="bg-white w-auto min-w-[140px]">
+                {termOptions.map((t) => (
+                  <SelectItem
+                    key={t.value}
+                    value={t.value}
+                    className={ITEM_CLASS}
+                  >
+                    {t.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           {selectedType === "announcement" && (

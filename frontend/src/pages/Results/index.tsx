@@ -20,6 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { getCurrentAcademicYear } from "../../lib/utils";
+import { useActiveTerm } from "../../hooks/useActiveTerm";
 
 const defaultPointsBoundaries = [
   { minPercent: 80, maxPercent: 100, gradePoint: 1, gradeLabel: "" },
@@ -96,12 +98,25 @@ const ResultsPage = () => {
 
   const selectedClassObj = classes.find((c: any) => c.id === selectedClass);
 
+  // Active term — single source of truth for academic year
+  const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
+
   const [newPeriod, setNewPeriod] = useState({
     name: "",
     term: "TERM_1",
-    academicYear: "2026",
+    academicYear: getCurrentAcademicYear(),
     examType: "END_TERM",
   });
+
+  // Sync the exam period form with the activated values as they load
+  useEffect(() => {
+    if (activeYear) {
+      setNewPeriod((prev) => ({ ...prev, academicYear: activeYear }));
+    }
+    if (currentTerm) {
+      setNewPeriod((prev) => ({ ...prev, term: currentTerm }));
+    }
+  }, [activeYear, currentTerm]);
 
   const loadBoundaries = async (system: "POINTS" | "LETTER") => {
     const b = await getGradeBoundaries(system);
@@ -478,7 +493,7 @@ const ResultsPage = () => {
             </SelectContent>
           </Select>
           <input
-            placeholder="Academic Year"
+            placeholder="eg. 2025-2026"
             value={newPeriod.academicYear}
             onChange={(e) =>
               setNewPeriod({ ...newPeriod, academicYear: e.target.value })

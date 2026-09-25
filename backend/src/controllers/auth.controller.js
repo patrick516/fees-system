@@ -309,6 +309,9 @@ const parentLoginWithStudentId = async (req, res) => {
         token,
         student: {
           id: student.id,
+          firstName: student.firstName,
+          middleName: student.middleName,
+          lastName: student.lastName,
           fullName: student.fullName,
           studentCode: student.studentCode,
           class: student.class.name,
@@ -500,6 +503,9 @@ const verifyOTP = async (req, res) => {
         token,
         student: {
           id: student.id,
+          firstName: student.firstName,
+          middleName: student.middleName,
+          lastName: student.lastName,
           fullName: student.fullName,
           studentCode: student.studentCode,
           class: student.class.name,

@@ -8,14 +8,27 @@ import {
   Edit2,
   Trash2,
   CheckCircle,
+  AlertCircle,
 } from "lucide-react";
 import api from "../../lib/axios";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { getCurrentAcademicYear } from "../../lib/utils";
+import { useActiveTerm } from "../../hooks/useActiveTerm";
 
 const terms = [
   { value: "TERM_1", label: "Term 1" },
   { value: "TERM_2", label: "Term 2" },
   { value: "TERM_3", label: "Term 3" },
 ];
+
+const ITEM_CLASS =
+  "cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900";
 
 const ClassesPage = () => {
   const [classes, setClasses] = useState<any[]>([]);
@@ -42,11 +55,14 @@ const ClassesPage = () => {
     branch: "",
   });
 
+  // Active term — single source of truth for the whole app
+  const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
+
   // Fee structure form state
   const [feeForm, setFeeForm] = useState({
     classId: "",
     term: "TERM_1",
-    academicYear: "2025",
+    academicYear: getCurrentAcademicYear(),
     totalAmount: "",
     tuitionFee: "",
     examFee: "",
@@ -60,15 +76,37 @@ const ClassesPage = () => {
   const [showFeeForm, setShowFeeForm] = useState<string | null>(null);
   const [editingFee, setEditingFee] = useState<any>(null);
 
-  // Active term state
+  // Active term state (for the display card)
   const [activeTerm, setActiveTerm] = useState<any>(null);
   const [activatingTerm, setActivatingTerm] = useState(false);
   const [activateForm, setActivateForm] = useState({
     term: "TERM_1",
-    academicYear: "2025",
+    academicYear: getCurrentAcademicYear(),
   });
   const [activateError, setActivateError] = useState("");
   const [activateSuccess, setActivateSuccess] = useState("");
+  const [showActivateForm, setShowActivateForm] = useState(false);
+
+  // Sync the Activate Term form with the activated values as soon as they load
+  useEffect(() => {
+    if (activeYear) {
+      setActivateForm((prev) => ({ ...prev, academicYear: activeYear }));
+    }
+    if (currentTerm) {
+      setActivateForm((prev) => ({ ...prev, term: currentTerm }));
+    }
+  }, [activeYear, currentTerm]);
+
+  // Keep the new fee form in sync with the activated term/year
+  useEffect(() => {
+    if (activeYear && showFeeForm && !editingFee) {
+      setFeeForm((prev) => ({
+        ...prev,
+        academicYear: activeYear,
+        term: currentTerm || prev.term,
+      }));
+    }
+  }, [activeYear, currentTerm, showFeeForm, editingFee]);
 
   const fetchClasses = async () => {
     try {
@@ -144,6 +182,7 @@ const ClassesPage = () => {
   const handleDeleteBank = (index: number) => {
     setBankAccounts((prev) => prev.filter((_, i) => i !== index));
   };
+
   const handleAddClass = async (e: React.FormEvent) => {
     e.preventDefault();
     setClassError("");
@@ -193,6 +232,9 @@ const ClassesPage = () => {
       setFeeForm((prev) => ({
         ...prev,
         classId,
+        // Prefer the currently activated year; fall back to the current calendar year
+        academicYear: activeYear || prev.academicYear,
+        term: currentTerm || prev.term,
         totalAmount: "",
         tuitionFee: "",
         examFee: "",
@@ -278,6 +320,11 @@ const ClassesPage = () => {
       const res = await api.post("/schools/activate-term", activateForm);
       setActivateSuccess(res.data.message);
       fetchActiveTerm();
+      // Close the form shortly after success so the table becomes the focus
+      setTimeout(() => {
+        setShowActivateForm(false);
+        setActivateSuccess("");
+      }, 1800);
     } catch (err: any) {
       setActivateError(
         err.response?.data?.message || "Failed to activate term",
@@ -299,89 +346,168 @@ const ClassesPage = () => {
       </div>
 
       {/* Active Term Card */}
-      <div
-        className={`rounded-xl p-6 border ${activeTerm ? "bg-green-50 border-green-200" : "bg-yellow-50 border-yellow-200"}`}
-      >
-        <div className="flex items-start justify-between">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {/* Header row */}
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <p className="text-sm font-semibold text-gray-700 mb-1">
-              Current Active Term
+            <h3 className="font-medium text-gray-800">Active Term</h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Sets the default term and academic year across the whole system
             </p>
-            {activeTerm ? (
-              <p className="text-2xl font-bold text-green-700">
-                {activeTerm.activeTerm.replace("_", " ")} —{" "}
-                {activeTerm.activeAcademicYear}
-              </p>
-            ) : (
-              <p className="text-sm text-yellow-700">
-                No active term set. Activate a term to enable fee collection.
-              </p>
-            )}
           </div>
-          <CheckCircle
-            size={24}
-            className={activeTerm ? "text-green-500" : "text-yellow-400"}
-          />
+          {activeTerm && !showActivateForm && (
+            <button
+              onClick={() => {
+                setShowActivateForm(true);
+                setActivateError("");
+                setActivateSuccess("");
+              }}
+              className="flex items-center gap-1.5 text-sm font-medium text-blue-900 hover:text-blue-700 transition-colors"
+            >
+              <Edit2 size={14} /> Change
+            </button>
+          )}
         </div>
 
-        {/* Activate Term Form */}
-        <form
-          onSubmit={handleActivateTerm}
-          className="mt-4 flex flex-wrap gap-3 items-end"
-        >
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Term
-            </label>
-            <select
-              value={activateForm.term}
-              onChange={(e) =>
-                setActivateForm({ ...activateForm, term: e.target.value })
-              }
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            >
-              {terms.map((t) => (
-                <option key={t.value} value={t.value}>
-                  {t.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1">
-              Academic Year
-            </label>
-            <input
-              value={activateForm.academicYear}
-              onChange={(e) =>
-                setActivateForm({
-                  ...activateForm,
-                  academicYear: e.target.value,
-                })
-              }
-              placeholder="2025"
-              className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-24 focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
-          <button
-            type="submit"
-            disabled={activatingTerm}
-            className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
-          >
-            {activatingTerm ? (
-              <Loader2 size={14} className="animate-spin" />
+        {/* Active term table */}
+        <table className="w-full text-sm">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr className="text-left text-gray-500">
+              <th className="px-6 py-2.5 font-medium">Term</th>
+              <th className="px-6 py-2.5 font-medium">Academic Year</th>
+              <th className="px-6 py-2.5 font-medium">Status</th>
+            </tr>
+          </thead>
+          <tbody>
+            {activeTerm ? (
+              <tr className="border-t border-gray-100">
+                <td className="px-6 py-3 font-medium text-gray-800">
+                  {activeTerm.activeTerm.replace("_", " ")}
+                </td>
+                <td className="px-6 py-3 text-gray-700">
+                  {activeTerm.activeAcademicYear}
+                </td>
+                <td className="px-6 py-3">
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                    <CheckCircle size={12} /> Active
+                  </span>
+                </td>
+              </tr>
             ) : (
-              <CheckCircle size={14} />
+              <tr className="border-t border-gray-100">
+                <td colSpan={3} className="px-6 py-8 text-center">
+                  <AlertCircle
+                    size={24}
+                    className="mx-auto mb-2 text-yellow-400"
+                  />
+                  <p className="text-sm text-gray-500 font-medium">
+                    No active term set
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Activate a term below to enable fee collection across the
+                    system
+                  </p>
+                </td>
+              </tr>
             )}
-            {activatingTerm ? "Activating..." : "Activate Term"}
-          </button>
-          {activateError && (
-            <p className="text-red-600 text-sm">{activateError}</p>
-          )}
-          {activateSuccess && (
-            <p className="text-green-600 text-sm">✅ {activateSuccess}</p>
-          )}
-        </form>
+          </tbody>
+        </table>
+
+        {/* Activation form — only when no active term, or user clicked "Change" */}
+        {(!activeTerm || showActivateForm) && (
+          <form
+            onSubmit={handleActivateTerm}
+            className="border-t border-gray-100 bg-gray-50 p-5 space-y-3"
+          >
+            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
+              {activeTerm ? "Change Active Term" : "Activate a Term"}
+            </p>
+
+            <div className="flex flex-wrap gap-3 items-end">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Term
+                </label>
+                <Select
+                  value={activateForm.term}
+                  onValueChange={(v) =>
+                    setActivateForm({ ...activateForm, term: v })
+                  }
+                >
+                  <SelectTrigger className="w-[130px] bg-white border-gray-300 rounded-lg text-sm h-[38px]">
+                    <SelectValue placeholder="Select term" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white w-auto min-w-[130px]">
+                    {terms.map((t) => (
+                      <SelectItem
+                        key={t.value}
+                        value={t.value}
+                        className={ITEM_CLASS}
+                      >
+                        {t.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Academic Year
+                </label>
+                <input
+                  value={activateForm.academicYear}
+                  onChange={(e) =>
+                    setActivateForm({
+                      ...activateForm,
+                      academicYear: e.target.value,
+                    })
+                  }
+                  placeholder="eg. 2025-2026"
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-32 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                />
+              </div>
+
+              <button
+                type="submit"
+                disabled={activatingTerm}
+                className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
+              >
+                {activatingTerm ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <CheckCircle size={14} />
+                )}
+                {activatingTerm
+                  ? "Activating..."
+                  : activeTerm
+                    ? "Update Active Term"
+                    : "Activate Term"}
+              </button>
+
+              {activeTerm && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowActivateForm(false);
+                    setActivateError("");
+                    setActivateSuccess("");
+                  }}
+                  className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-white"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+
+            {activateError && (
+              <p className="text-red-600 text-sm">{activateError}</p>
+            )}
+            {activateSuccess && (
+              <p className="text-green-600 text-sm">✅ {activateSuccess}</p>
+            )}
+          </form>
+        )}
       </div>
 
       {/* Add Class Form */}
@@ -569,19 +695,27 @@ const ClassesPage = () => {
                             <label className="block text-xs font-medium text-gray-600 mb-1">
                               Term *
                             </label>
-                            <select
+                            <Select
                               value={feeForm.term}
-                              onChange={(e) =>
-                                setFeeForm({ ...feeForm, term: e.target.value })
+                              onValueChange={(v) =>
+                                setFeeForm({ ...feeForm, term: v })
                               }
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             >
-                              {terms.map((t) => (
-                                <option key={t.value} value={t.value}>
-                                  {t.label}
-                                </option>
-                              ))}
-                            </select>
+                              <SelectTrigger className="w-full bg-white border-gray-300 rounded-lg text-sm h-[38px]">
+                                <SelectValue placeholder="Select term" />
+                              </SelectTrigger>
+                              <SelectContent className="bg-white w-auto min-w-[130px]">
+                                {terms.map((t) => (
+                                  <SelectItem
+                                    key={t.value}
+                                    value={t.value}
+                                    className={ITEM_CLASS}
+                                  >
+                                    {t.label}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           </div>
                           <div>
                             <label className="block text-xs font-medium text-gray-600 mb-1">
@@ -595,7 +729,7 @@ const ClassesPage = () => {
                                   academicYear: e.target.value,
                                 })
                               }
-                              placeholder="2025"
+                              placeholder="eg. 2025-2026"
                               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                             />
                           </div>

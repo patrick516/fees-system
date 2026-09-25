@@ -5,6 +5,9 @@ import { persist } from "zustand/middleware";
 
 interface Student {
   id: string;
+  firstName?: string;
+  middleName?: string | null;
+  lastName?: string;
   fullName: string;
   studentCode: string;
   class: string;
@@ -27,8 +30,8 @@ interface AuthState {
   token: string | null;
   student: Student | null;
   isAuthenticated: boolean;
-  _hasHydrated: boolean; // ← add this
-  setHasHydrated: (v: boolean) => void; // ← and this
+  _hasHydrated: boolean;
+  setHasHydrated: (v: boolean) => void;
   login: (token: string, student: Student) => void;
   logout: () => void;
 }

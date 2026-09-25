@@ -1,7 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
-const { verifyStaff, verifyParent } = require("../middleware/auth");
+const {
+  verifyStaff,
+  verifyParent,
+  verifyStaffOrParent,
+} = require("../middleware/auth");
 const { isAdmin, isBursar } = require("../middleware/role");
 const examController = require("../controllers/exam.controller");
 
@@ -39,7 +43,6 @@ router.put(
 );
 
 // ==================== UPLOAD ====================
-// ==================== UPLOAD ====================
 router.post(
   "/results/upload",
   verifyStaff,
@@ -62,6 +65,7 @@ router.delete(
   isAdmin,
   examController.discardPendingRow,
 );
+
 // ==================== ADMIN CLASS VIEW ====================
 router.get("/class-results", verifyStaff, examController.getClassResults);
 
@@ -71,6 +75,13 @@ router.get(
   verifyParent,
   examController.getStudentResults,
 );
-router.get("/active-period", verifyParent, examController.getActivePeriod);
+
+// Active period — read-only status flag telling the parent portal whether to
+// show the Results tab. Accepts both parent and staff tokens.
+router.get(
+  "/active-period",
+  verifyStaffOrParent,
+  examController.getActivePeriod,
+);
 
 module.exports = router;

@@ -1,12 +1,25 @@
 const prisma = require("../config/db");
 const { generateStudentCode, generateReceiptNumber } = require("../lib/utils");
 
+// Merge name parts into a single display name. Returns "" if no firstName/lastName.
+const buildFullName = (firstName, middleName, lastName) =>
+  [firstName, middleName, lastName]
+    .filter((p) => p && String(p).trim())
+    .map((p) => String(p).trim())
+    .join(" ");
+
+// ==================== ADD STUDENT ====================
+// POST /api/students
 // ==================== ADD STUDENT ====================
 // POST /api/students
 const addStudent = async (req, res) => {
   try {
     const {
-      fullName,
+      firstName,
+      middleName,
+      lastName,
+      // fallback: allow old clients still sending fullName
+      fullName: incomingFullName,
       dateOfBirth,
       gender,
       classId,
@@ -17,9 +30,22 @@ const addStudent = async (req, res) => {
       academicYear,
     } = req.body;
 
+    // Backwards-compat: if only fullName was sent, split it
+    let fName = firstName;
+    let mName = middleName;
+    let lName = lastName;
+
+    if (!fName && !lName && incomingFullName) {
+      const parts = String(incomingFullName).trim().split(/\s+/);
+      fName = parts[0];
+      lName = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+      mName = parts.length > 2 ? parts.slice(1, -1).join(" ") : null;
+    }
+
     // Validate required fields
     if (
-      !fullName ||
+      !fName ||
+      !lName ||
       !dateOfBirth ||
       !gender ||
       !classId ||
@@ -29,9 +55,11 @@ const addStudent = async (req, res) => {
       return res.status(400).json({
         success: false,
         message:
-          "fullName, dateOfBirth, gender, classId, parentName and parentPhone are required",
+          "firstName, lastName, dateOfBirth, gender, classId, parentName and parentPhone are required",
       });
     }
+
+    const mergedFullName = buildFullName(fName, mName, lName);
 
     // Check class belongs to this school
     const classExists = await prisma.class.findFirst({
@@ -45,13 +73,12 @@ const addStudent = async (req, res) => {
       });
     }
 
-    // Check if parent phone already has a student in this school
-    // (one phone can have multiple students but warn the bursar)
+    // Duplicate check (name + parent phone)
     const existingStudent = await prisma.student.findFirst({
       where: {
         schoolId: req.schoolId,
         parentPhone,
-        fullName: { equals: fullName, mode: "insensitive" },
+        fullName: { equals: mergedFullName, mode: "insensitive" },
       },
     });
 
@@ -68,7 +95,6 @@ const addStudent = async (req, res) => {
       where: { id: req.schoolId },
     });
 
-    // Count existing students to generate sequence
     const studentCount = await prisma.student.count({
       where: { schoolId: req.schoolId },
     });
@@ -85,7 +111,10 @@ const addStudent = async (req, res) => {
         schoolId: req.schoolId,
         classId,
         studentCode,
-        fullName: fullName.trim(),
+        firstName: fName.trim(),
+        middleName: mName?.trim() || null,
+        lastName: lName.trim(),
+        fullName: mergedFullName,
         dateOfBirth: new Date(dateOfBirth),
         gender,
         parentName: parentName.trim(),
@@ -100,7 +129,6 @@ const addStudent = async (req, res) => {
       },
     });
 
-    // Audit log
     await prisma.auditLog.create({
       data: {
         schoolId: req.schoolId,
@@ -108,7 +136,14 @@ const addStudent = async (req, res) => {
         action: "STUDENT_ADDED",
         entity: "Student",
         entityId: student.id,
-        changes: { studentCode, fullName, classId },
+        changes: {
+          studentCode,
+          firstName: fName,
+          middleName: mName || null,
+          lastName: lName,
+          fullName: mergedFullName,
+          classId,
+        },
       },
     });
 
@@ -318,11 +353,16 @@ const getStudent = async (req, res) => {
 
 // ==================== UPDATE STUDENT ====================
 // PUT /api/students/:id
+// ==================== UPDATE STUDENT ====================
+// PUT /api/students/:id
 const updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
     const {
-      fullName,
+      firstName,
+      middleName,
+      lastName,
+      fullName: incomingFullName,
       classId,
       parentName,
       parentPhone,
@@ -331,7 +371,6 @@ const updateStudent = async (req, res) => {
       isActive,
     } = req.body;
 
-    // Check student belongs to this school
     const existing = await prisma.student.findFirst({
       where: { id, schoolId: req.schoolId },
     });
@@ -343,10 +382,33 @@ const updateStudent = async (req, res) => {
       });
     }
 
+    // Resolve name parts. Prefer explicit parts; fall back to splitting fullName.
+    let fName = firstName ?? existing.firstName;
+    let mName = middleName ?? existing.middleName;
+    let lName = lastName ?? existing.lastName;
+
+    if (
+      !firstName &&
+      !middleName &&
+      !lastName &&
+      incomingFullName &&
+      incomingFullName !== existing.fullName
+    ) {
+      const parts = String(incomingFullName).trim().split(/\s+/);
+      fName = parts[0];
+      lName = parts.length > 1 ? parts[parts.length - 1] : parts[0];
+      mName = parts.length > 2 ? parts.slice(1, -1).join(" ") : null;
+    }
+
+    const mergedFullName = buildFullName(fName, mName, lName);
+
     const updated = await prisma.student.update({
       where: { id },
       data: {
-        ...(fullName && { fullName: fullName.trim() }),
+        firstName: fName.trim(),
+        middleName: mName?.trim() || null,
+        lastName: lName.trim(),
+        fullName: mergedFullName,
         ...(classId && { classId }),
         ...(parentName && { parentName: parentName.trim() }),
         ...(parentPhone && { parentPhone: parentPhone.trim() }),
@@ -407,6 +469,9 @@ const searchStudents = async (req, res) => {
         isActive: true,
         OR: [
           { fullName: { contains: q, mode: "insensitive" } },
+          { firstName: { contains: q, mode: "insensitive" } },
+          { middleName: { contains: q, mode: "insensitive" } },
+          { lastName: { contains: q, mode: "insensitive" } },
           { studentCode: { contains: q, mode: "insensitive" } },
           { parentPhone: { contains: q } },
           { parentName: { contains: q, mode: "insensitive" } },
@@ -465,6 +530,9 @@ const getStudentByCode = async (req, res) => {
       select: {
         id: true,
         studentCode: true,
+        firstName: true,
+        middleName: true,
+        lastName: true,
         fullName: true,
         dateOfBirth: true,
         school: { select: { name: true } },
@@ -485,6 +553,9 @@ const getStudentByCode = async (req, res) => {
       data: {
         id: student.id,
         studentCode: student.studentCode,
+        firstName: student.firstName,
+        middleName: student.middleName,
+        lastName: student.lastName,
         fullName: student.fullName,
         school: student.school.name,
         class: student.class.name,

@@ -18,6 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
+import { getCurrentAcademicYear } from "../../lib/utils";
+import { useActiveTerm } from "../../hooks/useActiveTerm";
 
 const paymentMethods = [
   { value: "AIRTEL_MONEY", label: "Airtel Money" },
@@ -47,19 +49,32 @@ export default function PayPage() {
   const [termStatusLoading, setTermStatusLoading] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState<any>(null);
 
+  // Active term — single source of truth for term + academic year
+  const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
+
   const [form, setForm] = useState({
     amount: "",
     paymentMethod: "AIRTEL_MONEY",
     term: "TERM_1",
-    academicYear: "2025",
+    academicYear: getCurrentAcademicYear(),
     bankReference: "",
   });
+
   useEffect(() => {
     if (!_hasHydrated) return;
     if (!isAuthenticated) router.push("/");
   }, [_hasHydrated, isAuthenticated]);
 
-  // Fetch term status when term changes
+  // Sync the form's term + academic year once the activated values load
+  useEffect(() => {
+    setForm((prev) => ({
+      ...prev,
+      academicYear: activeYear || prev.academicYear,
+      term: currentTerm || prev.term,
+    }));
+  }, [activeYear, currentTerm]);
+
+  // Fetch term status when term or year changes
   useEffect(() => {
     if (!student?.id || !form.term) return;
     setTermStatusLoading(true);
@@ -79,6 +94,7 @@ export default function PayPage() {
       .then((res) => setPaymentInfo(res.data.data))
       .catch(() => {});
   }, [student]);
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -121,6 +137,7 @@ export default function PayPage() {
       setLoading(false);
     }
   };
+
   if (!_hasHydrated)
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -185,7 +202,9 @@ export default function PayPage() {
               {student?.fullName?.charAt(0)}
             </div>
             <div>
-              <p className="font-medium text-gray-800">{student?.fullName}</p>
+              <h1 className="text-base font-bold truncate leading-tight">
+                {student?.fullName}
+              </h1>
               <p className="text-xs text-gray-500">
                 {student?.class} • {student?.studentCode}
               </p>
@@ -337,6 +356,7 @@ export default function PayPage() {
               />
             </div>
           </div>
+
           {/* Payment Account Details */}
           {paymentInfo &&
             (paymentInfo.airtelMoneyNumber ||
@@ -423,6 +443,7 @@ export default function PayPage() {
                 </div>
               </div>
             )}
+
           {/* Receipt Upload */}
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
             <h2 className="font-medium text-gray-800 text-sm mb-1">
@@ -497,7 +518,7 @@ export default function PayPage() {
         </form>
       </div>
 
-      {/* Sticky submit bar — always visible, no scrolling needed to pay */}
+      {/* Sticky submit bar */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 max-w-lg mx-auto shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
         <button
           type="submit"
