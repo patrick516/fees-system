@@ -1,3 +1,4 @@
+// ==================== SCHOOL ====================
 export interface School {
   id: string;
   name: string;
@@ -11,6 +12,7 @@ export interface School {
   isActive: boolean;
 }
 
+// ==================== STAFF ====================
 export interface Staff {
   id: string;
   fullName: string;
@@ -21,12 +23,14 @@ export interface Staff {
   school: School;
 }
 
+// ==================== CLASS ====================
 export interface Class {
   id: string;
   name: string;
   level?: number;
 }
 
+// ==================== STUDENT ====================
 export interface Student {
   id: string;
   studentCode: string;
@@ -45,11 +49,11 @@ export interface Student {
   academicYear: string;
   class: Class;
   totalPaid?: number;
-  isDebtor?: boolean; // NEW
-  outstandingBalance?: number; // NEW
+  isDebtor?: boolean;
+  outstandingBalance?: number;
 }
 
-// Add new type for fee structure
+// ==================== FEE STRUCTURE ====================
 export interface FeeStructure {
   id: string;
   classId: string;
@@ -66,19 +70,7 @@ export interface FeeStructure {
   class?: { name: string };
 }
 
-// Add to PaymentSummary interface
-export interface PaymentSummary {
-  totalCollected: number;
-  todayCollected: number;
-  pendingCount: number;
-  verifiedCount: number;
-  rejectedCount: number;
-  totalStudents: number;
-  paidStudents: number;
-  unpaidStudents: number;
-  debtorCount: number; // NEW
-  outstandingBalance: number; // NEW
-}
+// ==================== PAYMENT ====================
 export type PaymentMethod =
   | "CASH"
   | "AIRTEL_MONEY"
@@ -118,17 +110,33 @@ export interface Payment {
   verifiedBy?: { fullName: string } | null;
 }
 
+// ==================== PAYMENT SUMMARY ====================
+// One canonical shape — used by the Dashboard's /payments/summary endpoint.
 export interface PaymentSummary {
-  totalCollected: number;
+  // ===== Accounting =====
+  totalRequired: number; // sum of every student's fee for the term
+  totalCollected: number; // per-student MIN(paid, required), summed
+  outstandingBalance: number; // required − collected
+  totalCredit: number; // overpayments held for next term
+  totalCashReceived: number; // raw sum of verified payments (audit)
   todayCollected: number;
+
+  // ===== Counts =====
   pendingCount: number;
   verifiedCount: number;
   rejectedCount: number;
   totalStudents: number;
-  paidStudents: number;
-  unpaidStudents: number;
+  paidStudents: number; // students who've fully paid
+  unpaidStudents: number; // same as debtorCount (kept for compat)
+  debtorCount: number; // students with a balance owing
+  noFeeCount: number; // students whose class has no fee set
+
+  // ===== Meta =====
+  academicYear?: string;
+  term?: string | null;
 }
 
+// ==================== PAGINATION ====================
 export interface Pagination {
   total: number;
   page: number;
@@ -136,6 +144,7 @@ export interface Pagination {
   totalPages: number;
 }
 
+// ==================== API RESPONSE ====================
 export interface ApiResponse<T> {
   success: boolean;
   message?: string;

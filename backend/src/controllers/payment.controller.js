@@ -315,7 +315,6 @@ const submitPayment = async (req, res) => {
     });
   }
 };
-
 // ==================== BURSAR VERIFIES PAYMENT ====================
 // PATCH /api/payments/:id/verify
 const verifyPayment = async (req, res) => {
@@ -371,30 +370,85 @@ const verifyPayment = async (req, res) => {
       },
     });
 
-    // Recalculate debtor status after verification
-    const debtorStatus = await calculateDebtorStatus(
-      payment.studentId,
-      payment.student.classId,
-      req.schoolId,
-      payment.term,
-      payment.academicYear,
-    );
+    // ============ RECONCILE OVERPAYMENT + BALANCE ============
+    const requiredAmount = payment.requiredAmount;
 
-    await prisma.feePayment.updateMany({
-      where: {
-        studentId: payment.studentId,
-        term: payment.term,
-        academicYear: payment.academicYear,
-        status: "VERIFIED",
-      },
-      data: {
-        balance: debtorStatus.balance,
-        isDebtor: debtorStatus.isDebtor,
-      },
-    });
+    if (requiredAmount !== null) {
+      // Total verified for this student/term/year BEFORE this payment
+      const beforeAgg = await prisma.feePayment.aggregate({
+        where: {
+          studentId: payment.studentId,
+          term: payment.term,
+          academicYear: payment.academicYear,
+          status: "VERIFIED",
+          id: { not: payment.id },
+        },
+        _sum: { amount: true },
+      });
+      const paidBefore = beforeAgg._sum.amount || 0;
 
-    verified.balance = debtorStatus.balance;
-    verified.isDebtor = debtorStatus.isDebtor;
+      const totalPaid = paidBefore + payment.amount;
+      const overpayBefore = Math.max(0, paidBefore - requiredAmount);
+      const overpayAfter = Math.max(0, totalPaid - requiredAmount);
+      const deltaOverpay = overpayAfter - overpayBefore;
+
+      const balanceAfter = Math.max(0, requiredAmount - totalPaid);
+      const isDebtor = balanceAfter > 0;
+
+      // Roll up the new overpayment into the student's credit balance
+      if (deltaOverpay > 0) {
+        await prisma.student.update({
+          where: { id: payment.studentId },
+          data: { creditBalance: { increment: deltaOverpay } },
+        });
+      }
+
+      // Tag the newly-verified payment with its own delta overpayment
+      await prisma.feePayment.update({
+        where: { id },
+        data: { overpayment: deltaOverpay },
+      });
+
+      // Refresh balance + debtor flags on every verified payment for the term
+      await prisma.feePayment.updateMany({
+        where: {
+          studentId: payment.studentId,
+          term: payment.term,
+          academicYear: payment.academicYear,
+          status: "VERIFIED",
+        },
+        data: { balance: balanceAfter, isDebtor },
+      });
+
+      verified.balance = balanceAfter;
+      verified.isDebtor = isDebtor;
+      verified.overpayment = deltaOverpay;
+    } else {
+      // No fee structure set — just recalc debtor status
+      const debtorStatus = await calculateDebtorStatus(
+        payment.studentId,
+        payment.student.classId,
+        req.schoolId,
+        payment.term,
+        payment.academicYear,
+      );
+
+      await prisma.feePayment.updateMany({
+        where: {
+          studentId: payment.studentId,
+          term: payment.term,
+          academicYear: payment.academicYear,
+          status: "VERIFIED",
+        },
+        data: {
+          balance: debtorStatus.balance,
+          isDebtor: debtorStatus.isDebtor,
+        },
+      });
+
+      verified.balance = debtorStatus.balance;
+      verified.isDebtor = debtorStatus.isDebtor;
+    }
 
     await prisma.auditLog.create({
       data: {
@@ -408,13 +462,13 @@ const verifyPayment = async (req, res) => {
     });
 
     console.log(
-      `📱 SMS to ${payment.student.parentPhone}: Payment of MWK ${payment.amount} for ${payment.student.fullName} CONFIRMED. Receipt: ${payment.receiptNumber}${debtorStatus.balance && debtorStatus.balance > 0 ? `. Balance: MWK ${debtorStatus.balance.toLocaleString()}` : ". Fully paid!"}`,
+      `📱 SMS to ${payment.student.parentPhone}: Payment of MWK ${payment.amount} for ${payment.student.fullName} CONFIRMED. Receipt: ${payment.receiptNumber}${verified.balance && verified.balance > 0 ? `. Balance: MWK ${verified.balance.toLocaleString()}` : ". Fully paid!"}`,
     );
 
     return res.status(200).json({
       success: true,
       message: "Payment verified successfully",
-      data: { ...verified, debtorStatus },
+      data: verified,
     });
   } catch (error) {
     console.error("Verify payment error:", error);
@@ -424,7 +478,6 @@ const verifyPayment = async (req, res) => {
     });
   }
 };
-
 // ==================== BURSAR REJECTS PAYMENT ====================
 // PATCH /api/payments/:id/reject
 const rejectPayment = async (req, res) => {
@@ -640,82 +693,131 @@ const getPaymentSummary = async (req, res) => {
   try {
     const { term, academicYear } = req.query;
 
-    // Prefer explicit query param → then the school's active year → then calendar year
-    let year = academicYear;
-    if (!year) {
-      const school = await prisma.school.findUnique({
-        where: { id: req.schoolId },
-        select: { activeAcademicYear: true },
-      });
-      year = school?.activeAcademicYear || new Date().getFullYear().toString();
-    }
+    // Resolve year + term — query param → school's active → calendar fallback
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: { activeTerm: true, activeAcademicYear: true },
+    });
 
-    const where = { schoolId: req.schoolId, academicYear: year };
-    if (term) where.term = term;
+    const year =
+      academicYear ||
+      school?.activeAcademicYear ||
+      new Date().getFullYear().toString();
+    const resolvedTerm = term || school?.activeTerm || null;
 
+    const baseWhere = { schoolId: req.schoolId, academicYear: year };
+    if (resolvedTerm) baseWhere.term = resolvedTerm;
+
+    // ============ RAW COUNTS (for status panel) ============
     const [
-      totalCollected,
-      todayCollected,
+      totalCashReceivedAgg,
+      todayCollectedAgg,
       pendingCount,
       verifiedCount,
       rejectedCount,
       totalStudents,
-      debtorStudents,
     ] = await Promise.all([
       prisma.feePayment.aggregate({
-        where: { ...where, status: "VERIFIED" },
+        where: { ...baseWhere, status: "VERIFIED" },
         _sum: { amount: true },
       }),
       prisma.feePayment.aggregate({
         where: {
-          ...where,
+          ...baseWhere,
           status: "VERIFIED",
           createdAt: { gte: new Date(new Date().setHours(0, 0, 0, 0)) },
         },
         _sum: { amount: true },
       }),
-      prisma.feePayment.count({ where: { ...where, status: "PENDING" } }),
-      prisma.feePayment.count({ where: { ...where, status: "VERIFIED" } }),
-      prisma.feePayment.count({ where: { ...where, status: "REJECTED" } }),
+      prisma.feePayment.count({ where: { ...baseWhere, status: "PENDING" } }),
+      prisma.feePayment.count({ where: { ...baseWhere, status: "VERIFIED" } }),
+      prisma.feePayment.count({ where: { ...baseWhere, status: "REJECTED" } }),
       prisma.student.count({
         where: { schoolId: req.schoolId, isActive: true },
       }),
-
-      // Count distinct students who are debtors
-      // A debtor is a student whose latest payment for a term still has isDebtor = true
-      prisma.feePayment.findMany({
-        where: { ...where, status: "VERIFIED", isDebtor: true },
-        select: { studentId: true },
-        distinct: ["studentId"],
-      }),
     ]);
 
-    // Students who have made at least one verified payment
-    const studentsWithPayment = await prisma.feePayment.findMany({
-      where: { ...where, status: "VERIFIED" },
-      select: { studentId: true },
-      distinct: ["studentId"],
+    // ============ PER-STUDENT LEDGER ============
+    // Pull every active student + their class's fee structure for this term
+    const students = await prisma.student.findMany({
+      where: { schoolId: req.schoolId, isActive: true },
+      include: {
+        class: {
+          include: {
+            feeStructures: {
+              where: resolvedTerm
+                ? { term: resolvedTerm, academicYear: year, isActive: true }
+                : { academicYear: year, isActive: true },
+            },
+          },
+        },
+      },
     });
 
-    // Total outstanding balance across all debtors
-    const outstandingBalance = await prisma.feePayment.aggregate({
-      where: { ...where, status: "VERIFIED", isDebtor: true },
-      _sum: { balance: true },
+    // Batched: sum of verified payments per student for this term/year
+    const paymentGroups = await prisma.feePayment.groupBy({
+      by: ["studentId"],
+      where: { ...baseWhere, status: "VERIFIED" },
+      _sum: { amount: true },
     });
+    const paidByStudent = Object.fromEntries(
+      paymentGroups.map((p) => [p.studentId, p._sum.amount || 0]),
+    );
+
+    let totalRequired = 0; // sum of every student's fee structure
+    let totalCollected = 0; // per-student MIN(paid, required), summed
+    let totalCredit = 0; // per-student MAX(0, paid − required), summed
+    let paidFullCount = 0; // students who've fully paid
+    let debtorCount = 0; // students with a balance owing
+    let noFeeCount = 0; // students whose class has no fee structure
+
+    for (const s of students) {
+      const fee = s.class.feeStructures[0]?.totalAmount || 0;
+      if (fee === 0) {
+        noFeeCount++;
+        continue;
+      }
+
+      const paid = paidByStudent[s.id] || 0;
+      const applied = Math.min(paid, fee);
+      const credit = Math.max(0, paid - fee);
+
+      totalRequired += fee;
+      totalCollected += applied;
+      totalCredit += credit;
+
+      if (paid >= fee) paidFullCount++;
+      else debtorCount++;
+    }
+
+    const outstandingBalance = Math.max(0, totalRequired - totalCollected);
 
     return res.status(200).json({
       success: true,
       data: {
-        totalCollected: totalCollected._sum.amount || 0,
-        todayCollected: todayCollected._sum.amount || 0,
+        // ===== Accounting (new) =====
+        totalRequired,
+        totalCollected, // capped at required per student
+        outstandingBalance, // required − collected
+        totalCredit, // overpayments held for next term
+
+        // ===== Cash view (raw) =====
+        totalCashReceived: totalCashReceivedAgg._sum.amount || 0,
+        todayCollected: todayCollectedAgg._sum.amount || 0,
+
+        // ===== Counts =====
         pendingCount,
         verifiedCount,
         rejectedCount,
         totalStudents,
-        paidStudents: studentsWithPayment.length,
-        unpaidStudents: totalStudents - studentsWithPayment.length,
-        debtorCount: debtorStudents.length,
-        outstandingBalance: outstandingBalance._sum.balance || 0,
+        paidStudents: paidFullCount, // now means "paid in full"
+        unpaidStudents: debtorCount, // students with balance
+        debtorCount,
+        noFeeCount,
+
+        // ===== Meta =====
+        academicYear: year,
+        term: resolvedTerm,
       },
     });
   } catch (error) {

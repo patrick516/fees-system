@@ -10,6 +10,8 @@ import {
   XCircle,
   ArrowRight,
   BadgeAlert,
+  Target,
+  Star,
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { PaymentSummary } from "../../types";
@@ -82,7 +84,15 @@ const Dashboard = () => {
   return (
     <div className="space-y-6">
       {/* Stats Grid */}
+      {/* Stats Grid — 6 tiles matching the accounting model */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <StatCard
+          title="Total Required"
+          value={formatMWK(summary?.totalRequired || 0)}
+          icon={Target}
+          color="bg-blue-700"
+          subtitle="Fees expected this term"
+        />
         <StatCard
           title="Total Collected"
           value={formatMWK(summary?.totalCollected || 0)}
@@ -90,30 +100,23 @@ const Dashboard = () => {
           color="bg-[var(--color-primary)]"
           subtitle={
             activeYear
-              ? `${currentTerm?.replace("_", " ")} • ${activeYear}`
-              : "This academic year"
+              ? `${currentTerm?.replace("_", " ") || "Term"} • ${activeYear}`
+              : "This term"
           }
         />
         <StatCard
-          title="Today's Collection"
-          value={formatMWK(summary?.todayCollected || 0)}
-          icon={CreditCard}
-          color="bg-green-600"
-          subtitle="Verified payments today"
+          title="Outstanding Balance"
+          value={formatMWK(summary?.outstandingBalance || 0)}
+          icon={AlertCircle}
+          color="bg-orange-500"
+          subtitle="Fees still owed by parents"
         />
         <StatCard
-          title="Pending Approvals"
-          value={summary?.pendingCount || 0}
-          icon={Clock}
-          color="bg-yellow-500"
-          subtitle="Receipts awaiting verification"
-        />
-        <StatCard
-          title="Total Students"
-          value={summary?.totalStudents || 0}
-          icon={Users}
+          title="Credit Held"
+          value={formatMWK(summary?.totalCredit || 0)}
+          icon={Star}
           color="bg-purple-600"
-          subtitle={`${summary?.unpaidStudents || 0} yet to pay`}
+          subtitle="Overpayments for next term"
         />
         <StatCard
           title="Debtors"
@@ -123,11 +126,11 @@ const Dashboard = () => {
           subtitle="Students with balance owing"
         />
         <StatCard
-          title="Outstanding Balance"
-          value={formatMWK(summary?.outstandingBalance || 0)}
-          icon={AlertCircle}
-          color="bg-orange-500"
-          subtitle="Total fees still owed"
+          title="Paid in Full"
+          value={summary?.paidStudents || 0}
+          icon={CheckCircle}
+          color="bg-green-600"
+          subtitle={`of ${summary?.totalStudents || 0} students`}
         />
       </div>
 
@@ -208,21 +211,26 @@ const Dashboard = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4 mt-6">
-            <div className="text-center p-4 bg-[var(--color-primary-light)] rounded-lg">
-              <p className="text-2xl font-bold text-[var(--color-primary)]">
+          <div className="grid grid-cols-3 gap-4 mt-6">
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <p className="text-2xl font-bold text-green-600">
                 {summary?.paidStudents || 0}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Have Paid</p>
+              <p className="text-xs text-gray-500 mt-1">Paid in Full</p>
             </div>
             <div className="text-center p-4 bg-red-50 rounded-lg">
               <p className="text-2xl font-bold text-red-600">
-                {summary?.unpaidStudents || 0}
+                {summary?.debtorCount || 0}
               </p>
-              <p className="text-xs text-gray-500 mt-1">Not Paid</p>
+              <p className="text-xs text-gray-500 mt-1">Debtors</p>
+            </div>
+            <div className="text-center p-4 bg-gray-50 rounded-lg">
+              <p className="text-2xl font-bold text-gray-500">
+                {summary?.noFeeCount || 0}
+              </p>
+              <p className="text-xs text-gray-500 mt-1">No Fee Set</p>
             </div>
           </div>
-
           {/* Pending alert */}
           {(summary?.pendingCount || 0) > 0 && (
             <button
