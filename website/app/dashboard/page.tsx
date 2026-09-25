@@ -97,7 +97,7 @@ export default function DashboardPage() {
         {/* Main Card */}
         <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
           {/* Blue Header Section */}
-          <div className="bg-gradient-to-r from-blue-800 to-blue-600 text-white px-5 pt-5 pb-4">
+          <div className="bg-[var(--color-primary)] text-white px-5 pt-5 pb-4">
             {/* Top row: Logo + School name + Logout */}
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2.5">
@@ -156,7 +156,7 @@ export default function DashboardPage() {
               onClick={() => setActiveTab("overview")}
               className={`flex-1 py-3 text-xs font-semibold transition-all ${
                 activeTab === "overview"
-                  ? "text-blue-700 border-b-2 border-blue-600 bg-white"
+                  ? "text-[var(--color-primary)] border-b-2 border-[var(--color-primary)] bg-white"
                   : "text-slate-500 hover:text-slate-700"
               }`}
             >
@@ -460,11 +460,11 @@ export default function DashboardPage() {
                   paymentInfo.bankAccounts.length > 0)) && (
                 <div className="lg:max-w-2xl lg:mx-auto space-y-3">
                   {/* Reference Number */}
-                  <div className="bg-gradient-to-r from-blue-50 to-blue-100 rounded-xl p-3.5 border border-blue-200">
-                    <p className="text-xs font-medium text-blue-800">
+                  <div className="bg-[var(--color-primary-light)] rounded-xl p-3.5 border border-[var(--color-primary-light)]">
+                    <p className="text-xs font-medium text-[var(--color-primary)]">
                       Your Reference Number
                     </p>
-                    <p className="text-base font-bold text-blue-900 font-mono mt-0.5">
+                    <p className="text-base font-bold text-[var(--color-primary)] font-mono mt-0.5">
                       {student?.studentCode}
                     </p>
                     <p className="text-[10px] text-blue-600 mt-0.5">

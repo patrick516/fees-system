@@ -466,7 +466,7 @@ export default function ReportsPage() {
             <button
               onClick={generateReport}
               disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-blue-900 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-800 disabled:opacity-40 transition-colors"
+              className="w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40 transition-colors"
             >
               {loading ? (
                 <>
@@ -490,7 +490,7 @@ export default function ReportsPage() {
             <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">
               <div className="flex items-center justify-between mb-2">
                 <p className="text-xs text-gray-500">Total Students</p>
-                <Users size={16} className="text-blue-900" />
+                <Users size={16} className="text-[var(--color-primary)]" />
               </div>
               <p className="text-2xl font-bold text-gray-800">
                 {report.summary.totalStudents}

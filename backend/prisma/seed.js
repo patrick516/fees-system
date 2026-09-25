@@ -37,7 +37,8 @@ async function main() {
   });
   console.log(" School created");
 
-  // Create Classes
+  // Create Classes — Form 1 to Form 4 only (secondary school focus)
+  // Form 1 & 2 use letter grades; Form 3 & 4 use the points system
   const classes = await Promise.all([
     prisma.class.upsert({
       where: { id: "class-001" },
@@ -45,8 +46,9 @@ async function main() {
       create: {
         id: "class-001",
         schoolId: school.id,
-        name: "Standard 1",
+        name: "Form 1",
         level: 1,
+        gradingSystem: "LETTER",
       },
     }),
     prisma.class.upsert({
@@ -55,8 +57,9 @@ async function main() {
       create: {
         id: "class-002",
         schoolId: school.id,
-        name: "Standard 2",
+        name: "Form 2",
         level: 2,
+        gradingSystem: "LETTER",
       },
     }),
     prisma.class.upsert({
@@ -65,8 +68,9 @@ async function main() {
       create: {
         id: "class-003",
         schoolId: school.id,
-        name: "Form 1",
+        name: "Form 3",
         level: 3,
+        gradingSystem: "POINTS",
       },
     }),
     prisma.class.upsert({
@@ -75,12 +79,13 @@ async function main() {
       create: {
         id: "class-004",
         schoolId: school.id,
-        name: "Form 2",
+        name: "Form 4",
         level: 4,
+        gradingSystem: "POINTS",
       },
     }),
   ]);
-  console.log(" Classes created");
+  console.log(" Classes created: Form 1–4");
 
   // Create Admin Staff
   const adminPassword = await bcrypt.hash("Admin@2025", 12);
@@ -161,7 +166,7 @@ async function main() {
   Bursar login: bursar@stpeters.mw / Bursar@2025
 
   Test Students:
-  - John Banda | ID: STP-2025-001 | DOB: 1010-03-15
+   - John Banda | ID: STP-2025-001 | DOB: 2010-03-15
   - Grace Phiri | ID: STP-2025-002 | DOB: 2009-07-22
   ================================
   `);

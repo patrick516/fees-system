@@ -97,6 +97,40 @@ export const useExamResults = () => {
     }
   };
 
+  const getPendingRows = async (classId?: string, examPeriodId?: string) => {
+    try {
+      const res = await api.get("/exams/pending-rows", {
+        params: { classId, examPeriodId },
+      });
+      return { success: true, data: res.data.data };
+    } catch (err: any) {
+      return { success: false, message: err.response?.data?.message };
+    }
+  };
+
+  const resolvePendingRow = async (pendingRowId: string, studentId: string) => {
+    try {
+      const res = await api.post(
+        `/exams/pending-rows/${pendingRowId}/resolve`,
+        {
+          studentId,
+        },
+      );
+      return { success: true, message: res.data.message };
+    } catch (err: any) {
+      return { success: false, message: err.response?.data?.message };
+    }
+  };
+
+  const discardPendingRow = async (pendingRowId: string) => {
+    try {
+      await api.delete(`/exams/pending-rows/${pendingRowId}`);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, message: err.response?.data?.message };
+    }
+  };
+
   const uploadResults = async (
     file: File,
     classId: string,
@@ -131,5 +165,8 @@ export const useExamResults = () => {
     uploadResults,
     getClassResults,
     updateClassGradingSystem,
+    getPendingRows,
+    resolvePendingRow,
+    discardPendingRow,
   };
 };

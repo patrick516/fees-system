@@ -83,7 +83,7 @@ const Login = () => {
               className="h-16 w-auto object-contain"
             />
           ) : (
-            <div className="w-14 h-14 bg-[#0B1F44] rounded-2xl flex items-center justify-center">
+            <div className="w-14 h-14 bg-[var(--color-primary)] rounded-2xl flex items-center justify-center">
               <School size={28} className="text-white" />
             </div>
           )}
@@ -116,7 +116,7 @@ const Login = () => {
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
                 placeholder="stAndrews"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent transition-all duration-300"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all duration-300"
               />
             </div>
 
@@ -149,7 +149,7 @@ const Login = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[#0B1F44] hover:bg-[#0a1a3a] disabled:bg-[#0B1F44]/50 text-white font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
+              className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
             >
               {loading && <Loader2 size={18} className="animate-spin" />}
               {loading ? "Signing in..." : "Sign in"}

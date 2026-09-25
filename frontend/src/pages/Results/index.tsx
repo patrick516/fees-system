@@ -8,6 +8,8 @@ import {
   Pencil,
   X,
   Trophy,
+  AlertTriangle,
+  Check,
 } from "lucide-react";
 import { useExamResults } from "../../hooks/useExamResults";
 import { useClasses } from "../../hooks/useStudents";
@@ -50,6 +52,9 @@ const ResultsPage = () => {
     uploading,
     getClassResults,
     updateClassGradingSystem,
+    getPendingRows,
+    resolvePendingRow,
+    discardPendingRow,
   } = useExamResults();
   const { classes, refetch: refetchClasses } = useClasses();
 
@@ -81,6 +86,8 @@ const ResultsPage = () => {
   const [message, setMessage] = useState("");
   const [savingBoundaries, setSavingBoundaries] = useState(false);
   const [savingGradingSystem, setSavingGradingSystem] = useState(false);
+  const [pendingRows, setPendingRows] = useState<any[]>([]);
+  const [resolvingRowId, setResolvingRowId] = useState<string | null>(null);
 
   const boundaries =
     boundarySystem === "POINTS" ? pointsBoundaries : letterBoundaries;
@@ -122,6 +129,9 @@ const ResultsPage = () => {
           setResultsGradingSystem(r.gradingSystem || "POINTS");
         }
         setLoadingResults(false);
+
+        const p = await getPendingRows(savedClass, savedPeriod);
+        if (p.success) setPendingRows(p.data);
       }
     })();
   }, []);
@@ -202,6 +212,35 @@ const ResultsPage = () => {
     setMessage(res.message || (res.success ? "Uploaded" : "Upload failed"));
     if (res.success) {
       handleViewResults();
+      loadPendingRows();
+    }
+  };
+
+  const loadPendingRows = async () => {
+    if (!selectedClass || !selectedPeriod) return;
+    const res = await getPendingRows(selectedClass, selectedPeriod);
+    if (res.success) setPendingRows(res.data);
+  };
+
+  const handleResolvePendingRow = async (
+    pendingRowId: string,
+    studentId: string,
+  ) => {
+    setResolvingRowId(pendingRowId);
+    const res = await resolvePendingRow(pendingRowId, studentId);
+    if (res.success) {
+      setPendingRows(pendingRows.filter((r) => r.id !== pendingRowId));
+      handleViewResults();
+    } else {
+      setMessage(res.message || "Failed to resolve");
+    }
+    setResolvingRowId(null);
+  };
+
+  const handleDiscardPendingRow = async (pendingRowId: string) => {
+    const res = await discardPendingRow(pendingRowId);
+    if (res.success) {
+      setPendingRows(pendingRows.filter((r) => r.id !== pendingRowId));
     }
   };
 
@@ -599,6 +638,72 @@ const ResultsPage = () => {
           View Class Rankings
         </button>
       </div>
+
+      {/* Pending Name Matches */}
+      {pendingRows.length > 0 && (
+        <div className="bg-white rounded-xl shadow-sm border border-amber-200 p-6">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle size={16} className="text-amber-600" />
+            <h3 className="font-medium text-gray-800">
+              Pending Matches ({pendingRows.length})
+            </h3>
+          </div>
+          <p className="text-xs text-gray-500 mb-4">
+            These names matched more than one student in this class. Pick the
+            correct student for each, or discard the row.
+          </p>
+          <div className="space-y-3">
+            {pendingRows.map((row) => (
+              <div
+                key={row.id}
+                className="border border-amber-100 bg-amber-50 rounded-lg p-4"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <p className="font-medium text-gray-800 text-sm">
+                    "{row.rawName}"
+                  </p>
+                  <button
+                    onClick={() => handleDiscardPendingRow(row.id)}
+                    className="text-xs text-gray-400 hover:text-red-600"
+                  >
+                    Discard
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {row.marks.map((m: any, i: number) => (
+                    <span
+                      key={i}
+                      className="text-xs bg-white border border-gray-200 rounded px-2 py-0.5 text-gray-600"
+                    >
+                      {m.subject}: {m.mark}%
+                    </span>
+                  ))}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {row.candidates.map((c: any) => (
+                    <button
+                      key={c.id}
+                      onClick={() => handleResolvePendingRow(row.id, c.id)}
+                      disabled={resolvingRowId === row.id}
+                      className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-lg px-3 py-1.5 hover:border-blue-400 hover:bg-blue-50 disabled:opacity-40"
+                    >
+                      {resolvingRowId === row.id ? (
+                        <Loader2 size={12} className="animate-spin" />
+                      ) : (
+                        <Check size={12} className="text-green-600" />
+                      )}
+                      {c.fullName}{" "}
+                      <span className="text-gray-400 font-mono">
+                        ({c.studentCode})
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Class Rankings */}
       {classResults.length > 0 && (

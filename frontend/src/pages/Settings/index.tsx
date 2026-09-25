@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { useSchoolSettings } from "../../hooks/useSchoolSettings";
 import { useAuthStore } from "../../store/authStore";
+import { applyTheme } from "../../lib/theme";
 
 const SettingsPage = () => {
   const {
@@ -27,6 +28,7 @@ const SettingsPage = () => {
     address: "",
     city: "",
     motto: "",
+    primaryColor: "#1e3a8a",
   });
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
@@ -41,6 +43,7 @@ const SettingsPage = () => {
         address: settings.address || "",
         city: settings.city || "",
         motto: settings.motto || "",
+        primaryColor: settings.primaryColor || "#1e3a8a",
       });
       setLogoPreview(settings.logo || null);
     }
@@ -83,13 +86,20 @@ const SettingsPage = () => {
       return;
     }
 
-    // Keep sidebar/session in sync with new name/motto
+    // Keep sidebar/session in sync with new name/motto/color
     if (staff) {
       setStaff({
         ...staff,
-        school: { ...staff.school, name: form.name },
+        school: {
+          ...staff.school,
+          name: form.name,
+          primaryColor: form.primaryColor,
+        },
       });
     }
+
+    // Apply immediately — no refresh needed to see the new color
+    applyTheme(form.primaryColor);
 
     setSaved(true);
     setTimeout(() => setSaved(false), 3000);
@@ -136,7 +146,7 @@ const SettingsPage = () => {
               )}
             </div>
 
-            <label className="flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 cursor-pointer disabled:opacity-40">
+            <label className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] cursor-pointer disabled:opacity-40">
               {uploadingLogo ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
@@ -241,6 +251,34 @@ const SettingsPage = () => {
               />
             </div>
 
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                Brand Color
+              </label>
+              <div className="flex items-center gap-3">
+                <input
+                  type="color"
+                  value={form.primaryColor}
+                  onChange={(e) =>
+                    setForm({ ...form, primaryColor: e.target.value })
+                  }
+                  className="w-12 h-10 rounded-lg border border-gray-200 cursor-pointer"
+                />
+                <input
+                  value={form.primaryColor}
+                  onChange={(e) =>
+                    setForm({ ...form, primaryColor: e.target.value })
+                  }
+                  placeholder="#1e3a8a"
+                  className="flex-1 px-3 py-2.5 border border-gray-200 rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">
+                Used for buttons, headers, and highlights across the admin
+                dashboard and parent portal.
+              </p>
+            </div>
+
             {error && <p className="text-red-600 text-sm">{error}</p>}
             {saved && (
               <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
@@ -251,7 +289,7 @@ const SettingsPage = () => {
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 bg-blue-900 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-800 disabled:opacity-40"
+              className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
             >
               {saving ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -285,7 +323,9 @@ const SettingsPage = () => {
             {form.city ? `, ${form.city}` : ""}
           </p>
           {form.motto && (
-            <p className="text-xs italic text-blue-700 mt-1">"{form.motto}"</p>
+            <p className="text-xs italic text-[var(--color-primary)] mt-1">
+              "{form.motto}"
+            </p>
           )}
         </div>
       </div>

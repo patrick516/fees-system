@@ -80,7 +80,7 @@ const Dashboard = () => {
           title="Total Collected"
           value={formatMWK(summary?.totalCollected || 0)}
           icon={TrendingUp}
-          color="bg-blue-900"
+          color="bg-[var(--color-primary)]"
           subtitle="This academic year"
         />
         <StatCard
@@ -185,7 +185,7 @@ const Dashboard = () => {
             </div>
             <div className="w-full bg-gray-200 rounded-full h-3">
               <div
-                className="bg-blue-900 h-3 rounded-full transition-all"
+                className="bg-[var(--color-primary)] h-3 rounded-full transition-all"
                 style={{
                   width: `${
                     summary?.totalStudents
@@ -198,8 +198,8 @@ const Dashboard = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-4 mt-6">
-            <div className="text-center p-4 bg-blue-50 rounded-lg">
-              <p className="text-2xl font-bold text-blue-900">
+            <div className="text-center p-4 bg-[var(--color-primary-light)] rounded-lg">
+              <p className="text-2xl font-bold text-[var(--color-primary)]">
                 {summary?.paidStudents || 0}
               </p>
               <p className="text-xs text-gray-500 mt-1">Have Paid</p>
@@ -240,7 +240,7 @@ const Dashboard = () => {
             {
               label: "Record Cash Payment",
               path: "/payments/record",
-              color: "bg-blue-900",
+              color: "bg-[var(--color-primary)]",
               icon: CreditCard,
             },
             {

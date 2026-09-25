@@ -259,7 +259,7 @@ const AddStudent = () => {
           <button
             type="submit"
             disabled={loading}
-            className="flex-1 flex items-center justify-center gap-2 bg-blue-900 text-white px-6 py-3 rounded-lg text-sm hover:bg-blue-800 disabled:bg-blue-300 transition-colors"
+            className="flex-1 flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white px-6 py-3 rounded-lg text-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-40 transition-colors"
           >
             {loading && <Loader2 size={16} className="animate-spin" />}
             {loading ? "Adding..." : "Add Student"}

@@ -63,7 +63,7 @@ const PaymentsPage = () => {
         </div>
         <button
           onClick={() => navigate("/payments/record")}
-          className="flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-800"
+          className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm hover:bg-[var(--color-primary-dark)]"
         >
           <Plus size={16} />
           Record Payment
@@ -81,7 +81,7 @@ const PaymentsPage = () => {
             }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               statusFilter === s
-                ? "bg-blue-900 text-white"
+                ? "bg-[var(--color-primary)] text-white"
                 : "bg-white border border-gray-200 text-gray-600 hover:bg-gray-50"
             }`}
           >
@@ -94,7 +94,7 @@ const PaymentsPage = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-48">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]" />
           </div>
         ) : payments.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-gray-400">

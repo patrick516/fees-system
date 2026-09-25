@@ -39,6 +39,7 @@ router.put(
 );
 
 // ==================== UPLOAD ====================
+// ==================== UPLOAD ====================
 router.post(
   "/results/upload",
   verifyStaff,
@@ -47,6 +48,20 @@ router.post(
   examController.uploadResults,
 );
 
+// ==================== PENDING NAME MATCHES ====================
+router.get("/pending-rows", verifyStaff, examController.getPendingRows);
+router.post(
+  "/pending-rows/:id/resolve",
+  verifyStaff,
+  isAdmin,
+  examController.resolvePendingRow,
+);
+router.delete(
+  "/pending-rows/:id",
+  verifyStaff,
+  isAdmin,
+  examController.discardPendingRow,
+);
 // ==================== ADMIN CLASS VIEW ====================
 router.get("/class-results", verifyStaff, examController.getClassResults);
 

@@ -366,7 +366,7 @@ const ClassesPage = () => {
           <button
             type="submit"
             disabled={activatingTerm}
-            className="flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-800 disabled:opacity-40"
+            className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
           >
             {activatingTerm ? (
               <Loader2 size={14} className="animate-spin" />
@@ -393,7 +393,7 @@ const ClassesPage = () => {
             onChange={(e) =>
               setClassForm({ ...classForm, name: e.target.value })
             }
-            placeholder="Class name (eg. Form 1, Standard 3)"
+            placeholder="Class name (eg. Form 1, Form 3)"
             required
             className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
@@ -410,7 +410,7 @@ const ClassesPage = () => {
           <button
             type="submit"
             disabled={adding}
-            className="flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-800 disabled:opacity-40"
+            className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
           >
             {adding ? (
               <Loader2 size={14} className="animate-spin" />
@@ -429,7 +429,7 @@ const ClassesPage = () => {
       <div className="space-y-4">
         {loading ? (
           <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-900" />
+            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--color-primary)]" />
           </div>
         ) : classes.length === 0 ? (
           <div className="bg-white rounded-xl p-12 text-center border border-gray-100">
@@ -450,8 +450,11 @@ const ClassesPage = () => {
                 }
               >
                 <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                    <GraduationCap size={18} className="text-blue-900" />
+                  <div className="w-10 h-10 bg-[var(--color-primary-light)] rounded-xl flex items-center justify-center">
+                    <GraduationCap
+                      size={18}
+                      className="text-[var(--color-primary)]"
+                    />
                   </div>
                   <div>
                     <p className="font-medium text-gray-800">{cls.name}</p>
@@ -679,7 +682,7 @@ const ClassesPage = () => {
                         <button
                           type="submit"
                           disabled={feeLoading}
-                          className="flex-1 flex items-center justify-center gap-2 bg-blue-900 text-white py-2 rounded-lg text-sm disabled:opacity-40 hover:bg-blue-800"
+                          className="flex-1 flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-2 rounded-lg text-sm disabled:opacity-40 hover:bg-[var(--color-primary-dark)]"
                         >
                           {feeLoading && (
                             <Loader2 size={14} className="animate-spin" />
@@ -797,7 +800,7 @@ const ClassesPage = () => {
                     type="button"
                     onClick={handleAddBank}
                     disabled={!newBank.bankName || !newBank.accountNumber}
-                    className="flex items-center gap-1.5 bg-blue-900 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-40 hover:bg-blue-800"
+                    className="flex items-center gap-1.5 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm disabled:opacity-40 hover:bg-[var(--color-primary-dark)]"
                   >
                     <Plus size={14} />
                     Add
@@ -952,7 +955,7 @@ const ClassesPage = () => {
           <button
             type="submit"
             disabled={paymentDetailsLoading}
-            className="flex items-center gap-2 bg-blue-900 text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-800 disabled:opacity-40"
+            className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
           >
             {paymentDetailsLoading ? (
               <>

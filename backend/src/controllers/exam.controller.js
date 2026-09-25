@@ -214,6 +214,9 @@ const setGradeBoundaries = async (req, res) => {
 
 // POST /api/exams/results/upload
 // multipart/form-data: file, classId, examPeriodId
+// Sheet's first row is headers. One column must contain "id" (Student ID) and/or
+// one column must contain "name" (Student Name) — case-insensitive match on the header text.
+// If neither is found, the first column is treated as Student ID for backward compatibility.
 const uploadResults = async (req, res) => {
   try {
     if (!req.file) {
@@ -248,7 +251,6 @@ const uploadResults = async (req, res) => {
       });
     }
 
-    // Archive the original sheet in Cloudinary, same pattern as receipts/logos
     let sourceFileUrl = null;
     try {
       const uploadResult = await uploadToCloudinary(req.file.buffer, {
@@ -260,7 +262,6 @@ const uploadResults = async (req, res) => {
       console.error("Cloudinary upload failed (non-blocking):", uploadErr);
     }
 
-    // Parse the sheet: first column = Student ID, remaining columns = subject names
     const workbook = XLSX.read(req.file.buffer, { type: "buffer" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
@@ -272,11 +273,23 @@ const uploadResults = async (req, res) => {
     }
 
     const columns = Object.keys(rows[0]);
-    const studentIdColumn = columns[0]; // eg "Student ID"
-    const subjectColumns = columns.slice(1);
+    const headerLower = columns.map((c) => c.toLowerCase().trim());
+
+    const idColIdx = headerLower.findIndex((h) => h.includes("id"));
+    const nameColIdx = headerLower.findIndex((h) => h.includes("name"));
+
+    let idCol = idColIdx !== -1 ? columns[idColIdx] : null;
+    let nameCol = nameColIdx !== -1 ? columns[nameColIdx] : null;
+
+    // Backward compatibility: no recognizable header at all — assume first column is ID
+    if (!idCol && !nameCol) {
+      idCol = columns[0];
+    }
+
+    const excludedCols = new Set([idCol, nameCol].filter(Boolean));
+    const subjectColumns = columns.filter((c) => !excludedCols.has(c));
 
     // Ensure a Subject record exists for each column, for this class
-    // Trim + case-insensitive match so re-uploads never create duplicate subjects
     const subjectMap = {};
     for (const rawSubjectName of subjectColumns) {
       const subjectName = String(rawSubjectName).trim();
@@ -296,28 +309,76 @@ const uploadResults = async (req, res) => {
     }
 
     let processed = 0;
+    let pendingCount = 0;
     const errors = [];
 
     for (const row of rows) {
-      const studentCode = row[studentIdColumn];
-      if (!studentCode) continue;
+      let student = null;
 
-      const student = await prisma.student.findFirst({
-        where: {
-          schoolId: req.schoolId,
-          studentCode: String(studentCode).trim(),
-        },
-      });
+      // Try ID first — it's the trusted key
+      if (idCol && row[idCol]) {
+        const studentCode = String(row[idCol]).trim();
+        student = await prisma.student.findFirst({
+          where: { schoolId: req.schoolId, studentCode },
+        });
+        if (!student) {
+          errors.push(`Student ID ${studentCode} not found`);
+          continue;
+        }
+        if (student.classId !== classId) {
+          errors.push(
+            `Student ${studentCode} (${student.fullName}) is not in the selected class — skipped`,
+          );
+          continue;
+        }
+      } else if (nameCol && row[nameCol]) {
+        const rawName = String(row[nameCol]).trim();
+        const matches = await prisma.student.findMany({
+          where: {
+            schoolId: req.schoolId,
+            classId,
+            fullName: { equals: rawName, mode: "insensitive" },
+          },
+        });
 
-      if (!student) {
-        errors.push(`Student ${studentCode} not found`);
-        continue;
-      }
+        if (matches.length === 0) {
+          errors.push(`"${rawName}" not found in this class`);
+          continue;
+        }
 
-      if (student.classId !== classId) {
-        errors.push(
-          `Student ${studentCode} (${student.fullName}) is not in the selected class — skipped`,
-        );
+        if (matches.length === 1) {
+          student = matches[0];
+        } else {
+          // Ambiguous — store the marks for later manual resolution instead of guessing
+          const marksBySubjectId = {};
+          for (const subjectName of subjectColumns) {
+            const rawMark = row[subjectName];
+            if (rawMark === null || rawMark === undefined || rawMark === "")
+              continue;
+            const mark = parseFloat(rawMark);
+            if (isNaN(mark)) continue;
+            marksBySubjectId[subjectMap[subjectName]] = mark;
+          }
+
+          await prisma.pendingExamRow.create({
+            data: {
+              schoolId: req.schoolId,
+              classId,
+              examPeriodId,
+              rawName,
+              marks: marksBySubjectId,
+              candidateStudentIds: matches.map((m) => m.id),
+            },
+          });
+
+          pendingCount++;
+          errors.push(
+            `"${rawName}" matches ${matches.length} students in this class — added to Pending Matches for you to resolve manually`,
+          );
+          continue;
+        }
+      } else {
+        errors.push("A row had neither a Student ID nor a Name — skipped");
         continue;
       }
 
@@ -364,6 +425,7 @@ const uploadResults = async (req, res) => {
         changes: {
           classId,
           studentsProcessed: processed,
+          pendingCount,
           errors,
           sourceFileUrl,
         },
@@ -372,14 +434,161 @@ const uploadResults = async (req, res) => {
 
     res.json({
       success: true,
-      message: `Processed ${processed} student(s)${errors.length ? `, ${errors.length} issue(s)` : ""}`,
-      data: { processed, errors, sourceFileUrl },
+      message: `Processed ${processed} student(s)${pendingCount ? `, ${pendingCount} pending manual match(es)` : ""}${errors.length ? `, ${errors.length} issue(s)` : ""}`,
+      data: { processed, pendingCount, errors, sourceFileUrl },
     });
   } catch (err) {
     console.error(err);
     res
       .status(500)
       .json({ success: false, message: "Failed to upload results" });
+  }
+};
+
+// ==================== PENDING NAME MATCHES ====================
+
+// GET /api/exams/pending-rows?classId=&examPeriodId=
+const getPendingRows = async (req, res) => {
+  try {
+    const { classId, examPeriodId } = req.query;
+    const where = { schoolId: req.schoolId, resolvedStudentId: null };
+    if (classId) where.classId = classId;
+    if (examPeriodId) where.examPeriodId = examPeriodId;
+
+    const pending = await prisma.pendingExamRow.findMany({
+      where,
+      orderBy: { createdAt: "desc" },
+    });
+
+    // Attach candidate student details and subject names for display
+    const result = [];
+    for (const row of pending) {
+      const candidates = await prisma.student.findMany({
+        where: { id: { in: row.candidateStudentIds } },
+        select: { id: true, studentCode: true, fullName: true },
+      });
+
+      const subjectIds = Object.keys(row.marks);
+      const subjects = await prisma.subject.findMany({
+        where: { id: { in: subjectIds } },
+        select: { id: true, name: true },
+      });
+      const subjectNameMap = Object.fromEntries(
+        subjects.map((s) => [s.id, s.name]),
+      );
+
+      result.push({
+        id: row.id,
+        rawName: row.rawName,
+        candidates,
+        marks: Object.entries(row.marks).map(([subjectId, mark]) => ({
+          subject: subjectNameMap[subjectId] || "Unknown",
+          mark,
+        })),
+        createdAt: row.createdAt,
+      });
+    }
+
+    res.json({ success: true, data: result });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get pending matches" });
+  }
+};
+
+// POST /api/exams/pending-rows/:id/resolve
+// Body: { studentId }
+const resolvePendingRow = async (req, res) => {
+  try {
+    const { studentId } = req.body;
+    if (!studentId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "studentId is required" });
+    }
+
+    const pending = await prisma.pendingExamRow.findFirst({
+      where: {
+        id: req.params.id,
+        schoolId: req.schoolId,
+        resolvedStudentId: null,
+      },
+    });
+    if (!pending) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Pending match not found" });
+    }
+    if (!pending.candidateStudentIds.includes(studentId)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "That student wasn't one of the matched candidates for this row",
+      });
+    }
+
+    const cls = await prisma.class.findFirst({
+      where: { id: pending.classId },
+    });
+    const boundaries = await prisma.gradeBoundary.findMany({
+      where: { schoolId: req.schoolId, system: cls.gradingSystem },
+    });
+
+    const marks = pending.marks;
+    for (const [subjectId, mark] of Object.entries(marks)) {
+      const { gradePoint, gradeLabel } = resolveGrade(mark, boundaries);
+      await prisma.examResult.upsert({
+        where: {
+          studentId_subjectId_examPeriodId: {
+            studentId,
+            subjectId,
+            examPeriodId: pending.examPeriodId,
+          },
+        },
+        update: { mark, gradePoint, gradeLabel },
+        create: {
+          schoolId: req.schoolId,
+          studentId,
+          subjectId,
+          examPeriodId: pending.examPeriodId,
+          mark,
+          gradePoint,
+          gradeLabel,
+        },
+      });
+    }
+
+    await prisma.pendingExamRow.update({
+      where: { id: pending.id },
+      data: { resolvedStudentId: studentId, resolvedAt: new Date() },
+    });
+
+    res.json({ success: true, message: "Resolved and results saved" });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to resolve pending match" });
+  }
+};
+
+// DELETE /api/exams/pending-rows/:id — discard without assigning to anyone
+const discardPendingRow = async (req, res) => {
+  try {
+    const pending = await prisma.pendingExamRow.findFirst({
+      where: { id: req.params.id, schoolId: req.schoolId },
+    });
+    if (!pending) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Pending match not found" });
+    }
+    await prisma.pendingExamRow.delete({ where: { id: pending.id } });
+    res.json({ success: true, message: "Discarded" });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to discard" });
   }
 };
 
@@ -670,4 +879,7 @@ module.exports = {
   getClassResults,
   getActivePeriod,
   updateClassGradingSystem,
+  getPendingRows,
+  resolvePendingRow,
+  discardPendingRow,
 };

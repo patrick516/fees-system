@@ -71,7 +71,7 @@ const StudentsPage = () => {
         </div>
         <button
           onClick={() => navigate("/students/add")}
-          className="flex items-center gap-2 bg-blue-900 text-white px-3 py-2 md:px-4 rounded-lg text-sm hover:bg-blue-800 transition-colors shrink-0"
+          className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-3 py-2 md:px-4 rounded-lg text-sm hover:bg-[var(--color-primary-dark)] transition-colors shrink-0"
         >
           <Plus size={16} />
           <span className="hidden sm:inline">Add Student</span>
@@ -89,7 +89,7 @@ const StudentsPage = () => {
             onClick={() => handleClassFilter("")}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${
               selectedClassId === ""
-                ? "bg-blue-900 text-white"
+                ? "bg-[var(--color-primary)] text-white"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
             }`}
           >
@@ -101,7 +101,7 @@ const StudentsPage = () => {
               onClick={() => handleClassFilter(cls.id)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${
                 selectedClassId === cls.id
-                  ? "bg-blue-900 text-white"
+                  ? "bg-[var(--color-primary)] text-white"
                   : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
             >
@@ -109,7 +109,7 @@ const StudentsPage = () => {
               <span
                 className={`ml-2 text-xs px-1.5 py-0.5 rounded-full ${
                   selectedClassId === cls.id
-                    ? "bg-blue-700 text-blue-100"
+                    ? "bg-[var(--color-primary-dark)] text-white"
                     : "bg-gray-200 text-gray-500"
                 }`}
               >
@@ -179,7 +179,7 @@ const StudentsPage = () => {
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-48">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900" />
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]" />
           </div>
         ) : students.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-48 text-gray-400">
@@ -229,7 +229,7 @@ const StudentsPage = () => {
                               ? "bg-purple-100 text-purple-700"
                               : student.isDebtor
                                 ? "bg-red-100 text-red-700"
-                                : "bg-blue-100 text-blue-900"
+                                : "bg-[var(--color-primary-light)] text-[var(--color-primary)]"
                           }`}
                         >
                           {student.fullName.charAt(0)}
@@ -301,7 +301,7 @@ const StudentsPage = () => {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <button
                         onClick={() => navigate(`/students/${student.id}`)}
-                        className="flex items-center gap-1 text-blue-600 hover:text-blue-800 text-sm"
+                        className="flex items-center gap-1 text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm"
                       >
                         <Eye size={14} />
                         View

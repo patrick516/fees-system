@@ -163,12 +163,12 @@ export default function PayPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-blue-900 text-white sticky top-0 z-20 shadow-md">
+      <div className="bg-[var(--color-primary)] text-white sticky top-0 z-20 shadow-md">
         <div className="max-w-lg mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/dashboard")}
-              className="p-2 hover:bg-blue-800 rounded-xl transition-colors"
+              className="p-2 hover:bg-white/10 rounded-xl transition-colors"
             >
               <ArrowLeft size={18} />
             </button>
@@ -181,7 +181,7 @@ export default function PayPage() {
         {/* Student Info */}
         <div className="bg-white rounded-2xl p-3.5 shadow-sm border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center text-blue-900 font-bold">
+            <div className="w-10 h-10 bg-[var(--color-primary-light)] rounded-xl flex items-center justify-center text-[var(--color-primary)] font-bold">
               {student?.fullName?.charAt(0)}
             </div>
             <div>
@@ -312,8 +312,8 @@ export default function PayPage() {
                     onClick={() => setForm({ ...form, paymentMethod: m.value })}
                     className={`py-2.5 px-3 rounded-xl text-sm font-medium border transition-all ${
                       form.paymentMethod === m.value
-                        ? "bg-blue-900 text-white border-blue-900"
-                        : "bg-white text-gray-600 border-gray-200 hover:border-blue-300"
+                        ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
+                        : "bg-white text-gray-600 border-gray-200 hover:border-[var(--color-primary)]"
                     }`}
                   >
                     {m.label}
@@ -504,7 +504,7 @@ export default function PayPage() {
           form="payment-form"
           disabled={loading || !receiptFile}
           onClick={handleSubmit}
-          className="w-full flex items-center justify-center gap-2 bg-blue-900 text-white py-3.5 rounded-xl font-medium text-sm hover:bg-blue-800 disabled:bg-blue-300 transition-colors"
+          className="w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-3.5 rounded-xl font-medium text-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-40 transition-colors"
         >
           {loading ? (
             <>

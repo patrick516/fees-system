@@ -256,7 +256,7 @@ const RecordPayment = () => {
           </button>
           <button
             onClick={() => navigate("/payments")}
-            className="flex-1 bg-blue-900 text-white py-3 rounded-lg text-sm hover:bg-blue-800"
+            className="flex-1 bg-[var(--color-primary)] text-white py-3 rounded-lg text-sm hover:bg-[var(--color-primary-dark)]"
           >
             View Payments
           </button>
@@ -322,7 +322,7 @@ const RecordPayment = () => {
                   className="w-full flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors text-left"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center text-blue-900 text-sm font-bold">
+                    <div className="w-8 h-8 bg-[var(--color-primary-light)] rounded-full flex items-center justify-center text-[var(--color-primary)] text-sm font-bold">
                       {student.fullName.charAt(0)}
                     </div>
                     <div>
@@ -348,9 +348,9 @@ const RecordPayment = () => {
           )}
         </div>
       ) : (
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 flex items-center justify-between">
+        <div className="bg-[var(--color-primary-light)] border border-[var(--color-primary-light)] rounded-xl p-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-blue-900 rounded-full flex items-center justify-center text-white font-bold">
+            <div className="w-10 h-10 bg-[var(--color-primary)] rounded-full flex items-center justify-center text-white font-bold">
               {selectedStudent.fullName.charAt(0)}
             </div>
             <div>
@@ -364,7 +364,7 @@ const RecordPayment = () => {
           </div>
           <button
             onClick={() => setSelectedStudent(null)}
-            className="text-sm text-blue-600 hover:text-blue-800"
+            className="text-sm text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
           >
             Change
           </button>
@@ -590,7 +590,7 @@ const RecordPayment = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full flex items-center justify-center gap-2 bg-blue-900 text-white py-3 rounded-lg font-medium hover:bg-blue-800 disabled:bg-blue-300 transition-colors"
+            className="w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-3 rounded-lg font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40 transition-colors"
           >
             {loading && <Loader2 size={18} className="animate-spin" />}
             {loading

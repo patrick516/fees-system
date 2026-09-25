@@ -53,6 +53,7 @@ enum ExamType {
   END_TERM
   MOCK
 }
+
 enum GradingSystem {
   POINTS
   LETTER
@@ -78,12 +79,12 @@ model School {
   platformId String
   platform   Platform @relation(fields: [platformId], references: [id])
 
-  name    String
-  slug    String? @unique
-  address String
-  city    String
-  phone   String
-  email   String?
+  name         String
+  slug         String? @unique
+  address      String
+  city         String
+  phone        String
+  email        String?
   logo         String?
   motto        String?
   primaryColor String  @default("#1e3a8a")
@@ -107,16 +108,17 @@ model School {
   updatedAt DateTime @updatedAt
 
   // Relations
-    staff          Staff[]
-  classes        Class[]
-  students       Student[]
-  payments       FeePayment[]
-  smsLogs        SmsLog[]
-  feeStructures  FeeStructure[]
-  examPeriods    ExamPeriod[]
-  subjects       Subject[]
+  staff           Staff[]
+  classes         Class[]
+  students        Student[]
+  payments        FeePayment[]
+  smsLogs         SmsLog[]
+  feeStructures   FeeStructure[]
+  examPeriods     ExamPeriod[]
+  subjects        Subject[]
   gradeBoundaries GradeBoundary[]
-  examResults    ExamResult[]
+  examResults     ExamResult[]
+  pendingExamRows PendingExamRow[]
 
   @@map("schools")
 }
@@ -153,7 +155,7 @@ model Class {
   schoolId String
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-    name          String // eg "Form 1", "Grade 5"
+  name          String // eg "Form 1", "Grade 5"
   level         Int // for ordering eg 1, 2, 3
   isActive      Boolean       @default(true)
   gradingSystem GradingSystem @default(POINTS)
@@ -162,10 +164,10 @@ model Class {
   updatedAt DateTime @updatedAt
 
   // Relations
- 
-  students      Student[]
-  feeStructures FeeStructure[]
-  subjects      Subject[]
+  students        Student[]
+  feeStructures   FeeStructure[]
+  subjects        Subject[]
+  pendingExamRows PendingExamRow[]
 
   @@unique([schoolId, name])
   @@map("classes")
@@ -230,7 +232,7 @@ model Student {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-   // Relations
+  // Relations
   payments    FeePayment[]
   examResults ExamResult[]
 
@@ -350,9 +352,9 @@ model AuditLog {
 // A specific exam sitting - eg "End of Term 2 Exams, 2026"
 // isActive controls whether parents can see results in the portal
 model ExamPeriod {
-  id           String   @id @default(uuid())
-  schoolId     String
-  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   name         String
   term         Term
@@ -363,7 +365,8 @@ model ExamPeriod {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  examResults ExamResult[]
+  examResults     ExamResult[]
+  pendingExamRows PendingExamRow[]
 
   @@unique([schoolId, term, academicYear, examType])
   @@map("exam_periods")
@@ -371,11 +374,11 @@ model ExamPeriod {
 
 // Subjects taken by a specific class eg "Mathematics" for Form 1
 model Subject {
-  id       String  @id @default(uuid())
+  id       String @id @default(uuid())
   schoolId String
-  school   School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
   classId  String
-  class    Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  class    Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
 
   name     String
   code     String?
@@ -430,4 +433,27 @@ model ExamResult {
   @@index([schoolId])
   @@index([examPeriodId])
   @@map("exam_results")
+}
+
+// A row from an uploaded sheet that matched by name to more than one student
+// in the same class. Held here until an admin manually picks the right student.
+model PendingExamRow {
+  id           String     @id @default(uuid())
+  schoolId     String
+  school       School     @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId      String
+  class        Class      @relation(fields: [classId], references: [id], onDelete: Cascade)
+  examPeriodId String
+  examPeriod   ExamPeriod @relation(fields: [examPeriodId], references: [id], onDelete: Cascade)
+
+  rawName             String
+  marks               Json // { subjectId: mark }
+  candidateStudentIds String[] // student IDs the name matched within this class
+
+  resolvedStudentId String?
+  resolvedAt        DateTime?
+
+  createdAt DateTime @default(now())
+
+  @@map("pending_exam_rows")
 }
