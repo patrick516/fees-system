@@ -639,7 +639,16 @@ const getMyChildPayments = async (req, res) => {
 const getPaymentSummary = async (req, res) => {
   try {
     const { term, academicYear } = req.query;
-    const year = academicYear || new Date().getFullYear().toString();
+
+    // Prefer explicit query param → then the school's active year → then calendar year
+    let year = academicYear;
+    if (!year) {
+      const school = await prisma.school.findUnique({
+        where: { id: req.schoolId },
+        select: { activeAcademicYear: true },
+      });
+      year = school?.activeAcademicYear || new Date().getFullYear().toString();
+    }
 
     const where = { schoolId: req.schoolId, academicYear: year };
     if (term) where.term = term;

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { PaymentSummary } from "../../types";
+import { useActiveTerm } from "../../hooks/useActiveTerm";
 
 const StatCard = ({
   title,
@@ -47,13 +48,19 @@ const formatMWK = (amount: number) => {
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!activeYear) return; // wait until the hook resolves
     const fetchSummary = async () => {
       try {
-        const res = await api.get("/payments/summary");
+        const params = new URLSearchParams();
+        params.set("academicYear", activeYear);
+        if (currentTerm) params.set("term", currentTerm);
+
+        const res = await api.get(`/payments/summary?${params}`);
         setSummary(res.data.data);
       } catch (err) {
         console.error("Failed to load summary");
@@ -62,7 +69,7 @@ const Dashboard = () => {
       }
     };
     fetchSummary();
-  }, []);
+  }, [activeYear, currentTerm]);
 
   if (loading) {
     return (
@@ -81,7 +88,11 @@ const Dashboard = () => {
           value={formatMWK(summary?.totalCollected || 0)}
           icon={TrendingUp}
           color="bg-[var(--color-primary)]"
-          subtitle="This academic year"
+          subtitle={
+            activeYear
+              ? `${currentTerm?.replace("_", " ")} • ${activeYear}`
+              : "This academic year"
+          }
         />
         <StatCard
           title="Today's Collection"
