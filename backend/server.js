@@ -88,7 +88,6 @@ const smsRoutes = require("./src/routes/sms.routes");
 const reportRoutes = require("./src/routes/report.routes");
 const examRoutes = require("./src/routes/exam.routes");
 
-// MOUNT ROUTES WITH /api PREFIX (as frontend expects)
 app.use("/api/auth", authRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/payments", paymentRoutes);
