@@ -53,6 +53,10 @@ enum ExamType {
   END_TERM
   MOCK
 }
+enum GradingSystem {
+  POINTS
+  LETTER
+}
 
 // YOUR platform - one record only
 model Platform {
@@ -149,9 +153,10 @@ model Class {
   schoolId String
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  name     String // eg "Form 1", "Grade 5"
-  level    Int // for ordering eg 1, 2, 3
-  isActive Boolean @default(true)
+    name          String // eg "Form 1", "Grade 5"
+  level         Int // for ordering eg 1, 2, 3
+  isActive      Boolean       @default(true)
+  gradingSystem GradingSystem @default(POINTS)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -385,21 +390,20 @@ model Subject {
   @@map("subjects")
 }
 
-// School-configurable mark-to-point mapping eg 80-100% = point 1
 model GradeBoundary {
   id       String @id @default(uuid())
   schoolId String
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
+  system     GradingSystem @default(POINTS)
   minPercent Float
   maxPercent Float
-  gradePoint Int
+  gradePoint Int?
   gradeLabel String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([schoolId, gradePoint])
   @@map("grade_boundaries")
 }
 
@@ -417,6 +421,7 @@ model ExamResult {
 
   mark       Float
   gradePoint Int?
+  gradeLabel String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

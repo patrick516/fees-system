@@ -30,6 +30,14 @@ router.put(
   examController.setGradeBoundaries,
 );
 
+// ==================== CLASS GRADING SYSTEM ====================
+router.put(
+  "/classes/:classId/grading-system",
+  verifyStaff,
+  isAdmin,
+  examController.updateClassGradingSystem,
+);
+
 // ==================== UPLOAD ====================
 router.post(
   "/results/upload",
@@ -38,6 +46,9 @@ router.post(
   upload.single("file"),
   examController.uploadResults,
 );
+
+// ==================== ADMIN CLASS VIEW ====================
+router.get("/class-results", verifyStaff, examController.getClassResults);
 
 // ==================== PARENT VIEW ====================
 router.get(

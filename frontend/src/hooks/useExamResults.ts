@@ -40,19 +40,58 @@ export const useExamResults = () => {
     }
   };
 
-  const getGradeBoundaries = async () => {
+  const getGradeBoundaries = async (system: "POINTS" | "LETTER") => {
     try {
-      const res = await api.get("/exams/grade-boundaries");
+      const res = await api.get("/exams/grade-boundaries", {
+        params: { system },
+      });
       return { success: true, data: res.data.data };
     } catch (err: any) {
       return { success: false, message: err.response?.data?.message };
     }
   };
 
-  const setGradeBoundaries = async (boundaries: any[]) => {
+  const setGradeBoundaries = async (
+    boundaries: any[],
+    system: "POINTS" | "LETTER",
+  ) => {
     try {
-      const res = await api.put("/exams/grade-boundaries", { boundaries });
+      const res = await api.put("/exams/grade-boundaries", {
+        boundaries,
+        system,
+      });
       return { success: true, data: res.data.data };
+    } catch (err: any) {
+      return { success: false, message: err.response?.data?.message };
+    }
+  };
+
+  const updateClassGradingSystem = async (
+    classId: string,
+    gradingSystem: "POINTS" | "LETTER",
+  ) => {
+    try {
+      const res = await api.put(`/exams/classes/${classId}/grading-system`, {
+        gradingSystem,
+      });
+      return { success: true, data: res.data.data };
+    } catch (err: any) {
+      return { success: false, message: err.response?.data?.message };
+    }
+  };
+  const getClassResults = async (classId: string, examPeriodId: string) => {
+    try {
+      const res = await api.get("/exams/class-results", {
+        params: { classId, examPeriodId },
+      });
+      return {
+        success: true,
+        data: res.data.data,
+        gradingSystem: res.data.gradingSystem as
+          | "POINTS"
+          | "LETTER"
+          | undefined,
+      };
     } catch (err: any) {
       return { success: false, message: err.response?.data?.message };
     }
@@ -90,5 +129,7 @@ export const useExamResults = () => {
     getGradeBoundaries,
     setGradeBoundaries,
     uploadResults,
+    getClassResults,
+    updateClassGradingSystem,
   };
 };

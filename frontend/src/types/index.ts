@@ -7,6 +7,7 @@ export interface School {
   email?: string | null;
   logo: string | null;
   motto?: string | null;
+  primaryColor?: string | null;
   isActive: boolean;
 }
 

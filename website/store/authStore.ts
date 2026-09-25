@@ -15,6 +15,7 @@ interface Student {
     phone: string;
     logo: string | null;
     motto: string | null;
+    primaryColor?: string | null;
   };
   parentName: string;
   parentPhone: string;

@@ -52,26 +52,61 @@ export default function ResultsView({ studentId }: { studentId: string }) {
       </div>
       <div className="divide-y divide-gray-100">
         {results.results.map((r: any, i: number) => (
-          <div key={i} className="px-4 py-3 flex items-center justify-between">
-            <span className="text-sm text-gray-700">{r.subject}</span>
+          <div
+            key={i}
+            className={`px-4 py-3 flex items-center justify-between ${
+              r.countedInTotal ? "bg-green-50/50" : ""
+            }`}
+          >
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700">{r.subject}</span>
+              {r.countedInTotal && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-100 text-green-700 font-medium">
+                  Counted
+                </span>
+              )}
+            </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-medium text-gray-800">
                 {r.mark}%
               </span>
-              <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
-                Point {r.gradePoint}
-              </span>
+              {results.gradingSystem === "LETTER" ? (
+                <span className="text-xs px-2 py-0.5 rounded-full bg-blue-100 text-blue-700">
+                  {r.gradeLabel}
+                </span>
+              ) : (
+                <span
+                  className={`text-xs px-2 py-0.5 rounded-full ${
+                    r.countedInTotal
+                      ? "bg-green-100 text-green-700"
+                      : "bg-gray-100 text-gray-500"
+                  }`}
+                >
+                  Point {r.gradePoint}
+                </span>
+              )}
             </div>
           </div>
         ))}
       </div>
-      <div className="px-4 py-3 bg-gray-50 border-t border-gray-100 flex justify-between">
-        <span className="text-sm font-semibold text-gray-700">
-          Total Marks: {results.totalMarks}
-        </span>
-        <span className="text-sm font-semibold text-gray-700">
-          Total Points: {results.totalPoints}
-        </span>
+      <div className="px-4 py-3 bg-gray-50 border-t border-gray-100">
+        <div className="flex justify-between mb-1">
+          <span className="text-sm font-semibold text-gray-700">
+            Total Marks (all subjects): {results.totalMarks}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          {results.gradingSystem === "LETTER" ? (
+            <span className="text-sm font-bold text-blue-900">
+              Average: {results.averageMark}% — Overall Grade:{" "}
+              {results.overallGrade}
+            </span>
+          ) : (
+            <span className="text-sm font-bold text-blue-900">
+              Best {results.subjectsCounted} Points Total: {results.totalPoints}
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

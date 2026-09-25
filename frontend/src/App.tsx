@@ -1,5 +1,7 @@
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
+import { applyTheme } from "./lib/theme";
 
 // Pages
 import Login from "./pages/Auth/Login";
@@ -27,6 +29,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 function App() {
+  const { staff } = useAuthStore();
+
+  useEffect(() => {
+    applyTheme(staff?.school?.primaryColor);
+  }, [staff?.school?.primaryColor]);
+
   return (
     <BrowserRouter>
       <Routes>

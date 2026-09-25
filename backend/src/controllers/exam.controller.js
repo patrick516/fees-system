@@ -2,12 +2,15 @@ const prisma = require("../config/db");
 const XLSX = require("xlsx");
 const { uploadToCloudinary } = require("../lib/cloudinary");
 
-// Look up the grade point for a given percentage mark
-const resolveGradePoint = (mark, boundaries) => {
+// Look up the grade (point and/or label) for a given percentage mark
+const resolveGrade = (mark, boundaries) => {
   const match = boundaries.find(
     (b) => mark >= b.minPercent && mark <= b.maxPercent,
   );
-  return match ? match.gradePoint : null;
+  return {
+    gradePoint: match ? match.gradePoint : null,
+    gradeLabel: match ? match.gradeLabel : null,
+  };
 };
 
 // ==================== EXAM PERIODS ====================
@@ -145,13 +148,13 @@ const createSubject = async (req, res) => {
 };
 
 // ==================== GRADE BOUNDARIES ====================
-
-// GET /api/exams/grade-boundaries
+// GET /api/exams/grade-boundaries?system=POINTS|LETTER
 const getGradeBoundaries = async (req, res) => {
   try {
+    const system = req.query.system === "LETTER" ? "LETTER" : "POINTS";
     const boundaries = await prisma.gradeBoundary.findMany({
-      where: { schoolId: req.schoolId },
-      orderBy: { gradePoint: "asc" },
+      where: { schoolId: req.schoolId, system },
+      orderBy: { minPercent: "desc" },
     });
     res.json({ success: true, data: boundaries });
   } catch (err) {
@@ -162,11 +165,13 @@ const getGradeBoundaries = async (req, res) => {
 };
 
 // PUT /api/exams/grade-boundaries
-// Body: { boundaries: [{ minPercent, maxPercent, gradePoint, gradeLabel }, ...] }
-// Replaces the whole set for this school
+// Body: { system: "POINTS"|"LETTER", boundaries: [{ minPercent, maxPercent, gradePoint?, gradeLabel? }, ...] }
+// Replaces the whole set for this school, for that system only
 const setGradeBoundaries = async (req, res) => {
   try {
-    const { boundaries } = req.body;
+    const { boundaries, system } = req.body;
+    const resolvedSystem = system === "LETTER" ? "LETTER" : "POINTS";
+
     if (!Array.isArray(boundaries) || boundaries.length === 0) {
       return res.status(400).json({
         success: false,
@@ -175,15 +180,19 @@ const setGradeBoundaries = async (req, res) => {
     }
 
     await prisma.gradeBoundary.deleteMany({
-      where: { schoolId: req.schoolId },
+      where: { schoolId: req.schoolId, system: resolvedSystem },
     });
 
     const created = await prisma.gradeBoundary.createMany({
       data: boundaries.map((b) => ({
         schoolId: req.schoolId,
+        system: resolvedSystem,
         minPercent: parseFloat(b.minPercent),
         maxPercent: parseFloat(b.maxPercent),
-        gradePoint: parseInt(b.gradePoint),
+        gradePoint:
+          resolvedSystem === "POINTS" && b.gradePoint !== undefined
+            ? parseInt(b.gradePoint)
+            : null,
         gradeLabel: b.gradeLabel || null,
       })),
     });
@@ -220,14 +229,22 @@ const uploadResults = async (req, res) => {
       });
     }
 
+    const cls = await prisma.class.findFirst({
+      where: { id: classId, schoolId: req.schoolId },
+    });
+    if (!cls) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Class not found" });
+    }
+
     const boundaries = await prisma.gradeBoundary.findMany({
-      where: { schoolId: req.schoolId },
+      where: { schoolId: req.schoolId, system: cls.gradingSystem },
     });
     if (boundaries.length === 0) {
       return res.status(400).json({
         success: false,
-        message:
-          "Please set grade boundaries in Settings before uploading results",
+        message: `Please set ${cls.gradingSystem === "LETTER" ? "letter grade" : "point"} boundaries before uploading results for this class`,
       });
     }
 
@@ -259,17 +276,23 @@ const uploadResults = async (req, res) => {
     const subjectColumns = columns.slice(1);
 
     // Ensure a Subject record exists for each column, for this class
+    // Trim + case-insensitive match so re-uploads never create duplicate subjects
     const subjectMap = {};
-    for (const subjectName of subjectColumns) {
+    for (const rawSubjectName of subjectColumns) {
+      const subjectName = String(rawSubjectName).trim();
       let subject = await prisma.subject.findFirst({
-        where: { schoolId: req.schoolId, classId, name: subjectName },
+        where: {
+          schoolId: req.schoolId,
+          classId,
+          name: { equals: subjectName, mode: "insensitive" },
+        },
       });
       if (!subject) {
         subject = await prisma.subject.create({
           data: { schoolId: req.schoolId, classId, name: subjectName },
         });
       }
-      subjectMap[subjectName] = subject.id;
+      subjectMap[rawSubjectName] = subject.id;
     }
 
     let processed = 0;
@@ -291,6 +314,13 @@ const uploadResults = async (req, res) => {
         continue;
       }
 
+      if (student.classId !== classId) {
+        errors.push(
+          `Student ${studentCode} (${student.fullName}) is not in the selected class — skipped`,
+        );
+        continue;
+      }
+
       for (const subjectName of subjectColumns) {
         const rawMark = row[subjectName];
         if (rawMark === null || rawMark === undefined || rawMark === "")
@@ -299,7 +329,7 @@ const uploadResults = async (req, res) => {
         const mark = parseFloat(rawMark);
         if (isNaN(mark)) continue;
 
-        const gradePoint = resolveGradePoint(mark, boundaries);
+        const { gradePoint, gradeLabel } = resolveGrade(mark, boundaries);
 
         await prisma.examResult.upsert({
           where: {
@@ -309,7 +339,7 @@ const uploadResults = async (req, res) => {
               examPeriodId,
             },
           },
-          update: { mark, gradePoint },
+          update: { mark, gradePoint, gradeLabel },
           create: {
             schoolId: req.schoolId,
             studentId: student.id,
@@ -317,6 +347,7 @@ const uploadResults = async (req, res) => {
             examPeriodId,
             mark,
             gradePoint,
+            gradeLabel,
           },
         });
       }
@@ -354,7 +385,6 @@ const uploadResults = async (req, res) => {
 
 // ==================== PARENT VIEW ====================
 
-// GET /api/exams/student-results/:studentId?examPeriodId=
 const getStudentResults = async (req, res) => {
   try {
     const { studentId } = req.params;
@@ -400,36 +430,185 @@ const getStudentResults = async (req, res) => {
     });
 
     const totalMarks = results.reduce((sum, r) => sum + r.mark, 0);
-    const totalPoints = results.reduce(
-      (sum, r) => sum + (r.gradePoint || 0),
-      0,
+    const gradingSystem = student.class.gradingSystem;
+
+    const baseData = {
+      student: {
+        fullName: student.fullName,
+        studentCode: student.studentCode,
+        className: student.class.name,
+      },
+      examPeriod: {
+        name: period.name,
+        term: period.term,
+        academicYear: period.academicYear,
+      },
+      gradingSystem,
+      totalMarks,
+    };
+
+    if (gradingSystem === "LETTER") {
+      const average = results.length > 0 ? totalMarks / results.length : 0;
+      const letterBoundaries = await prisma.gradeBoundary.findMany({
+        where: { schoolId: req.student.schoolId, system: "LETTER" },
+      });
+      const { gradeLabel: overallGrade } = resolveGrade(
+        average,
+        letterBoundaries,
+      );
+
+      return res.json({
+        success: true,
+        data: {
+          ...baseData,
+          results: results.map((r) => ({
+            subject: r.subject.name,
+            mark: r.mark,
+            gradeLabel: r.gradeLabel,
+          })),
+          averageMark: Math.round(average * 10) / 10,
+          overallGrade,
+        },
+      });
+    }
+
+    // POINTS system — best 6 subjects, lower point = better
+    const withPoints = results.filter(
+      (r) => r.gradePoint !== null && r.gradePoint !== undefined,
     );
+    const sortedByBest = [...withPoints].sort(
+      (a, b) => a.gradePoint - b.gradePoint,
+    );
+    const bestSix = sortedByBest.slice(0, 6);
+    const bestSixIds = new Set(bestSix.map((r) => r.id));
+    const totalPoints = bestSix.reduce((sum, r) => sum + r.gradePoint, 0);
 
     res.json({
       success: true,
       data: {
-        student: {
-          fullName: student.fullName,
-          studentCode: student.studentCode,
-          className: student.class.name,
-        },
-        examPeriod: {
-          name: period.name,
-          term: period.term,
-          academicYear: period.academicYear,
-        },
+        ...baseData,
         results: results.map((r) => ({
           subject: r.subject.name,
           mark: r.mark,
           gradePoint: r.gradePoint,
+          countedInTotal: bestSixIds.has(r.id),
         })),
-        totalMarks,
         totalPoints,
+        subjectsCounted: bestSix.length,
       },
     });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to get results" });
+  }
+};
+const getClassResults = async (req, res) => {
+  try {
+    const { classId, examPeriodId } = req.query;
+    if (!classId || !examPeriodId) {
+      return res.status(400).json({
+        success: false,
+        message: "classId and examPeriodId are required",
+      });
+    }
+
+    const cls = await prisma.class.findFirst({
+      where: { id: classId, schoolId: req.schoolId },
+    });
+    if (!cls) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Class not found" });
+    }
+
+    const students = await prisma.student.findMany({
+      where: { schoolId: req.schoolId, classId, isActive: true },
+      orderBy: { fullName: "asc" },
+    });
+
+    let letterBoundaries = [];
+    if (cls.gradingSystem === "LETTER") {
+      letterBoundaries = await prisma.gradeBoundary.findMany({
+        where: { schoolId: req.schoolId, system: "LETTER" },
+      });
+    }
+
+    const rows = [];
+
+    for (const student of students) {
+      const results = await prisma.examResult.findMany({
+        where: { studentId: student.id, examPeriodId },
+        include: { subject: { select: { name: true } } },
+        orderBy: { subject: { name: "asc" } },
+      });
+
+      if (results.length === 0) continue; // skip students with no results uploaded yet
+
+      const totalMarks = results.reduce((sum, r) => sum + r.mark, 0);
+
+      if (cls.gradingSystem === "LETTER") {
+        const average = totalMarks / results.length;
+        const { gradeLabel: overallGrade } = resolveGrade(
+          average,
+          letterBoundaries,
+        );
+        rows.push({
+          studentId: student.id,
+          studentCode: student.studentCode,
+          fullName: student.fullName,
+          subjectsSat: results.length,
+          totalMarks,
+          averageMark: Math.round(average * 10) / 10,
+          overallGrade,
+          subjects: results.map((r) => ({
+            subject: r.subject.name,
+            mark: r.mark,
+            gradeLabel: r.gradeLabel,
+          })),
+        });
+      } else {
+        const withPoints = results.filter(
+          (r) => r.gradePoint !== null && r.gradePoint !== undefined,
+        );
+        const sortedByBest = [...withPoints].sort(
+          (a, b) => a.gradePoint - b.gradePoint,
+        );
+        const bestSix = sortedByBest.slice(0, 6);
+        const totalPoints = bestSix.reduce((sum, r) => sum + r.gradePoint, 0);
+
+        rows.push({
+          studentId: student.id,
+          studentCode: student.studentCode,
+          fullName: student.fullName,
+          subjectsSat: results.length,
+          totalMarks,
+          totalPoints,
+          subjects: results.map((r) => ({
+            subject: r.subject.name,
+            mark: r.mark,
+            gradePoint: r.gradePoint,
+          })),
+        });
+      }
+    }
+
+    if (cls.gradingSystem === "LETTER") {
+      // Descending by average mark — higher mark = better performance = ranked first
+      rows.sort((a, b) => b.averageMark - a.averageMark);
+    } else {
+      // Ascending by total points — lower points = better performance = ranked first
+      rows.sort((a, b) => a.totalPoints - b.totalPoints);
+    }
+    rows.forEach((row, index) => {
+      row.position = index + 1;
+    });
+
+    res.json({ success: true, data: rows, gradingSystem: cls.gradingSystem });
+  } catch (err) {
+    console.error(err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get class results" });
   }
 };
 
@@ -448,6 +627,36 @@ const getActivePeriod = async (req, res) => {
   }
 };
 
+// PUT /api/exams/classes/:classId/grading-system
+const updateClassGradingSystem = async (req, res) => {
+  try {
+    const { gradingSystem } = req.body;
+    if (!["POINTS", "LETTER"].includes(gradingSystem)) {
+      return res.status(400).json({
+        success: false,
+        message: "gradingSystem must be POINTS or LETTER",
+      });
+    }
+    const cls = await prisma.class.findFirst({
+      where: { id: req.params.classId, schoolId: req.schoolId },
+    });
+    if (!cls) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Class not found" });
+    }
+    const updated = await prisma.class.update({
+      where: { id: cls.id },
+      data: { gradingSystem },
+    });
+    res.json({ success: true, data: updated });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to update grading system" });
+  }
+};
+
 module.exports = {
   createExamPeriod,
   listExamPeriods,
@@ -458,5 +667,7 @@ module.exports = {
   setGradeBoundaries,
   uploadResults,
   getStudentResults,
+  getClassResults,
   getActivePeriod,
+  updateClassGradingSystem,
 };
