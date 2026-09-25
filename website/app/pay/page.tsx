@@ -361,7 +361,8 @@ export default function PayPage() {
           {paymentInfo &&
             (paymentInfo.airtelMoneyNumber ||
               paymentInfo.mpambaNumber ||
-              paymentInfo.nationalBankAccount) && (
+              (paymentInfo.bankAccounts &&
+                paymentInfo.bankAccounts.length > 0)) && (
               <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
                 <h2 className="font-medium text-gray-800 text-sm mb-2.5">
                   Pay To These Accounts
@@ -409,29 +410,37 @@ export default function PayPage() {
                       </button>
                     </div>
                   )}
-                  {paymentInfo.nationalBankAccount && (
-                    <div className="flex items-center justify-between p-3 bg-blue-50 rounded-xl">
-                      <div>
-                        <p className="text-xs text-gray-500">
-                          National Bank • {paymentInfo.nationalBankName}
-                        </p>
-                        <p className="text-sm font-bold text-gray-800">
-                          {paymentInfo.nationalBankAccount}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigator.clipboard?.writeText(
-                            paymentInfo.nationalBankAccount,
-                          )
-                        }
-                        className="text-xs text-blue-600 font-medium px-3 py-1 bg-blue-100 rounded-lg"
+                  {paymentInfo.bankAccounts &&
+                    paymentInfo.bankAccounts.map((bank: any, index: number) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-blue-50 rounded-xl"
                       >
-                        Copy
-                      </button>
-                    </div>
-                  )}
+                        <div className="min-w-0">
+                          <p className="text-xs text-gray-500 truncate">
+                            {bank.bankName}
+                            {bank.branch ? ` • ${bank.branch}` : ""}
+                          </p>
+                          <p className="text-sm font-bold text-gray-800 font-mono">
+                            {bank.accountNumber}
+                          </p>
+                          {bank.accountName && (
+                            <p className="text-[10px] text-gray-400 truncate">
+                              {bank.accountName}
+                            </p>
+                          )}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            navigator.clipboard?.writeText(bank.accountNumber)
+                          }
+                          className="text-xs text-blue-600 font-medium px-3 py-1 bg-blue-100 rounded-lg shrink-0 ml-2"
+                        >
+                          Copy
+                        </button>
+                      </div>
+                    ))}
                   <div className="bg-gray-50 rounded-xl p-3 mt-1">
                     <p className="text-xs text-gray-500">
                       Reference:{" "}
