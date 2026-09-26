@@ -1,5 +1,9 @@
 const prisma = require("../config/db");
-const { generateStudentCode, generateReceiptNumber } = require("../lib/utils");
+const {
+  generateStudentCode,
+  regenerateStudentCode,
+  generateReceiptNumber,
+} = require("../lib/utils");
 
 // Merge name parts into a single display name. Returns "" if no firstName/lastName.
 const buildFullName = (firstName, middleName, lastName) =>
@@ -89,7 +93,7 @@ const addStudent = async (req, res) => {
       });
     }
 
-    // Generate unique student code
+    // Generate unique student code — format: PREFIX-CLASS-YEAR-SEQ
     const year = academicYear || new Date().getFullYear().toString();
     const school = await prisma.school.findUnique({
       where: { id: req.schoolId },
@@ -101,6 +105,8 @@ const addStudent = async (req, res) => {
 
     const studentCode = generateStudentCode(
       school.name,
+      classExists.name,
+      classExists.level,
       year,
       studentCount + 1,
     );

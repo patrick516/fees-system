@@ -32,7 +32,7 @@ const uploadToCloudinary = (buffer, options = {}) => {
           );
           reject(error);
         } else {
-          console.log("✅ Cloudinary upload success:", result.secure_url);
+          console.log(" Cloudinary upload success:", result.secure_url);
           resolve(result);
         }
       })

@@ -11,6 +11,7 @@ const prisma = require("../config/db");
 const schoolController = require("../controllers/school.controller");
 
 const upload = multer({ storage: multer.memoryStorage() });
+
 // ==================== CLASSES ====================
 
 // GET /api/schools/classes
@@ -95,7 +96,6 @@ router.delete("/classes/:id", verifyStaff, isAdmin, async (req, res) => {
 // ==================== FEE STRUCTURES ====================
 
 // GET /api/schools/fee-structures
-// Get all fee structures - optionally filter by classId, term, academicYear
 router.get("/fee-structures", verifyStaff, isBursar, async (req, res) => {
   try {
     const { classId, term, academicYear } = req.query;
@@ -123,7 +123,6 @@ router.get("/fee-structures", verifyStaff, isBursar, async (req, res) => {
 });
 
 // GET /api/schools/fee-structures/lookup
-// Used when recording payment - find required amount for a class+term+year
 router.get(
   "/fee-structures/lookup",
   verifyStaff,
@@ -171,7 +170,6 @@ router.get(
 );
 
 // POST /api/schools/fee-structures
-// Admin sets fees for a class per term
 router.post("/fee-structures", verifyStaff, isAdmin, async (req, res) => {
   try {
     const {
@@ -195,7 +193,6 @@ router.post("/fee-structures", verifyStaff, isAdmin, async (req, res) => {
       });
     }
 
-    // Verify class belongs to this school
     const cls = await prisma.class.findFirst({
       where: { id: classId, schoolId: req.schoolId },
     });
@@ -206,7 +203,6 @@ router.post("/fee-structures", verifyStaff, isAdmin, async (req, res) => {
       });
     }
 
-    // Upsert - update if exists, create if not
     const feeStructure = await prisma.feeStructure.upsert({
       where: {
         schoolId_classId_academicYear_term: {
@@ -246,7 +242,6 @@ router.post("/fee-structures", verifyStaff, isAdmin, async (req, res) => {
       },
     });
 
-    // Audit log
     await prisma.auditLog.create({
       data: {
         schoolId: req.schoolId,
@@ -351,7 +346,6 @@ router.delete("/fee-structures/:id", verifyStaff, isAdmin, async (req, res) => {
 // ==================== ACTIVE TERM ====================
 
 // GET /api/schools/active-term
-// Returns the currently active term for this school
 router.get("/active-term", verifyStaffOrParent, async (req, res) => {
   try {
     const school = await prisma.school.findUnique({
@@ -359,6 +353,8 @@ router.get("/active-term", verifyStaffOrParent, async (req, res) => {
       select: {
         activeTerm: true,
         activeAcademicYear: true,
+        activeTermStartDate: true,
+        activeTermEndDate: true,
       },
     });
 
@@ -374,6 +370,8 @@ router.get("/active-term", verifyStaffOrParent, async (req, res) => {
       data: {
         activeTerm: school.activeTerm,
         activeAcademicYear: school.activeAcademicYear,
+        activeTermStartDate: school.activeTermStartDate,
+        activeTermEndDate: school.activeTermEndDate,
       },
     });
   } catch (err) {
@@ -383,11 +381,93 @@ router.get("/active-term", verifyStaffOrParent, async (req, res) => {
   }
 });
 
+// GET /api/schools/term-history
+// Every term the school has run, with a financial summary per term.
+router.get("/term-history", verifyStaff, async (req, res) => {
+  try {
+    const activations = await prisma.termActivation.findMany({
+      where: { schoolId: req.schoolId },
+      orderBy: [{ academicYear: "desc" }, { term: "desc" }],
+    });
+
+    if (activations.length === 0) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const students = await prisma.student.findMany({
+      where: { schoolId: req.schoolId, isActive: true },
+      include: {
+        class: {
+          include: {
+            feeStructures: { where: { isActive: true } },
+          },
+        },
+      },
+    });
+
+    const paymentGroups = await prisma.feePayment.groupBy({
+      by: ["studentId", "term", "academicYear"],
+      where: { schoolId: req.schoolId, status: "VERIFIED" },
+      _sum: { amount: true },
+    });
+
+    const paidMap = new Map();
+    for (const p of paymentGroups) {
+      paidMap.set(
+        `${p.studentId}|${p.term}|${p.academicYear}`,
+        p._sum.amount || 0,
+      );
+    }
+
+    const history = activations.map((a) => {
+      let totalRequired = 0;
+      let totalCollected = 0;
+      let debtors = 0;
+      let paidFull = 0;
+
+      for (const s of students) {
+        const fee =
+          s.class.feeStructures.find(
+            (fs) => fs.term === a.term && fs.academicYear === a.academicYear,
+          )?.totalAmount || 0;
+        if (fee === 0) continue;
+
+        const paid = paidMap.get(`${s.id}|${a.term}|${a.academicYear}`) || 0;
+        totalRequired += fee;
+        totalCollected += Math.min(paid, fee);
+
+        if (paid >= fee) paidFull++;
+        else debtors++;
+      }
+
+      return {
+        id: a.id,
+        term: a.term,
+        academicYear: a.academicYear,
+        startDate: a.startDate,
+        endDate: a.endDate,
+        activatedAt: a.activatedAt,
+        totalRequired,
+        totalCollected,
+        outstanding: Math.max(0, totalRequired - totalCollected),
+        debtors,
+        paidFull,
+      };
+    });
+
+    res.json({ success: true, data: history });
+  } catch (err) {
+    console.error("Get term history error:", err);
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get term history" });
+  }
+});
+
 // POST /api/schools/activate-term
-// Admin activates a term - only one term active at a time
 router.post("/activate-term", verifyStaff, isAdmin, async (req, res) => {
   try {
-    const { term, academicYear } = req.body;
+    const { term, academicYear, startDate, endDate } = req.body;
 
     if (!term || !academicYear) {
       return res.status(400).json({
@@ -396,8 +476,60 @@ router.post("/activate-term", verifyStaff, isAdmin, async (req, res) => {
       });
     }
 
-    // Check that fee structures exist for this term
-    // At least one class must have fees set
+    let parsedStart = null;
+    let parsedEnd = null;
+    if (startDate) parsedStart = new Date(startDate);
+    if (endDate) parsedEnd = new Date(endDate);
+
+    if (parsedStart && parsedEnd && parsedEnd < parsedStart) {
+      return res.status(400).json({
+        success: false,
+        message: "End date must be after start date",
+      });
+    }
+
+    // Snapshot the previous active term before switching
+    const currentSchool = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: {
+        activeTerm: true,
+        activeAcademicYear: true,
+        activeTermStartDate: true,
+        activeTermEndDate: true,
+      },
+    });
+
+    if (currentSchool?.activeTerm && currentSchool.activeAcademicYear) {
+      const isSameTerm =
+        currentSchool.activeTerm === term &&
+        currentSchool.activeAcademicYear === academicYear;
+
+      if (!isSameTerm) {
+        await prisma.termActivation.upsert({
+          where: {
+            schoolId_term_academicYear: {
+              schoolId: req.schoolId,
+              term: currentSchool.activeTerm,
+              academicYear: currentSchool.activeAcademicYear,
+            },
+          },
+          update: {
+            startDate: currentSchool.activeTermStartDate,
+            endDate: currentSchool.activeTermEndDate,
+          },
+          create: {
+            schoolId: req.schoolId,
+            term: currentSchool.activeTerm,
+            academicYear: currentSchool.activeAcademicYear,
+            startDate: currentSchool.activeTermStartDate,
+            endDate: currentSchool.activeTermEndDate,
+            activatedById: req.staff.id,
+          },
+        });
+      }
+    }
+
+    // Require at least one fee structure
     const feeStructuresExist = await prisma.feeStructure.count({
       where: {
         schoolId: req.schoolId,
@@ -415,8 +547,7 @@ router.post("/activate-term", verifyStaff, isAdmin, async (req, res) => {
       });
     }
 
-    // Apply any student credits to the new term
-    // Get all students with credit balance
+    // Apply credits
     const studentsWithCredit = await prisma.student.findMany({
       where: {
         schoolId: req.schoolId,
@@ -429,7 +560,6 @@ router.post("/activate-term", verifyStaff, isAdmin, async (req, res) => {
     let creditsApplied = 0;
 
     for (const student of studentsWithCredit) {
-      // Find fee structure for this student's class
       const feeStructure = await prisma.feeStructure.findFirst({
         where: {
           schoolId: req.schoolId,
@@ -442,13 +572,11 @@ router.post("/activate-term", verifyStaff, isAdmin, async (req, res) => {
 
       if (!feeStructure || student.creditBalance <= 0) continue;
 
-      // Apply credit as a payment for new term
       const creditToApply = Math.min(
         student.creditBalance,
         feeStructure.totalAmount,
       );
 
-      // Count payments for receipt number
       const paymentCount = await prisma.feePayment.count({
         where: { schoolId: req.schoolId },
       });
@@ -459,7 +587,6 @@ router.post("/activate-term", verifyStaff, isAdmin, async (req, res) => {
         paymentCount + 1,
       );
 
-      // Create credit payment record
       await prisma.feePayment.create({
         data: {
           schoolId: req.schoolId,
@@ -480,7 +607,6 @@ router.post("/activate-term", verifyStaff, isAdmin, async (req, res) => {
         },
       });
 
-      // Reduce student credit balance
       await prisma.student.update({
         where: { id: student.id },
         data: { creditBalance: student.creditBalance - creditToApply },
@@ -489,16 +615,42 @@ router.post("/activate-term", verifyStaff, isAdmin, async (req, res) => {
       creditsApplied++;
     }
 
-    // Activate the term
+    // Activate the term on the school row
     await prisma.school.update({
       where: { id: req.schoolId },
       data: {
         activeTerm: term,
         activeAcademicYear: academicYear,
+        activeTermStartDate: parsedStart,
+        activeTermEndDate: parsedEnd,
       },
     });
 
-    // Audit log
+    // Record the new term in the permanent history table
+    await prisma.termActivation.upsert({
+      where: {
+        schoolId_term_academicYear: {
+          schoolId: req.schoolId,
+          term,
+          academicYear,
+        },
+      },
+      update: {
+        startDate: parsedStart,
+        endDate: parsedEnd,
+        activatedAt: new Date(),
+        activatedById: req.staff.id,
+      },
+      create: {
+        schoolId: req.schoolId,
+        term,
+        academicYear,
+        startDate: parsedStart,
+        endDate: parsedEnd,
+        activatedById: req.staff.id,
+      },
+    });
+
     await prisma.auditLog.create({
       data: {
         schoolId: req.schoolId,
@@ -522,6 +674,9 @@ router.post("/activate-term", verifyStaff, isAdmin, async (req, res) => {
       .json({ success: false, message: "Failed to activate term" });
   }
 });
+
+// ==================== STUDENT TERM STATUS ====================
+
 router.get(
   "/student-term-status/:studentId",
   verifyStaffOrParent,
@@ -537,7 +692,7 @@ router.get(
         });
       }
       const student = await prisma.student.findFirst({
-        where: { id: studentId, schoolId: req.schoolId }, // ← set by both middlewares
+        where: { id: studentId, schoolId: req.schoolId },
         include: { class: true },
       });
 
@@ -549,7 +704,7 @@ router.get(
 
       const feeStructure = await prisma.feeStructure.findFirst({
         where: {
-          schoolId: req.student.schoolId,
+          schoolId: req.schoolId,
           classId: student.classId,
           term,
           academicYear,
@@ -557,7 +712,6 @@ router.get(
         },
       });
 
-      // Get total already paid for this term
       const paymentsThisTerm = await prisma.feePayment.aggregate({
         where: {
           studentId,
@@ -614,7 +768,8 @@ router.get(
   },
 );
 
-// PUT /api/schools/payment-details
+// ==================== PAYMENT DETAILS ====================
+
 router.put("/payment-details", verifyStaff, isAdmin, async (req, res) => {
   try {
     const {
@@ -624,7 +779,6 @@ router.put("/payment-details", verifyStaff, isAdmin, async (req, res) => {
       paymentInstructions,
     } = req.body;
 
-    // Validate bank accounts structure
     if (bankAccounts && !Array.isArray(bankAccounts)) {
       return res.status(400).json({
         success: false,
@@ -667,8 +821,7 @@ router.put("/payment-details", verifyStaff, isAdmin, async (req, res) => {
   }
 });
 
-// GET /api/schools/payment-info/:schoolId
-// Public - parents can see payment details without auth
+// GET /api/schools/payment-info/:schoolId — public
 router.get("/payment-info/:schoolId", async (req, res) => {
   try {
     const school = await prisma.school.findUnique({
@@ -699,7 +852,8 @@ router.get("/payment-info/:schoolId", async (req, res) => {
   }
 });
 
-//  SCHOOL INFO
+// ==================== SCHOOL INFO ====================
+
 router.get("/me", verifyStaff, async (req, res) => {
   try {
     const school = await prisma.school.findUnique({
@@ -722,38 +876,7 @@ router.get("/me", verifyStaff, async (req, res) => {
   }
 });
 
-// GET /api/schools/payment-info/:schoolId
-// Public endpoint - parents can see payment details
-router.get("/payment-info/:schoolId", async (req, res) => {
-  try {
-    const school = await prisma.school.findUnique({
-      where: { id: req.params.schoolId },
-      select: {
-        name: true,
-        phone: true,
-        nationalBankAccount: true,
-        nationalBankName: true,
-        airtelMoneyNumber: true,
-        mpambaNumber: true,
-        paymentInstructions: true,
-      },
-    });
-
-    if (!school) {
-      return res
-        .status(404)
-        .json({ success: false, message: "School not found" });
-    }
-
-    res.json({ success: true, data: school });
-  } catch (err) {
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to get payment info" });
-  }
-});
-
-// ==================== SETTINGS (school identity: name, motto, logo) ====================
+// ==================== SETTINGS ====================
 
 router.get("/settings", verifyStaff, schoolController.getSettings);
 router.put("/settings", verifyStaff, isAdmin, schoolController.updateSettings);

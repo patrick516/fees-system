@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2, CalendarIcon } from "lucide-react";
+import { ArrowLeft, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import api from "../../lib/axios";
 import type { Class } from "../../types";
@@ -11,14 +11,26 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
-import { Calendar } from "../../components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../../components/ui/popover";
 import { getCurrentAcademicYear } from "../../lib/utils";
 import { useActiveTerm } from "../../hooks/useActiveTerm";
+
+const MONTHS = [
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
+];
+
+const ITEM_CLASS =
+  "cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900";
 
 const AddStudent = () => {
   const navigate = useNavigate();
@@ -27,10 +39,11 @@ const AddStudent = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>(undefined);
-  const [dobOpen, setDobOpen] = useState(false);
+  // DOB split into three parts (day/month/year) driven by shadcn Selects
+  const [dobDay, setDobDay] = useState("");
+  const [dobMonth, setDobMonth] = useState(""); // "1" .. "12"
+  const [dobYear, setDobYear] = useState("");
 
-  // Active term from admin — single source of truth for academic year
   const { academicYear: activeYear } = useActiveTerm();
 
   const [form, setForm] = useState({
@@ -46,7 +59,47 @@ const AddStudent = () => {
     academicYear: getCurrentAcademicYear(),
   });
 
-  // Sync the form's academic year once the activated value loads
+  // Years list — current year down to 1950
+  const YEARS = useMemo(() => {
+    const currentYear = new Date().getFullYear();
+    const years: number[] = [];
+    for (let y = currentYear; y >= 1950; y--) years.push(y);
+    return years;
+  }, []);
+
+  // Days in the selected month/year (or 31 if month not picked yet)
+  const daysInMonth = useMemo(() => {
+    if (!dobMonth || !dobYear) return 31;
+    const y = parseInt(dobYear);
+    const m = parseInt(dobMonth);
+    return new Date(y, m, 0).getDate(); // 0 gives last day of previous month
+  }, [dobMonth, dobYear]);
+
+  // Derived Date object — undefined unless all three parts are set and valid
+  const dateOfBirth = useMemo(() => {
+    if (!dobDay || !dobMonth || !dobYear) return undefined;
+    const y = parseInt(dobYear);
+    const m = parseInt(dobMonth);
+    const d = parseInt(dobDay);
+    const date = new Date(y, m - 1, d);
+    // Reject overflow (e.g. Feb 30 → Mar 2)
+    if (
+      date.getFullYear() !== y ||
+      date.getMonth() !== m - 1 ||
+      date.getDate() !== d
+    ) {
+      return undefined;
+    }
+    return date;
+  }, [dobDay, dobMonth, dobYear]);
+
+  // If the day exceeds the days in the newly chosen month, clear it
+  useEffect(() => {
+    if (!dobDay) return;
+    const d = parseInt(dobDay);
+    if (d > daysInMonth) setDobDay("");
+  }, [daysInMonth, dobDay]);
+
   useEffect(() => {
     if (activeYear) {
       setForm((prev) => ({ ...prev, academicYear: activeYear }));
@@ -77,7 +130,17 @@ const AddStudent = () => {
     }
 
     if (!dateOfBirth) {
-      setError("Please select the date of birth");
+      setError("Please select a valid date of birth");
+      return;
+    }
+
+    if (form.parentPhone.length !== 9) {
+      setError("Please enter the full 9-digit parent phone number");
+      return;
+    }
+
+    if (form.parentPhone2 && form.parentPhone2.length !== 9) {
+      setError("Second phone must be 9 digits (or leave it empty)");
       return;
     }
 
@@ -87,7 +150,10 @@ const AddStudent = () => {
       const payload = {
         ...form,
         dateOfBirth: format(dateOfBirth, "yyyy-MM-dd"),
-        parentPhone2: form.parentPhone2 || undefined,
+        parentPhone: `+265${form.parentPhone}`,
+        parentPhone2: form.parentPhone2
+          ? `+265${form.parentPhone2}`
+          : undefined,
         parentEmail: form.parentEmail || undefined,
       };
       const res = await api.post("/students", payload);
@@ -104,6 +170,14 @@ const AddStudent = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setForm({ ...form, [e.target.name]: e.target.value });
+  };
+
+  const handlePhoneChange = (
+    field: "parentPhone" | "parentPhone2",
+    value: string,
+  ) => {
+    const digits = value.replace(/\D/g, "").slice(0, 9);
+    setForm((prev) => ({ ...prev, [field]: digits }));
   };
 
   return (
@@ -164,51 +238,73 @@ const AddStudent = () => {
               </div>
             </div>
 
-            {/* Date of Birth — shadcn DatePicker */}
-            <div>
+            {/* Date of Birth — three shadcn Selects */}
+            <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Date of Birth *
               </label>
-              <Popover open={dobOpen} onOpenChange={setDobOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="w-full flex items-center justify-between px-4 py-2 border border-gray-300 rounded-lg text-sm text-left focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  >
-                    <span
-                      className={
-                        dateOfBirth ? "text-gray-900" : "text-gray-400"
-                      }
-                    >
-                      {dateOfBirth
-                        ? format(dateOfBirth, "dd/MM/yyyy")
-                        : "dd/mm/yyyy"}
-                    </span>
-                    <CalendarIcon size={16} className="text-gray-400" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[300px] p-0 bg-white border border-gray-200 rounded-xl shadow-lg"
-                  align="start"
-                >
-                  <Calendar
-                    mode="single"
-                    selected={dateOfBirth}
-                    onSelect={(d) => {
-                      setDateOfBirth(d);
-                      setDobOpen(false);
-                    }}
-                    disabled={(d) =>
-                      d > new Date() || d < new Date("1950-01-01")
-                    }
-                    captionLayout="dropdown"
-                    startMonth={new Date(1950, 0)}
-                    endMonth={new Date()}
-                    defaultMonth={dateOfBirth || new Date(2015, 0, 1)}
-                    autoFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="grid grid-cols-[80px_1fr_100px] gap-2">
+                {/* Day */}
+                <Select value={dobDay} onValueChange={setDobDay}>
+                  <SelectTrigger className="w-full bg-transparent border-gray-300 rounded-lg text-sm h-[38px]">
+                    <SelectValue placeholder="Day" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white max-h-[240px] w-auto min-w-[80px]">
+                    {Array.from({ length: daysInMonth }, (_, i) => i + 1).map(
+                      (d) => (
+                        <SelectItem
+                          key={d}
+                          value={String(d)}
+                          className={ITEM_CLASS}
+                        >
+                          {d}
+                        </SelectItem>
+                      ),
+                    )}
+                  </SelectContent>
+                </Select>
+
+                {/* Month */}
+                <Select value={dobMonth} onValueChange={setDobMonth}>
+                  <SelectTrigger className="w-full bg-transparent border-gray-300 rounded-lg text-sm h-[38px]">
+                    <SelectValue placeholder="Month" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white max-h-[240px] w-auto min-w-[160px]">
+                    {MONTHS.map((m, i) => (
+                      <SelectItem
+                        key={m}
+                        value={String(i + 1)}
+                        className={ITEM_CLASS}
+                      >
+                        {m}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                {/* Year */}
+                <Select value={dobYear} onValueChange={setDobYear}>
+                  <SelectTrigger className="w-full bg-transparent border-gray-300 rounded-lg text-sm h-[38px]">
+                    <SelectValue placeholder="Year" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white max-h-[240px] w-auto min-w-[100px]">
+                    {YEARS.map((y) => (
+                      <SelectItem
+                        key={y}
+                        value={String(y)}
+                        className={ITEM_CLASS}
+                      >
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">
+                {dateOfBirth
+                  ? `Selected: ${format(dateOfBirth, "dd MMMM yyyy")}`
+                  : "Pick day, month and year"}
+              </p>
             </div>
 
             <div>
@@ -223,16 +319,10 @@ const AddStudent = () => {
                   <SelectValue placeholder="Select gender" />
                 </SelectTrigger>
                 <SelectContent className="bg-white w-auto min-w-[140px]">
-                  <SelectItem
-                    value="MALE"
-                    className="cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900"
-                  >
+                  <SelectItem value="MALE" className={ITEM_CLASS}>
                     Male
                   </SelectItem>
-                  <SelectItem
-                    value="FEMALE"
-                    className="cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900"
-                  >
+                  <SelectItem value="FEMALE" className={ITEM_CLASS}>
                     Female
                   </SelectItem>
                 </SelectContent>
@@ -252,11 +342,7 @@ const AddStudent = () => {
                 </SelectTrigger>
                 <SelectContent className="bg-white w-auto min-w-[140px]">
                   {classes.map((c) => (
-                    <SelectItem
-                      key={c.id}
-                      value={c.id}
-                      className="cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900"
-                    >
+                    <SelectItem key={c.id} value={c.id} className={ITEM_CLASS}>
                       {c.name}
                     </SelectItem>
                   ))}
@@ -300,33 +386,54 @@ const AddStudent = () => {
               />
             </div>
 
+            {/* Phone Number — +265 fixed prefix */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Phone Number *{" "}
                 <span className="text-gray-400 font-normal">(for SMS)</span>
               </label>
-              <input
-                name="parentPhone"
-                value={form.parentPhone}
-                onChange={handleChange}
-                required
-                placeholder="+265999123456"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="flex items-stretch border rounded-lg overflow-hidden transition-all duration-200 bg-white border-gray-300 focus-within:border-[#0B1F44] focus-within:shadow-[0_0_0_3px_rgba(11,31,68,0.12)]">
+                <span className="flex items-center pl-4 pr-1 text-sm font-medium text-gray-700 select-none">
+                  +265
+                </span>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={form.parentPhone}
+                  onChange={(e) =>
+                    handlePhoneChange("parentPhone", e.target.value)
+                  }
+                  placeholder="994067223"
+                  required
+                  className="flex-1 pr-4 py-2 bg-transparent text-sm text-gray-900 placeholder-gray-300 outline-none ring-0 focus:ring-0 focus:outline-none rounded-none"
+                />
+              </div>
+              <p className="text-xs text-gray-400 mt-1.5">
+                Type the 9-digit number (e.g. 994067223)
+              </p>
             </div>
 
+            {/* Second Phone — +265 fixed prefix */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Second Phone{" "}
                 <span className="text-gray-400 font-normal">(optional)</span>
               </label>
-              <input
-                name="parentPhone2"
-                value={form.parentPhone2}
-                onChange={handleChange}
-                placeholder="+265888654321"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+              <div className="flex items-stretch border rounded-lg overflow-hidden transition-all duration-200 bg-white border-gray-300 focus-within:border-[#0B1F44] focus-within:shadow-[0_0_0_3px_rgba(11,31,68,0.12)]">
+                <span className="flex items-center pl-4 pr-1 text-sm font-medium text-gray-700 select-none">
+                  +265
+                </span>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={form.parentPhone2}
+                  onChange={(e) =>
+                    handlePhoneChange("parentPhone2", e.target.value)
+                  }
+                  placeholder="888654321"
+                  className="flex-1 pr-4 py-2 bg-transparent text-sm text-gray-900 placeholder-gray-300 outline-none ring-0 focus:ring-0 focus:outline-none rounded-none"
+                />
+              </div>
             </div>
 
             <div className="md:col-span-2">
@@ -354,7 +461,7 @@ const AddStudent = () => {
         )}
         {success && (
           <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-            ✅ {success}
+            {success}
           </div>
         )}
 

@@ -466,7 +466,7 @@ const RecordPayment = () => {
                 {termStatus.termStatus.isFullyPaid && (
                   <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
                     <p className="text-sm font-medium text-green-800">
-                      ✅ This student has already paid in full for{" "}
+                      This student has already paid in full for{" "}
                       {form.term.replace("_", " ")}.
                     </p>
                     <p className="text-xs text-green-600 mt-1">

@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import {
   Download,
   FileSpreadsheet,
@@ -10,6 +11,7 @@ import {
   Clock,
   Loader2,
   BarChart2,
+  History,
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import { saveAs } from "file-saver";
@@ -48,17 +50,21 @@ const statusLabels: Record<string, string> = {
 
 const formatMWK = (amount: number) => `MWK ${(amount || 0).toLocaleString()}`;
 
+const termLabel = (t?: string | null) =>
+  t ? t.replace("_", " ").replace("TERM", "Term") : "";
+
 const ITEM_CLASS =
   "cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900";
 
 export default function ReportsPage() {
   const { settings } = useSchoolSettings();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [classes, setClasses] = useState<any[]>([]);
   const [report, setReport] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(false);
+  const [generatedFromHistory, setGeneratedFromHistory] = useState(false);
 
-  // Active term — single source of truth for academic year
   const { academicYear: activeYear } = useActiveTerm();
 
   const [filters, setFilters] = useState({
@@ -67,7 +73,6 @@ export default function ReportsPage() {
     academicYear: getCurrentAcademicYear(),
   });
 
-  // Sync filter's academic year once the activated value loads
   useEffect(() => {
     if (activeYear) {
       setFilters((prev) => ({ ...prev, academicYear: activeYear }));
@@ -81,15 +86,13 @@ export default function ReportsPage() {
       .catch(() => {});
   }, []);
 
-  const generateReport = async () => {
+  const runReport = async (f: typeof filters) => {
     setLoading(true);
     setGenerated(false);
     try {
-      const params = new URLSearchParams({
-        academicYear: filters.academicYear,
-        ...(filters.term && { term: filters.term }),
-        ...(filters.classId && { classId: filters.classId }),
-      });
+      const params = new URLSearchParams({ academicYear: f.academicYear });
+      if (f.term) params.set("term", f.term);
+      if (f.classId) params.set("classId", f.classId);
       const res = await api.get(`/reports/fees?${params}`);
       setReport(res.data.data);
       setGenerated(true);
@@ -100,18 +103,37 @@ export default function ReportsPage() {
     }
   };
 
+  const generateReport = () => runReport(filters);
+
+  useEffect(() => {
+    const urlTerm = searchParams.get("term");
+    const urlYear = searchParams.get("academicYear");
+
+    if (!urlTerm && !urlYear) return;
+
+    const newFilters = {
+      term: urlTerm || "",
+      classId: "",
+      academicYear: urlYear || getCurrentAcademicYear(),
+    };
+    setFilters(newFilters);
+    setGeneratedFromHistory(true);
+    runReport(newFilters);
+    setSearchParams({}, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const exportToExcel = () => {
     if (!report) return;
 
     const wb = XLSX.utils.book_new();
 
-    // Sheet 1 — Summary
     const summaryData = [
       [settings?.name || "SCHOOL FEES REPORT"],
       ...(settings?.motto ? [[settings.motto]] : []),
       [`Generated: ${new Date().toLocaleDateString("en-GB")}`],
       [`Academic Year: ${filters.academicYear}`],
-      [`Term: ${filters.term ? filters.term.replace("_", " ") : "All Terms"}`],
+      [`Term: ${filters.term ? termLabel(filters.term) : "All Terms"}`],
       [],
       ["OVERALL SUMMARY"],
       ["Total Students", report.summary.totalStudents],
@@ -128,7 +150,6 @@ export default function ReportsPage() {
     ws1["!cols"] = [{ wch: 25 }, { wch: 20 }];
     XLSX.utils.book_append_sheet(wb, ws1, "Summary");
 
-    // Sheet 2 — Class Summary
     const classHeaders = [
       "Class",
       "Total Students",
@@ -153,7 +174,6 @@ export default function ReportsPage() {
     ws2["!cols"] = classHeaders.map(() => ({ wch: 18 }));
     XLSX.utils.book_append_sheet(wb, ws2, "By Class");
 
-    // Sheet 3 — Detailed Student List
     const detailHeaders = [
       "Student ID",
       "Full Name",
@@ -198,7 +218,6 @@ export default function ReportsPage() {
     ];
     XLSX.utils.book_append_sheet(wb, ws3, "Student Details");
 
-    // Save
     const fileName = `SchoolPay_Report_${filters.academicYear}_${filters.term || "AllTerms"}_${new Date().toISOString().slice(0, 10)}.xlsx`;
     const excelBuffer = XLSX.write(wb, { bookType: "xlsx", type: "array" });
     const blob = new Blob([excelBuffer], {
@@ -210,180 +229,510 @@ export default function ReportsPage() {
   const exportToPDF = () => {
     if (!report) return;
 
-    const termLabel = filters.term
-      ? filters.term.replace("_", " ")
-      : "All Terms";
+    const termText = filters.term ? termLabel(filters.term) : "All Terms";
     const classLabel = filters.classId
       ? classes.find((c) => c.id === filters.classId)?.name || "All Classes"
       : "All Classes";
+
+    const collectionPct =
+      report.summary.totalRequired > 0
+        ? Math.round(
+            (report.summary.totalCollected / report.summary.totalRequired) *
+              100,
+          )
+        : 0;
+
+    // Resolve logo URL to absolute
+    const logoUrl = settings?.logo
+      ? settings.logo.startsWith("http") || settings.logo.startsWith("data:")
+        ? settings.logo
+        : `${(import.meta.env.VITE_API_URL || "").replace(/\/api\/?$/, "")}${settings.logo}`
+      : null;
+
+    const today = new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+
+    const badgeFor = (status: string) => {
+      const map: Record<string, { bg: string; fg: string; label: string }> = {
+        PAID_FULL: { bg: "#dcfce7", fg: "#15803d", label: "✓ Paid in Full" },
+        PAID_WITH_CREDIT: {
+          bg: "#f3e8ff",
+          fg: "#7e22ce",
+          label: "★ Paid + Credit",
+        },
+        PARTIAL: { bg: "#fef3c7", fg: "#a16207", label: "⚠ Partial" },
+        NO_PAYMENT: { bg: "#f1f5f9", fg: "#64748b", label: "○ No Payment" },
+      };
+      const s = map[status] || map.NO_PAYMENT;
+      return `<span style="display:inline-block;padding:3px 9px;border-radius:999px;background:${s.bg};color:${s.fg};font-size:9px;font-weight:600;letter-spacing:0.2px;white-space:nowrap;">${s.label}</span>`;
+    };
 
     const html = `
 <!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
-  <title>School Fees Report</title>
+  <title>${settings?.name || "School"} — Fees Report</title>
   <style>
+    @page { size: A4; margin: 14mm 12mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    body { font-family: Arial, sans-serif; font-size: 11px; color: #1a1a1a; padding: 24px; }
-    .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #1e3a5f; padding-bottom: 12px; }
-    .header h1 { font-size: 20px; color: #1e3a5f; }
-    .header p { color: #666; font-size: 11px; margin-top: 4px; }
-    .meta { display: flex; gap: 24px; margin-bottom: 16px; font-size: 11px; }
-    .meta span { background: #f0f4ff; padding: 4px 10px; border-radius: 4px; }
-    .section-title { font-size: 13px; font-weight: bold; color: #1e3a5f; margin: 16px 0 8px; border-left: 3px solid #1e3a5f; padding-left: 8px; }
-    .summary-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-    .summary-card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 12px; text-align: center; }
-    .summary-card .value { font-size: 18px; font-weight: bold; color: #1e3a5f; }
-    .summary-card .label { font-size: 10px; color: #666; margin-top: 2px; }
-    .money-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 16px; }
-    .money-card { border: 1px solid #e5e7eb; border-radius: 6px; padding: 8px 12px; }
-    .money-card .value { font-size: 14px; font-weight: bold; }
-    .money-card .label { font-size: 10px; color: #666; }
-    table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-    th { background: #1e3a5f; color: white; padding: 6px 8px; text-align: left; font-size: 10px; }
-    td { padding: 5px 8px; border-bottom: 1px solid #f0f0f0; font-size: 10px; }
-    tr:nth-child(even) { background: #fafafa; }
-    .badge { display: inline-block; padding: 2px 6px; border-radius: 10px; font-size: 9px; font-weight: bold; }
-    .badge-green { background: #dcfce7; color: #166534; }
-    .badge-yellow { background: #fef9c3; color: #854d0e; }
-    .badge-gray { background: #f3f4f6; color: #6b7280; }
-    .badge-purple { background: #f3e8ff; color: #7e22ce; }
-    .footer { text-align: center; color: #999; font-size: 10px; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 12px; }
-    @media print { body { padding: 12px; } }
+    body {
+      font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
+      font-size: 10.5px;
+      color: #1e293b;
+      line-height: 1.45;
+      background: white;
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+    }
+
+    /* HEADER */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      padding-bottom: 14px;
+      border-bottom: 3px solid #1e3a5f;
+      margin-bottom: 18px;
+    }
+    .header-logo {
+      width: 68px;
+      height: 68px;
+      object-fit: contain;
+      flex-shrink: 0;
+    }
+    .header-logo-placeholder {
+      width: 68px;
+      height: 68px;
+      background: #f1f5f9;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #94a3b8;
+      font-size: 9px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+    .header-content { flex: 1; min-width: 0; }
+    .school-name {
+      font-size: 19px;
+      font-weight: 800;
+      color: #1e3a5f;
+      letter-spacing: -0.3px;
+      line-height: 1.15;
+    }
+    .school-motto {
+      font-size: 10.5px;
+      color: #64748b;
+      font-style: italic;
+      margin-top: 2px;
+    }
+    .report-title {
+      font-size: 12px;
+      font-weight: 600;
+      color: #334155;
+      margin-top: 6px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+    .header-meta {
+      text-align: right;
+      font-size: 9.5px;
+      color: #64748b;
+      line-height: 1.6;
+      white-space: nowrap;
+    }
+    .header-meta strong { color: #1e3a5f; font-weight: 700; }
+
+    /* FILTER CHIPS */
+    .filter-row {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+    }
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: #eff6ff;
+      color: #1e40af;
+      padding: 4px 10px;
+      border-radius: 6px;
+      font-size: 9.5px;
+      font-weight: 600;
+      border: 1px solid #dbeafe;
+    }
+    .chip-label { color: #64748b; font-weight: 500; }
+
+    /* SECTION */
+    .section { margin-bottom: 22px; page-break-inside: avoid; }
+    .section-title {
+      font-size: 12px;
+      font-weight: 700;
+      color: #1e3a5f;
+      padding-left: 10px;
+      border-left: 4px solid #1e3a5f;
+      margin-bottom: 12px;
+      letter-spacing: 0.3px;
+    }
+
+    /* STAT CARDS */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .stat-card {
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 12px 14px;
+      background: #ffffff;
+    }
+    .stat-label {
+      font-size: 9px;
+      font-weight: 600;
+      color: #64748b;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 5px;
+    }
+    .stat-value {
+      font-size: 22px;
+      font-weight: 800;
+      line-height: 1;
+      letter-spacing: -0.5px;
+    }
+    .stat-value.green { color: #16a34a; }
+    .stat-value.red { color: #dc2626; }
+    .stat-value.blue { color: #1e3a5f; }
+    .stat-value.amber { color: #ca8a04; }
+    .stat-value.slate { color: #475569; }
+    .stat-sub {
+      font-size: 9px;
+      color: #94a3b8;
+      margin-top: 4px;
+    }
+
+    /* MONEY CARDS */
+    .money-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+      margin-bottom: 14px;
+    }
+    .money-card {
+      border-radius: 10px;
+      padding: 12px 14px;
+      border: 1px solid;
+    }
+    .money-card.collected { background: #f0fdf4; border-color: #bbf7d0; }
+    .money-card.outstanding { background: #fef2f2; border-color: #fecaca; }
+    .money-card.required { background: #eff6ff; border-color: #bfdbfe; }
+    .money-label {
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 4px;
+    }
+    .money-card.collected .money-label { color: #15803d; }
+    .money-card.outstanding .money-label { color: #b91c1c; }
+    .money-card.required .money-label { color: #1e40af; }
+    .money-value {
+      font-size: 17px;
+      font-weight: 800;
+      letter-spacing: -0.3px;
+    }
+    .money-card.collected .money-value { color: #15803d; }
+    .money-card.outstanding .money-value { color: #b91c1c; }
+    .money-card.required .money-value { color: #1e3a5f; }
+
+    /* PROGRESS */
+    .progress-wrap { margin-top: 8px; }
+    .progress-track {
+      height: 6px;
+      background: #e2e8f0;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 4px;
+    }
+    .progress-fill {
+      height: 100%;
+      background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
+      border-radius: 999px;
+    }
+    .progress-text {
+      display: flex;
+      justify-content: space-between;
+      font-size: 9px;
+      color: #64748b;
+      margin-top: 4px;
+    }
+    .progress-text strong { color: #1e3a5f; }
+
+    /* TABLES */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 9.5px;
+      border-radius: 8px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+    }
+    thead th {
+      background: #1e3a5f;
+      color: #ffffff;
+      font-size: 8.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      padding: 9px 8px;
+      text-align: left;
+      white-space: nowrap;
+    }
+    thead th.right { text-align: right; }
+    thead th.center { text-align: center; }
+    tbody td {
+      padding: 8px;
+      border-top: 1px solid #f1f5f9;
+      vertical-align: middle;
+    }
+    tbody tr:nth-child(even) td { background: #f8fafc; }
+    tbody td.right { text-align: right; }
+    tbody td.center { text-align: center; }
+    tbody td.mono {
+      font-family: 'Courier New', monospace;
+      font-size: 9px;
+      color: #475569;
+    }
+    tbody td.bold { font-weight: 700; color: #1e293b; }
+    tbody td.green { color: #16a34a; font-weight: 600; }
+    tbody td.red { color: #dc2626; font-weight: 600; }
+    tbody td.slate { color: #64748b; }
+    tbody td.muted { color: #94a3b8; }
+
+    /* FOOTER */
+    .footer {
+      margin-top: 24px;
+      padding-top: 12px;
+      border-top: 1px solid #e2e8f0;
+      display: flex;
+      justify-content: space-between;
+      font-size: 8.5px;
+      color: #94a3b8;
+    }
+    .footer strong { color: #1e3a5f; font-weight: 700; }
+
+    .empty-state {
+      padding: 24px;
+      text-align: center;
+      color: #94a3b8;
+      font-size: 10px;
+      border: 1px dashed #e2e8f0;
+      border-radius: 8px;
+    }
+
+    @media print {
+      body { padding: 0; }
+      .section { page-break-inside: avoid; }
+      table { page-break-inside: auto; }
+      tr { page-break-inside: avoid; page-break-after: auto; }
+    }
   </style>
 </head>
 <body>
+
+  <!-- HEADER -->
   <div class="header">
-    ${settings?.logo ? `<img src="${settings.logo}" alt="Logo" style="width:56px;height:56px;object-fit:contain;margin-bottom:8px;" />` : ""}
-    <h1>${settings?.name || "School Fees Report"}</h1>
-    ${settings?.motto ? `<p style="font-style:italic;color:#1e3a5f;">"${settings.motto}"</p>` : ""}
-    <p>Academic Year: ${filters.academicYear} &nbsp;|&nbsp; ${termLabel} &nbsp;|&nbsp; ${classLabel}</p>
-    <p>Generated: ${new Date().toLocaleDateString("en-GB", { day: "2-digit", month: "long", year: "numeric" })}</p>
-  </div>
-
-  <div class="section-title">Overall Summary</div>
-  <div class="summary-grid">
-    <div class="summary-card">
-      <div class="value">${report.summary.totalStudents}</div>
-      <div class="label">Total Students</div>
+    ${
+      logoUrl
+        ? `<img src="${logoUrl}" alt="Logo" class="header-logo" />`
+        : `<div class="header-logo-placeholder">LOGO</div>`
+    }
+    <div class="header-content">
+      <div class="school-name">${settings?.name || "School Fees Report"}</div>
+      ${settings?.motto ? `<div class="school-motto">"${settings.motto}"</div>` : ""}
+      <div class="report-title">School Fees Collection Report</div>
     </div>
-    <div class="summary-card">
-      <div class="value" style="color:#16a34a">${report.summary.paidFull}</div>
-      <div class="label">Paid in Full</div>
-    </div>
-    <div class="summary-card">
-      <div class="value" style="color:#ca8a04">${report.summary.partial}</div>
-      <div class="label">Partial</div>
-    </div>
-    <div class="summary-card">
-      <div class="value" style="color:#dc2626">${report.summary.debtors}</div>
-      <div class="label">Debtors</div>
+    <div class="header-meta">
+      <div>Generated on</div>
+      <div><strong>${today}</strong></div>
+      <div style="margin-top:6px;">Academic Year</div>
+      <div><strong>${filters.academicYear}</strong></div>
     </div>
   </div>
 
-  <div class="money-grid">
-    <div class="money-card">
-      <div class="value" style="color:#16a34a">MWK ${report.summary.totalCollected.toLocaleString()}</div>
-      <div class="label">Total Collected</div>
+  <!-- FILTER CHIPS -->
+  <div class="filter-row">
+    <div class="chip"><span class="chip-label">Term:</span> ${termText}</div>
+    <div class="chip"><span class="chip-label">Class:</span> ${classLabel}</div>
+    <div class="chip"><span class="chip-label">Students:</span> ${report.summary.totalStudents}</div>
+  </div>
+
+  <!-- SECTION 1 -->
+  <div class="section">
+    <div class="section-title">1. Overview</div>
+
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Students</div>
+        <div class="stat-value blue">${report.summary.totalStudents}</div>
+        <div class="stat-sub">Enrolled this term</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Paid in Full</div>
+        <div class="stat-value green">${report.summary.paidFull}</div>
+        <div class="stat-sub">${report.summary.totalStudents > 0 ? Math.round((report.summary.paidFull / report.summary.totalStudents) * 100) : 0}% of students</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Partial Payment</div>
+        <div class="stat-value amber">${report.summary.partial}</div>
+        <div class="stat-sub">Paying but not cleared</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Debtors</div>
+        <div class="stat-value red">${report.summary.debtors}</div>
+        <div class="stat-sub">With balance owing</div>
+      </div>
     </div>
-    <div class="money-card">
-      <div class="value" style="color:#dc2626">MWK ${report.summary.totalOutstanding.toLocaleString()}</div>
-      <div class="label">Total Outstanding</div>
+
+    <div class="money-grid">
+      <div class="money-card collected">
+        <div class="money-label">Total Collected</div>
+        <div class="money-value">MWK ${report.summary.totalCollected.toLocaleString()}</div>
+      </div>
+      <div class="money-card outstanding">
+        <div class="money-label">Total Outstanding</div>
+        <div class="money-value">MWK ${report.summary.totalOutstanding.toLocaleString()}</div>
+      </div>
+      <div class="money-card required">
+        <div class="money-label">Total Required</div>
+        <div class="money-value">MWK ${report.summary.totalRequired.toLocaleString()}</div>
+      </div>
     </div>
-    <div class="money-card">
-      <div class="value" style="color:#1e3a5f">MWK ${report.summary.totalRequired.toLocaleString()}</div>
-      <div class="label">Total Required</div>
+
+    <div class="progress-wrap">
+      <div class="progress-track">
+        <div class="progress-fill" style="width:${collectionPct}%"></div>
+      </div>
+      <div class="progress-text">
+        <span><strong>${collectionPct}%</strong> collected</span>
+        <span>Target: <strong>MWK ${report.summary.totalRequired.toLocaleString()}</strong></span>
+      </div>
     </div>
   </div>
 
-  <div class="section-title">Summary by Class</div>
-  <table>
-    <thead>
-      <tr>
-        <th>Class</th>
-        <th>Students</th>
-        <th>Paid Full</th>
-        <th>Partial</th>
-        <th>No Payment</th>
-        <th>Debtors</th>
-        <th>Collected</th>
-        <th>Outstanding</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${report.classSummary
-        .map(
-          (c: any) => `
-        <tr>
-          <td><strong>${c.className}</strong></td>
-          <td>${c.totalStudents}</td>
-          <td style="color:#16a34a"><strong>${c.paidFull}</strong></td>
-          <td style="color:#ca8a04">${c.partial}</td>
-          <td style="color:#6b7280">${c.noPayment}</td>
-          <td style="color:#dc2626">${c.debtors}</td>
-          <td>MWK ${c.totalCollected.toLocaleString()}</td>
-          <td style="color:#dc2626">MWK ${c.totalOutstanding.toLocaleString()}</td>
-        </tr>
-      `,
-        )
-        .join("")}
-    </tbody>
-  </table>
-
-  <div class="section-title">Detailed Student List</div>
-  <table>
-    <thead>
-      <tr>
-        <th>ID</th>
-        <th>Student Name</th>
-        <th>Class</th>
-        <th>Parent</th>
-        <th>Phone</th>
-        <th>Required</th>
-        <th>Paid</th>
-        <th>Balance</th>
-        <th>Status</th>
-      </tr>
-    </thead>
-    <tbody>
-      ${report.rows
-        .map(
-          (r: any) => `
-        <tr>
-          <td style="font-family:monospace">${r.studentCode}</td>
-          <td><strong>${r.fullName}</strong></td>
-          <td>${r.className}</td>
-          <td>${r.parentName}</td>
-          <td>${r.parentPhone}</td>
-          <td>MWK ${(r.requiredAmount || 0).toLocaleString()}</td>
-          <td style="color:#16a34a">MWK ${r.totalPaid.toLocaleString()}</td>
-          <td style="color:${r.balance > 0 ? "#dc2626" : "#16a34a"}">
-            ${r.balance > 0 ? "MWK " + r.balance.toLocaleString() : "✓ Clear"}
-          </td>
-          <td>
-            <span class="badge ${
-              r.paymentStatus === "PAID_FULL"
-                ? "badge-green"
-                : r.paymentStatus === "PARTIAL"
-                  ? "badge-yellow"
-                  : r.paymentStatus === "PAID_WITH_CREDIT"
-                    ? "badge-purple"
-                    : "badge-gray"
-            }">
-              ${statusLabels[r.paymentStatus] || r.paymentStatus}
-            </span>
-          </td>
-        </tr>
-      `,
-        )
-        .join("")}
-    </tbody>
-  </table>
-
- <div class="footer">
-    ${settings?.name || "SchoolPay Malawi"} &nbsp;|&nbsp; Confidential &nbsp;|&nbsp; ${new Date().toLocaleDateString("en-GB")}
+  <!-- SECTION 2 -->
+  <div class="section">
+    <div class="section-title">2. Summary by Class</div>
+    ${
+      report.classSummary.length === 0
+        ? `<div class="empty-state">No classes to report.</div>`
+        : `<table>
+            <thead>
+              <tr>
+                <th>Class</th>
+                <th class="center">Students</th>
+                <th class="center">Paid Full</th>
+                <th class="center">Partial</th>
+                <th class="center">Debtors</th>
+                <th class="right">Collected</th>
+                <th class="right">Outstanding</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${report.classSummary
+                .map(
+                  (c: any) => `
+                <tr>
+                  <td class="bold">${c.className}</td>
+                  <td class="center">${c.totalStudents}</td>
+                  <td class="center green">${c.paidFull}</td>
+                  <td class="center" style="color:#ca8a04;font-weight:600;">${c.partial}</td>
+                  <td class="center ${c.debtors > 0 ? "red" : "muted"}">${c.debtors}</td>
+                  <td class="right green">MWK ${c.totalCollected.toLocaleString()}</td>
+                  <td class="right ${c.totalOutstanding > 0 ? "red" : "green"}">
+                    ${c.totalOutstanding > 0 ? `MWK ${c.totalOutstanding.toLocaleString()}` : "✓ Clear"}
+                  </td>
+                </tr>
+              `,
+                )
+                .join("")}
+            </tbody>
+          </table>`
+    }
   </div>
+
+  <!-- SECTION 3 -->
+  <div class="section">
+    <div class="section-title">3. Detailed Student List</div>
+    ${
+      report.rows.length === 0
+        ? `<div class="empty-state">No student records found for the selected filters.</div>`
+        : `<table>
+            <thead>
+              <tr>
+                <th>Student</th>
+                <th>Student ID</th>
+                <th>Class</th>
+                <th>Parent / Guardian</th>
+                <th class="right">Required</th>
+                <th class="right">Paid</th>
+                <th class="right">Balance</th>
+                <th class="center">Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${report.rows
+                .map(
+                  (r: any) => `
+                <tr>
+                  <td class="bold">${r.fullName}</td>
+                  <td class="mono">${r.studentCode}</td>
+                  <td class="slate">${r.className}</td>
+                  <td>
+                    <div style="font-weight:600;color:#334155;">${r.parentName}</div>
+                    <div style="font-size:8.5px;color:#94a3b8;">${r.parentPhone}</div>
+                  </td>
+                  <td class="right slate">
+                    ${r.requiredAmount ? `MWK ${r.requiredAmount.toLocaleString()}` : "—"}
+                  </td>
+                  <td class="right green">MWK ${r.totalPaid.toLocaleString()}</td>
+                  <td class="right ${r.balance > 0 ? "red" : "green"}">
+                    ${
+                      r.balance === null
+                        ? "—"
+                        : r.balance > 0
+                          ? `MWK ${r.balance.toLocaleString()}`
+                          : "✓ Clear"
+                    }
+                  </td>
+                  <td class="center">${badgeFor(r.paymentStatus)}</td>
+                </tr>
+              `,
+                )
+                .join("")}
+            </tbody>
+          </table>`
+    }
+  </div>
+
+  <!-- FOOTER -->
+  <div class="footer">
+    <div>
+      <strong>${settings?.name || "SchoolPay Malawi"}</strong> &nbsp;·&nbsp; Confidential Report &nbsp;·&nbsp; Generated by SchoolPay
+    </div>
+    <div>
+      ${today} &nbsp;·&nbsp; ${termText} &nbsp;·&nbsp; ${filters.academicYear}
+    </div>
+  </div>
+
 </body>
 </html>`;
 
@@ -394,7 +743,7 @@ export default function ReportsPage() {
     printWindow.focus();
     setTimeout(() => {
       printWindow.print();
-    }, 500);
+    }, 600);
   };
 
   return (
@@ -426,6 +775,26 @@ export default function ReportsPage() {
           </div>
         )}
       </div>
+
+      {/* History banner */}
+      {generatedFromHistory && (
+        <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-xl p-3">
+          <History size={15} className="text-blue-700 shrink-0" />
+          <p className="text-xs text-blue-800">
+            Viewing historical report for{" "}
+            <span className="font-semibold">
+              {termLabel(filters.term)} • {filters.academicYear}
+            </span>
+            . Change the filters below to view a different term.
+          </p>
+          <button
+            onClick={() => setGeneratedFromHistory(false)}
+            className="ml-auto text-xs text-blue-700 font-medium hover:text-blue-900"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100">

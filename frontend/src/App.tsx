@@ -17,6 +17,7 @@ import SMSPage from "./pages/SMS/index";
 import ReportsPage from "./pages/Reports/index";
 import SettingsPage from "./pages/Settings/index";
 import ResultsPage from "./pages/Results/index";
+import Promote from "./pages/Students/Promote";
 
 // Layout
 import MainLayout from "./components/Layout/MainLayout";
@@ -55,6 +56,7 @@ function App() {
           <Route path="dashboard" element={<Dashboard />} />
           <Route path="students" element={<StudentsPage />} />
           <Route path="students/add" element={<AddStudent />} />
+          <Route path="students/promote" element={<Promote />} />
           <Route path="students/:id" element={<StudentDetail />} />
           <Route path="payments" element={<PaymentsPage />} />
           <Route path="payments/record" element={<RecordPayment />} />

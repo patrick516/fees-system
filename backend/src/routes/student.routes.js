@@ -8,14 +8,22 @@ const {
   searchStudents,
   getStudentByCode,
 } = require("../controllers/student.controller");
+const {
+  previewPromotion,
+  promoteStudents,
+} = require("../controllers/promotion.controller");
 
 const { verifyStaff, verifyParent } = require("../middleware/auth");
-const { isBursar } = require("../middleware/role");
+const { isBursar, isAdmin } = require("../middleware/role");
 
-// Public - for parent login page to confirm student exists
+// Public — parent login page
 router.get("/by-code/:code", getStudentByCode);
 
-// Staff only routes
+// Promotion (register BEFORE /:id so it doesn't get captured)
+router.get("/promote/preview", verifyStaff, isAdmin, previewPromotion);
+router.post("/promote", verifyStaff, isAdmin, promoteStudents);
+
+// Staff only
 router.get("/search", verifyStaff, isBursar, searchStudents);
 router.get("/", verifyStaff, isBursar, getStudents);
 router.get("/:id", verifyStaff, isBursar, getStudent);

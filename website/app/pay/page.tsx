@@ -222,41 +222,26 @@ export default function PayPage() {
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                  Term *
+                  Term
                 </label>
-                <Select
-                  value={form.term}
-                  onValueChange={(v) => setForm({ ...form, term: v })}
-                >
-                  <SelectTrigger className="w-full bg-transparent border-gray-200 rounded-xl text-sm h-[42px] focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                    <SelectValue placeholder="Select term" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white w-auto min-w-[110px]">
-                    {terms.map((t) => (
-                      <SelectItem
-                        key={t.value}
-                        value={t.value}
-                        className="cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-2 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900"
-                      >
-                        {t.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 font-medium">
+                  {currentTerm?.replace("_", " ") || "—"}
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                  Academic Year *
+                  Academic Year
                 </label>
-                <input
-                  value={form.academicYear}
-                  onChange={(e) =>
-                    setForm({ ...form, academicYear: e.target.value })
-                  }
-                  className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                />
+                <div className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 font-medium">
+                  {activeYear || "—"}
+                </div>
               </div>
             </div>
+
+            <p className="text-[11px] text-gray-400 -mt-1">
+              Fees are only collected for the currently activated term. Contact
+              the school office if you need to pay for a different term.
+            </p>
 
             {/* Fee Info */}
             {termStatusLoading && (

@@ -1,6 +1,13 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Plus, Eye, User, AlertCircle } from "lucide-react";
+import {
+  Search,
+  Plus,
+  Eye,
+  User,
+  AlertCircle,
+  GraduationCap,
+} from "lucide-react";
 import api from "../../lib/axios";
 import type { Student, Class, Pagination } from "../../types";
 
@@ -69,14 +76,25 @@ const StudentsPage = () => {
               : " total"}
           </p>
         </div>
-        <button
-          onClick={() => navigate("/students/add")}
-          className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-3 py-2 md:px-4 rounded-lg text-sm hover:bg-[var(--color-primary-dark)] transition-colors shrink-0"
-        >
-          <Plus size={16} />
-          <span className="hidden sm:inline">Add Student</span>
-          <span className="sm:hidden">Add</span>
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => navigate("/students/promote")}
+            className="flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 md:px-4 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+            title="End of year promotion"
+          >
+            <GraduationCap size={16} />
+            <span className="hidden lg:inline">End of Year Promotion</span>
+            <span className="lg:hidden hidden sm:inline">Promote</span>
+          </button>
+          <button
+            onClick={() => navigate("/students/add")}
+            className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-3 py-2 md:px-4 rounded-lg text-sm hover:bg-[var(--color-primary-dark)] transition-colors"
+          >
+            <Plus size={16} />
+            <span className="hidden sm:inline">Add Student</span>
+            <span className="sm:hidden">Add</span>
+          </button>
+        </div>
       </div>
 
       {/* Class Filter — horizontally scrollable on mobile */}

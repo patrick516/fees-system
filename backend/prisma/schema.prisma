@@ -101,8 +101,10 @@ model School {
   mpambaNumber        String?
   paymentInstructions String?
 
-  activeTerm         Term?
-  activeAcademicYear String?
+  activeTerm          Term?
+  activeAcademicYear  String?
+  activeTermStartDate DateTime?
+  activeTermEndDate   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -114,11 +116,12 @@ model School {
   payments        FeePayment[]
   smsLogs         SmsLog[]
   feeStructures   FeeStructure[]
-  examPeriods     ExamPeriod[]
+   examPeriods     ExamPeriod[]
   subjects        Subject[]
   gradeBoundaries GradeBoundary[]
   examResults     ExamResult[]
   pendingExamRows PendingExamRow[]
+  termActivations TermActivation[]
 
   @@map("schools")
 }
@@ -211,8 +214,10 @@ model Student {
   classId  String
   class    Class  @relation(fields: [classId], references: [id])
 
-  // Auto generated unique ID shown to parents
-  studentCode String @unique // eg STP-2025-001
+    // Auto generated unique ID shown to parents
+  // Format: {PREFIX}-{CLASS_TAG}-{YEAR}-{SEQ}  eg SPP-F1-2026-001
+  studentCode        String   @unique
+  formerStudentCodes String[] @default([]) // previous codes after promotion
 
   // Name — split into parts, fullName is auto-merged for display
   firstName  String
@@ -461,4 +466,25 @@ model PendingExamRow {
   createdAt DateTime @default(now())
 
   @@map("pending_exam_rows")
+}
+
+// Permanent record of every term the school has ever run.
+// Written when the admin activates a term, or snapshots the previous
+// active term before switching away from it.
+model TermActivation {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  term         Term
+  academicYear String
+  startDate    DateTime?
+  endDate      DateTime?
+
+  activatedAt   DateTime @default(now())
+  activatedById String?
+
+  @@unique([schoolId, term, academicYear])
+  @@index([schoolId])
+  @@map("term_activations")
 }
