@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Users,
@@ -12,6 +12,8 @@ import {
   BadgeAlert,
   Target,
   Star,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { PaymentSummary } from "../../types";
@@ -53,27 +55,44 @@ const Dashboard = () => {
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
 
-  useEffect(() => {
-    if (!activeYear) return; // wait until the hook resolves
-    const fetchSummary = async () => {
-      try {
-        const params = new URLSearchParams();
-        params.set("academicYear", activeYear);
-        if (currentTerm) params.set("term", currentTerm);
+  const fetchSummary = useCallback(async () => {
+    if (!activeYear) return;
+    setLoading(true);
+    setError("");
+    try {
+      const params = new URLSearchParams();
+      params.set("academicYear", activeYear);
+      if (currentTerm) params.set("term", currentTerm);
 
-        const res = await api.get(`/payments/summary?${params}`);
-        setSummary(res.data.data);
-      } catch (err) {
-        console.error("Failed to load summary");
-      } finally {
-        setLoading(false);
+      const res = await api.get(`/payments/summary?${params}`);
+      setSummary(res.data.data);
+    } catch (err: any) {
+      const status = err.response?.status;
+      const msg = err.response?.data?.message;
+
+      if (status === 429) {
+        setError("Too many requests — please wait a moment before refreshing.");
+      } else if (status === 401) {
+        // axios interceptor already redirects; nothing to show
+        setError("Your session expired. Redirecting to login…");
+      } else {
+        setError(msg || "Couldn't load dashboard data. Please try again.");
       }
-    };
-    fetchSummary();
+      // Leave summary as-is (don't null it) so a transient error
+      // doesn't wipe out previously-loaded numbers
+    } finally {
+      setLoading(false);
+    }
   }, [activeYear, currentTerm]);
 
-  if (loading) {
+  useEffect(() => {
+    fetchSummary();
+  }, [fetchSummary]);
+
+  // Show initial spinner only when there's nothing to show yet
+  if (loading && !summary) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]" />
@@ -81,10 +100,58 @@ const Dashboard = () => {
     );
   }
 
+  // Hard error — no data at all to show
+  if (error && !summary) {
+    return (
+      <div className="max-w-md mx-auto mt-12 bg-white rounded-xl shadow-sm border border-red-100 p-8 text-center">
+        <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+          <AlertCircle size={22} className="text-red-600" />
+        </div>
+        <h2 className="text-base font-semibold text-gray-800 mb-1">
+          Couldn't load dashboard
+        </h2>
+        <p className="text-sm text-gray-500 mb-5">{error}</p>
+        <button
+          onClick={fetchSummary}
+          disabled={loading}
+          className="inline-flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
+        >
+          {loading ? (
+            <Loader2 size={14} className="animate-spin" />
+          ) : (
+            <RefreshCw size={14} />
+          )}
+          {loading ? "Retrying…" : "Retry"}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
+      {/* Non-blocking error banner — data is showing but stale */}
+      {error && summary && (
+        <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3">
+          <AlertCircle size={15} className="text-amber-600 shrink-0" />
+          <p className="text-xs text-amber-800 flex-1">
+            {error} Numbers below may be out of date.
+          </p>
+          <button
+            onClick={fetchSummary}
+            disabled={loading}
+            className="text-xs text-amber-700 font-semibold hover:text-amber-900 disabled:opacity-40 inline-flex items-center gap-1"
+          >
+            {loading ? (
+              <Loader2 size={12} className="animate-spin" />
+            ) : (
+              <RefreshCw size={12} />
+            )}
+            Refresh
+          </button>
+        </div>
+      )}
+
       {/* Stats Grid */}
-      {/* Stats Grid — 6 tiles matching the accounting model */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatCard
           title="Total Required"
@@ -136,7 +203,6 @@ const Dashboard = () => {
 
       {/* Two columns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Payment Status Breakdown */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h2 className="text-lg font-semibold text-gray-800 mb-6">
             Payment Status
@@ -178,13 +244,11 @@ const Dashboard = () => {
           </div>
         </div>
 
-        {/* Student Fee Status */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h2 className="text-lg font-semibold text-gray-800 mb-6">
             Student Fee Status
           </h2>
 
-          {/* Progress bar */}
           <div className="mb-4">
             <div className="flex justify-between text-sm mb-2">
               <span className="text-gray-500">Payment Progress</span>
@@ -231,7 +295,7 @@ const Dashboard = () => {
               <p className="text-xs text-gray-500 mt-1">No Fee Set</p>
             </div>
           </div>
-          {/* Pending alert */}
+
           {(summary?.pendingCount || 0) > 0 && (
             <button
               onClick={() => navigate("/payments/pending")}

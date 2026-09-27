@@ -9,7 +9,7 @@ dotenv.config();
 
 const app = express();
 
-//middleware
+// ============ MIDDLEWARE ============
 app.use(helmet());
 app.use(morgan("dev"));
 app.use(express.json({ limit: "10mb" }));
@@ -18,7 +18,6 @@ app.use(express.urlencoded({ extended: true, limit: "10mb" }));
 app.use(
   cors({
     origin: function (origin, callback) {
-      // Allow requests with no origin (curl, mobile, server-to-server)
       if (!origin) return callback(null, true);
 
       const allowed = [
@@ -28,11 +27,10 @@ app.use(
         "http://localhost:3000",
       ]
         .filter(Boolean)
-        .map((u) => u.replace(/\/$/, "")); // strip trailing slash
+        .map((u) => u.replace(/\/$/, ""));
 
       const cleanOrigin = origin.replace(/\/$/, "");
 
-      // Exact match OR any *.vercel.app preview URL for your projects
       if (
         allowed.includes(cleanOrigin) ||
         /^https:\/\/fees-system-[a-z0-9]+-.*\.vercel\.app$/.test(cleanOrigin) ||
@@ -49,28 +47,62 @@ app.use(
   }),
 );
 
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 100,
-  message: {
-    success: false,
-    message: "Too many requests, please try again later",
-  },
-});
-app.use("/api/", limiter);
+// ============ RATE LIMITING ============
+// Three tiers:
+//   1. OTP — very strict (3/min in prod)
+//   2. Auth (login, refresh) — strict (20/15min in prod)
+//   3. Everything else (reads, writes) — generous (1500/15min in prod)
+//
+// In development, all tiers are effectively disabled so you can test freely.
 
-// Strict OTP rate limit
+const isProd = process.env.NODE_ENV === "production";
+
+// Strict OTP limiter
 const otpLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: 3,
+  max: isProd ? 3 : 500,
   message: {
     success: false,
     message: "Too many OTP requests, please wait a minute",
   },
+  skip: (req) => req.method === "OPTIONS",
+  standardHeaders: true,
+  legacyHeaders: false,
 });
-app.use("/api/auth/parent/request-otp", otpLimiter);
 
+// Auth limiter (login attempts, password changes)
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 20 : 2000,
+  message: {
+    success: false,
+    message: "Too many auth attempts, please try again later",
+  },
+  skip: (req) => req.method === "OPTIONS",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Generous limiter for everything else — reads, writes, uploads, etc.
+// The admin dashboard alone fires ~5 requests per load + ~1 every 30s for the bell.
+const readLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: isProd ? 1500 : 20000,
+  message: {
+    success: false,
+    message: "Too many requests, please try again later",
+  },
+  skip: (req) => req.method === "OPTIONS",
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Apply the strictest first (Express matches in order)
+app.use("/api/auth/parent/request-otp", otpLimiter);
+app.use("/api/auth", authLimiter);
+app.use("/api/", readLimiter);
+
+// ============ HEALTH ============
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,
@@ -80,6 +112,7 @@ app.get("/api/health", (req, res) => {
   });
 });
 
+// ============ ROUTES ============
 const authRoutes = require("./src/routes/auth.routes");
 const studentRoutes = require("./src/routes/student.routes");
 const paymentRoutes = require("./src/routes/payment.routes");
@@ -95,7 +128,8 @@ app.use("/api/schools", schoolRoutes);
 app.use("/api/sms", smsRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/exams", examRoutes);
-//404 error handler
+
+// ============ 404 ============
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -103,7 +137,7 @@ app.use((req, res) => {
   });
 });
 
-// error handling middleware
+// ============ ERROR HANDLER ============
 app.use((err, req, res, next) => {
   console.error("Error:", err.message);
   res.status(err.status || 500).json({
@@ -113,7 +147,7 @@ app.use((err, req, res, next) => {
   });
 });
 
-//starting the server
+// ============ START ============
 const PORT = process.env.PORT || 5000;
 const server = app.listen(PORT, () => {
   console.log(`
