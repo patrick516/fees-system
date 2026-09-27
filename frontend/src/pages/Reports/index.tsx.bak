@@ -229,10 +229,6 @@ export default function ReportsPage() {
   const exportToPDF = () => {
     if (!report) return;
 
-    // School's brand color — CSS vars don't work in the separate print window,
-    // so we inject the real hex into the PDF CSS.
-    const brand = settings?.primaryColor || "#1e3a5f";
-
     const termText = filters.term ? termLabel(filters.term) : "All Terms";
     const classLabel = filters.classId
       ? classes.find((c) => c.id === filters.classId)?.name || "All Classes"
@@ -299,7 +295,7 @@ export default function ReportsPage() {
       align-items: center;
       gap: 16px;
       padding-bottom: 14px;
-      border-bottom: 3px solid ${brand};
+      border-bottom: 3px solid #1e3a5f;
       margin-bottom: 18px;
     }
     .header-logo {
@@ -325,7 +321,7 @@ export default function ReportsPage() {
     .school-name {
       font-size: 19px;
       font-weight: 800;
-      color: ${brand};
+      color: #1e3a5f;
       letter-spacing: -0.3px;
       line-height: 1.15;
     }
@@ -350,7 +346,7 @@ export default function ReportsPage() {
       line-height: 1.6;
       white-space: nowrap;
     }
-    .header-meta strong { color: ${brand}; font-weight: 700; }
+    .header-meta strong { color: #1e3a5f; font-weight: 700; }
 
     /* FILTER CHIPS */
     .filter-row {
@@ -364,7 +360,7 @@ export default function ReportsPage() {
       align-items: center;
       gap: 5px;
       background: #eff6ff;
-      color: ${brand};
+      color: #1e40af;
       padding: 4px 10px;
       border-radius: 6px;
       font-size: 9.5px;
@@ -378,9 +374,9 @@ export default function ReportsPage() {
     .section-title {
       font-size: 12px;
       font-weight: 700;
-      color: ${brand};
+      color: #1e3a5f;
       padding-left: 10px;
-      border-left: 4px solid ${brand};
+      border-left: 4px solid #1e3a5f;
       margin-bottom: 12px;
       letter-spacing: 0.3px;
     }
@@ -414,7 +410,7 @@ export default function ReportsPage() {
     }
     .stat-value.green { color: #16a34a; }
     .stat-value.red { color: #dc2626; }
-    .stat-value.blue { color: ${brand}; }
+    .stat-value.blue { color: #1e3a5f; }
     .stat-value.amber { color: #ca8a04; }
     .stat-value.slate { color: #475569; }
     .stat-sub {
@@ -447,7 +443,7 @@ export default function ReportsPage() {
     }
     .money-card.collected .money-label { color: #15803d; }
     .money-card.outstanding .money-label { color: #b91c1c; }
-    .money-card.required .money-label { color: ${brand}; }
+    .money-card.required .money-label { color: #1e40af; }
     .money-value {
       font-size: 17px;
       font-weight: 800;
@@ -455,7 +451,7 @@ export default function ReportsPage() {
     }
     .money-card.collected .money-value { color: #15803d; }
     .money-card.outstanding .money-value { color: #b91c1c; }
-    .money-card.required .money-value { color: ${brand}; }
+    .money-card.required .money-value { color: #1e3a5f; }
 
     /* PROGRESS */
     .progress-wrap { margin-top: 8px; }
@@ -478,7 +474,7 @@ export default function ReportsPage() {
       color: #64748b;
       margin-top: 4px;
     }
-    .progress-text strong { color: ${brand}; }
+    .progress-text strong { color: #1e3a5f; }
 
     /* TABLES */
     table {
@@ -490,7 +486,7 @@ export default function ReportsPage() {
       border: 1px solid #e2e8f0;
     }
     thead th {
-      background: ${brand};
+      background: #1e3a5f;
       color: #ffffff;
       font-size: 8.5px;
       font-weight: 700;
@@ -531,7 +527,7 @@ export default function ReportsPage() {
       font-size: 8.5px;
       color: #94a3b8;
     }
-    .footer strong { color: ${brand}; font-weight: 700; }
+    .footer strong { color: #1e3a5f; font-weight: 700; }
 
     .empty-state {
       padding: 24px;
@@ -783,10 +779,7 @@ export default function ReportsPage() {
       {/* History banner */}
       {generatedFromHistory && (
         <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-xl p-3">
-          <History
-            size={15}
-            className="text-[var(--color-primary-dark)] shrink-0"
-          />
+          <History size={15} className="text-[var(--color-primary-dark)] shrink-0" />
           <p className="text-xs text-blue-800">
             Viewing historical report for{" "}
             <span className="font-semibold">
