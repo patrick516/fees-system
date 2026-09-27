@@ -1,5 +1,5 @@
 const prisma = require("../config/db");
-const { regenerateStudentCode } = require("../lib/utils");
+const { generateStudentCode } = require("../lib/utils");
 
 // GET /api/students/promote/preview
 // Returns: promotion map + students grouped by class
@@ -76,10 +76,23 @@ const promoteStudents = async (req, res) => {
         .status(404)
         .json({ success: false, message: "School not found" });
     }
-
     const results = { promoted: [], graduated: [], errors: [] };
 
     // ==================== PROMOTE ====================
+    // Track per-class sequence counters so promoted students don't collide
+    // with existing students who already own those numbers in the target class
+    const classSeqCounters = {};
+
+    // Prime counters with the current count for each target class
+    const allClasses = await prisma.class.findMany({
+      where: { schoolId: req.schoolId },
+    });
+    for (const cls of allClasses) {
+      classSeqCounters[cls.id] = await prisma.student.count({
+        where: { schoolId: req.schoolId, classId: cls.id },
+      });
+    }
+
     for (const p of promotions) {
       try {
         const student = await prisma.student.findFirst({
@@ -102,11 +115,17 @@ const promoteStudents = async (req, res) => {
         }
 
         const oldCode = student.studentCode;
-        const newCode = regenerateStudentCode(
+
+        // Bump the target class counter and build the new code from it
+        classSeqCounters[newClass.id] =
+          (classSeqCounters[newClass.id] || 0) + 1;
+
+        const newCode = generateStudentCode(
           school.name,
           newClass.name,
           newClass.level,
-          oldCode,
+          student.academicYear,
+          classSeqCounters[newClass.id],
         );
 
         await prisma.student.update({
