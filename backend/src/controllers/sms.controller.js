@@ -291,23 +291,42 @@ async function sendToRecipients({ recipients, schoolId, type, staffId, res }) {
 }
 
 // ==================== LOGS ====================
-// GET /api/sms/logs?type=&limit=
+// GET /api/sms/logs?type=&status=&page=1&limit=20
 const getSmsLogs = async (req, res) => {
   try {
-    const { type, limit = 50 } = req.query;
+    const { type, status, page = 1, limit = 20 } = req.query;
+
+    const pageNum = Math.max(1, parseInt(page) || 1);
+    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    const skip = (pageNum - 1) * limitNum;
+
     const where = { schoolId: req.schoolId };
     if (type) where.type = type;
+    if (status) where.status = status;
 
-    const logs = await prisma.smsLog.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      take: parseInt(limit),
-      include: {
-        sentBy: { select: { fullName: true } },
+    const [logs, total] = await Promise.all([
+      prisma.smsLog.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: limitNum,
+        include: {
+          sentBy: { select: { fullName: true } },
+        },
+      }),
+      prisma.smsLog.count({ where }),
+    ]);
+
+    res.json({
+      success: true,
+      data: logs,
+      pagination: {
+        total,
+        page: pageNum,
+        limit: limitNum,
+        totalPages: Math.ceil(total / limitNum),
       },
     });
-
-    res.json({ success: true, data: logs });
   } catch (err) {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to get SMS logs" });

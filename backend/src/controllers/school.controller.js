@@ -207,7 +207,13 @@ const lookupByEmail = async (req, res) => {
 const getPublicSchool = async (req, res) => {
   try {
     const school = await prisma.school.findFirst({
-      select: { id: true, name: true, logo: true, motto: true },
+      select: {
+        id: true,
+        name: true,
+        logo: true,
+        motto: true,
+        primaryColor: true,
+      },
     });
 
     if (!school) {

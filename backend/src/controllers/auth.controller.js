@@ -11,10 +11,6 @@ const generateToken = (payload) => {
   });
 };
 
-// const generateOTP = () => {
-//   return Math.floor(100000 + Math.random() * 900000).toString();
-// };
-
 //  STAFF AUTH
 
 // POST /api/auth/staff/login
@@ -22,7 +18,6 @@ const staffLogin = async (req, res) => {
   try {
     const { email, password } = req.body;
 
-    // Validate input
     if (!email || !password) {
       return res.status(400).json({
         success: false,
@@ -30,7 +25,6 @@ const staffLogin = async (req, res) => {
       });
     }
 
-    // Find staff by email
     const staff = await prisma.staff.findUnique({
       where: { email: email.toLowerCase().trim() },
       include: {
@@ -42,13 +36,13 @@ const staffLogin = async (req, res) => {
             phone: true,
             logo: true,
             motto: true,
+            primaryColor: true,
             isActive: true,
           },
         },
       },
     });
 
-    // Check if staff exists
     if (!staff) {
       return res.status(401).json({
         success: false,
@@ -56,7 +50,6 @@ const staffLogin = async (req, res) => {
       });
     }
 
-    // Check if account is active
     if (!staff.isActive) {
       return res.status(401).json({
         success: false,
@@ -65,7 +58,6 @@ const staffLogin = async (req, res) => {
       });
     }
 
-    // Check if school is active
     if (!staff.school.isActive) {
       return res.status(401).json({
         success: false,
@@ -73,7 +65,6 @@ const staffLogin = async (req, res) => {
       });
     }
 
-    // Verify password
     const isPasswordValid = await bcrypt.compare(password, staff.passwordHash);
     if (!isPasswordValid) {
       return res.status(401).json({
@@ -82,13 +73,11 @@ const staffLogin = async (req, res) => {
       });
     }
 
-    // Update last login
     await prisma.staff.update({
       where: { id: staff.id },
       data: { lastLogin: new Date() },
     });
 
-    // Generate token
     const token = generateToken({
       id: staff.id,
       schoolId: staff.schoolId,
@@ -96,7 +85,6 @@ const staffLogin = async (req, res) => {
       type: "STAFF",
     });
 
-    // Return response
     return res.status(200).json({
       success: true,
       message: "Login successful",
@@ -143,6 +131,7 @@ const getStaffProfile = async (req, res) => {
             phone: true,
             logo: true,
             motto: true,
+            primaryColor: true,
           },
         },
       },
@@ -180,12 +169,10 @@ const changePassword = async (req, res) => {
       });
     }
 
-    // Get staff with password
     const staff = await prisma.staff.findUnique({
       where: { id: req.staff.id },
     });
 
-    // Verify current password
     const isValid = await bcrypt.compare(currentPassword, staff.passwordHash);
     if (!isValid) {
       return res.status(400).json({
@@ -194,10 +181,8 @@ const changePassword = async (req, res) => {
       });
     }
 
-    // Hash new password
     const newHash = await bcrypt.hash(newPassword, 12);
 
-    // Update password
     await prisma.staff.update({
       where: { id: req.staff.id },
       data: { passwordHash: newHash },
@@ -219,7 +204,6 @@ const changePassword = async (req, res) => {
 // ==================== PARENT AUTH ====================
 
 // POST /api/auth/parent/login-student-id
-// Parent logs in using Student ID + Date of Birth
 const parentLoginWithStudentId = async (req, res) => {
   try {
     const { studentCode, dateOfBirth } = req.body;
@@ -231,7 +215,6 @@ const parentLoginWithStudentId = async (req, res) => {
       });
     }
 
-    // Find student by code
     const student = await prisma.student.findUnique({
       where: { studentCode: studentCode.toUpperCase().trim() },
       include: {
@@ -243,6 +226,7 @@ const parentLoginWithStudentId = async (req, res) => {
             phone: true,
             logo: true,
             motto: true,
+            primaryColor: true,
           },
         },
         class: {
@@ -268,7 +252,6 @@ const parentLoginWithStudentId = async (req, res) => {
       });
     }
 
-    // Verify date of birth
     const inputDOB = new Date(dateOfBirth);
     const studentDOB = new Date(student.dateOfBirth);
 
@@ -284,7 +267,6 @@ const parentLoginWithStudentId = async (req, res) => {
       });
     }
 
-    // Generate parent token
     const token = generateToken({
       studentId: student.id,
       schoolId: student.schoolId,
@@ -292,7 +274,6 @@ const parentLoginWithStudentId = async (req, res) => {
       type: "PARENT",
     });
 
-    // Calculate fee summary
     const payments = await prisma.feePayment.findMany({
       where: {
         studentId: student.id,
@@ -333,7 +314,6 @@ const parentLoginWithStudentId = async (req, res) => {
 };
 
 // POST /api/auth/parent/request-otp
-// Parent requests OTP via their phone number — TumaSend generates & sends it
 const requestOTP = async (req, res) => {
   try {
     const { phone } = req.body;
@@ -345,10 +325,8 @@ const requestOTP = async (req, res) => {
       });
     }
 
-    // Clean phone number
     const cleanPhone = phone.replace(/\s/g, "").replace(/^0/, "+265");
 
-    // Check if this phone belongs to any student
     const student = await prisma.student.findFirst({
       where: {
         OR: [
@@ -372,15 +350,12 @@ const requestOTP = async (req, res) => {
       });
     }
 
-    // Ask TumaSend to generate, store, and send the OTP
     const { otpId, expiresAt } = await sendOtp(cleanPhone);
 
-    // Delete any existing OTP session for this phone
     await prisma.otpCode.deleteMany({
       where: { phone: cleanPhone },
     });
 
-    // Save TumaSend's otp_id (not a 6-digit code — TumaSend holds that)
     await prisma.otpCode.create({
       data: {
         phone: cleanPhone,
@@ -401,6 +376,7 @@ const requestOTP = async (req, res) => {
     });
   }
 };
+
 // POST /api/auth/parent/verify-otp
 const verifyOTP = async (req, res) => {
   try {
@@ -415,7 +391,6 @@ const verifyOTP = async (req, res) => {
 
     const cleanPhone = phone.replace(/\s/g, "").replace(/^0/, "+265");
 
-    // Find the pending OTP session for this phone (code field holds TumaSend's otp_id)
     const otpRecord = await prisma.otpCode.findFirst({
       where: {
         phone: cleanPhone,
@@ -432,7 +407,6 @@ const verifyOTP = async (req, res) => {
       });
     }
 
-    // Ask TumaSend to verify the code against that otp_id
     let verified = false;
     try {
       const result = await verifyOtp(otpRecord.code, otp);
@@ -448,13 +422,11 @@ const verifyOTP = async (req, res) => {
       });
     }
 
-    // Mark OTP session as used
     await prisma.otpCode.update({
       where: { id: otpRecord.id },
       data: { used: true },
     });
 
-    // Find student linked to this phone
     const student = await prisma.student.findFirst({
       where: {
         OR: [
@@ -473,6 +445,7 @@ const verifyOTP = async (req, res) => {
             phone: true,
             logo: true,
             motto: true,
+            primaryColor: true,
           },
         },
         class: {
@@ -488,7 +461,6 @@ const verifyOTP = async (req, res) => {
       });
     }
 
-    // Generate token
     const token = generateToken({
       studentId: student.id,
       schoolId: student.schoolId,

@@ -91,7 +91,7 @@ async function main() {
         "Use your child's Student ID as the payment reference. Send the screenshot to the school office after payment.",
     },
   });
-  console.log(" School ready (active term + payment details + branding)");
+  console.log(" School ready");
 
   // ============ CLASSES ============
   const classData = [
@@ -110,7 +110,7 @@ async function main() {
     });
     classes.push(cls);
   }
-  console.log(` Classes ready (Form 1–4)`);
+  console.log(" Classes ready (Form 1–4)");
 
   // ============ STAFF ============
   const adminPassword = await bcrypt.hash("Admin@2025", 12);
@@ -144,7 +144,6 @@ async function main() {
   console.log(" Bursar ready — bursar@stpeters.mw / Bursar@2025");
 
   // ============ FEE STRUCTURES ============
-  // Fee breakdown per class: total = tuition + exam + building + book + uniform
   const feeData = [
     {
       classId: classes[0].id, // Form 1
@@ -220,67 +219,271 @@ async function main() {
   console.log(" Fee structures ready — Form 1–4 • Term 1 • 2026-2027");
 
   // ============ STUDENTS ============
-  const student1 = await prisma.student.upsert({
-    where: { studentCode: "STP-2026-001" },
-    update: { academicYear: "2026-2027" },
-    create: {
-      schoolId: school.id,
-      classId: classes[2].id, // Form 3
-      studentCode: "STP-2026-001",
-      firstName: "John",
-      middleName: null,
-      lastName: "Banda",
-      fullName: "John Banda",
-      dateOfBirth: new Date("2010-03-15"),
-      gender: "MALE",
-      parentName: "Mary Banda",
-      parentPhone: "+265995049331",
-      academicYear: "2026-2027",
-    },
-  });
-
-  const student2 = await prisma.student.upsert({
-    where: { studentCode: "STP-2026-002" },
-    update: { academicYear: "2026-2027" },
-    create: {
-      schoolId: school.id,
-      classId: classes[3].id, // Form 4
-      studentCode: "STP-2026-002",
-      firstName: "Grace",
-      middleName: "Mary",
-      lastName: "Phiri",
-      fullName: "Grace Mary Phiri",
-      dateOfBirth: new Date("2009-07-22"),
-      gender: "FEMALE",
-      parentName: "James Phiri",
-      parentPhone: "+265882781930",
-      academicYear: "2026-2027",
-    },
-  });
-
-  const student3 = await prisma.student.upsert({
-    where: { studentCode: "STP-2026-003" },
-    update: { academicYear: "2026-2027" },
-    create: {
-      schoolId: school.id,
-      classId: classes[0].id, // Form 1
-      studentCode: "STP-2026-003",
+  // 20 students across 4 classes. Codes: SPP-F{level}-2026-{001..020}
+  // Special case: Mr Chingwalu (+265882781930) is guardian for TWO students
+  // (Roosevelt Chisomo in Form 1, Thokozani Phiri in Form 3).
+  const studentsData = [
+    // ===== Form 1 (LETTER) =====
+    {
+      code: "SPP-F1-2026-001",
+      classId: classes[0].id,
       firstName: "Roosevelt",
       middleName: null,
       lastName: "Chisomo",
-      fullName: "Roosevelt Chisomo",
-      dateOfBirth: new Date("2010-03-10"),
       gender: "MALE",
+      dob: "2010-03-10",
       parentName: "Mr Chingwalu",
-      parentPhone: "+265882781930",
+      parentPhone: "+265998333060",
       parentPhone2: "+265995049331",
       parentEmail: "kulinjipatricks@gmail.com",
-      academicYear: "2026-2027",
     },
-  });
-  console.log(
-    " Students ready — John (Form 3), Grace (Form 4), Roosevelt (Form 1)",
-  );
+    {
+      code: "SPP-F1-2026-002",
+      classId: classes[0].id,
+      firstName: "Emmanuel",
+      middleName: null,
+      lastName: "Kachale",
+      gender: "MALE",
+      dob: "2010-06-11",
+      parentName: "Grace Kachale",
+      parentPhone: "+265991112301",
+    },
+    {
+      code: "SPP-F1-2026-003",
+      classId: classes[0].id,
+      firstName: "Grace",
+      middleName: null,
+      lastName: "Chunga",
+      gender: "FEMALE",
+      dob: "2010-08-22",
+      parentName: "Moses Chunga",
+      parentPhone: "+265991112302",
+    },
+    {
+      code: "SPP-F1-2026-004",
+      classId: classes[0].id,
+      firstName: "Dalitso",
+      middleName: null,
+      lastName: "Nkhoma",
+      gender: "MALE",
+      dob: "2010-01-15",
+      parentName: "Esther Nkhoma",
+      parentPhone: "+265991112303",
+    },
+    {
+      code: "SPP-F1-2026-005",
+      classId: classes[0].id,
+      firstName: "Faith",
+      middleName: null,
+      lastName: "Msukwa",
+      gender: "FEMALE",
+      dob: "2010-04-29",
+      parentName: "Hastings Msukwa",
+      parentPhone: "+265991112304",
+    },
+
+    // ===== Form 2 (LETTER) =====
+    {
+      code: "SPP-F2-2026-006",
+      classId: classes[1].id,
+      firstName: "Chisomo",
+      middleName: null,
+      lastName: "Mvula",
+      gender: "FEMALE",
+      dob: "2010-05-08",
+      parentName: "Mr Mvula",
+      parentPhone: "+265899110469",
+    },
+    {
+      code: "SPP-F2-2026-007",
+      classId: classes[1].id,
+      firstName: "Innocent",
+      middleName: "K",
+      lastName: "Chimwendo",
+      gender: "MALE",
+      dob: "2009-12-05",
+      parentName: "Violet Chimwendo",
+      parentPhone: "+265991112305",
+    },
+    {
+      code: "SPP-F2-2026-008",
+      classId: classes[1].id,
+      firstName: "Ruth",
+      middleName: null,
+      lastName: "Kalua",
+      gender: "FEMALE",
+      dob: "2010-09-09",
+      parentName: "Robert Kalua",
+      parentPhone: "+265991112306",
+    },
+    {
+      code: "SPP-F2-2026-009",
+      classId: classes[1].id,
+      firstName: "Patrick",
+      middleName: null,
+      lastName: "Nyasulu",
+      gender: "MALE",
+      dob: "2010-02-27",
+      parentName: "Linda Nyasulu",
+      parentPhone: "+265991112307",
+    },
+    {
+      code: "SPP-F2-2026-010",
+      classId: classes[1].id,
+      firstName: "Memory",
+      middleName: "T",
+      lastName: "Chizuma",
+      gender: "FEMALE",
+      dob: "2010-07-03",
+      parentName: "Elton Chizuma",
+      parentPhone: "+265991112308",
+    },
+
+    // ===== Form 3 (POINTS) =====
+    {
+      code: "SPP-F3-2026-011",
+      classId: classes[2].id,
+      firstName: "John",
+      middleName: null,
+      lastName: "Banda",
+      gender: "MALE",
+      dob: "2009-03-15",
+      parentName: "Mary Banda",
+      parentPhone: "+265995049331",
+    },
+    {
+      code: "SPP-F3-2026-012",
+      classId: classes[2].id,
+      firstName: "Wisdom",
+      middleName: null,
+      lastName: "Nkhata",
+      gender: "MALE",
+      dob: "2008-11-18",
+      parentName: "Chrissy Nkhata",
+      parentPhone: "+265991112309",
+    },
+    {
+      code: "SPP-F3-2026-013",
+      classId: classes[2].id,
+      firstName: "Joyce",
+      middleName: null,
+      lastName: "Manda",
+      gender: "FEMALE",
+      dob: "2009-05-24",
+      parentName: "Andrew Manda",
+      parentPhone: "+265991112310",
+    },
+    {
+      // Second child of Mr Chingwalu — shares the same parent phone as Roosevelt
+      code: "SPP-F3-2026-014",
+      classId: classes[2].id,
+      firstName: "Thokozani",
+      middleName: null,
+      lastName: "Phiri",
+      gender: "FEMALE",
+      dob: "2009-01-12",
+      parentName: "Mr Chingwalu",
+      parentPhone: "+265998333060",
+    },
+    {
+      code: "SPP-F3-2026-015",
+      classId: classes[2].id,
+      firstName: "Blessings",
+      middleName: null,
+      lastName: "Tembo",
+      gender: "MALE",
+      dob: "2008-08-30",
+      parentName: "Memory Tembo",
+      parentPhone: "+265991112311",
+    },
+
+    // ===== Form 4 (POINTS) =====
+    {
+      code: "SPP-F4-2026-016",
+      classId: classes[3].id,
+      firstName: "Grace",
+      middleName: "Mary",
+      lastName: "Phiri",
+      gender: "FEMALE",
+      dob: "2008-07-22",
+      parentName: "James Phiri",
+      parentPhone: "+265882781930",
+    },
+    {
+      code: "SPP-F4-2026-017",
+      classId: classes[3].id,
+      firstName: "Mphatso",
+      middleName: null,
+      lastName: "Banda",
+      gender: "FEMALE",
+      dob: "2008-03-14",
+      parentName: "Chimwemwe Banda",
+      parentPhone: "+265991112312",
+    },
+    {
+      code: "SPP-F4-2026-018",
+      classId: classes[3].id,
+      firstName: "Chimwemwe",
+      middleName: null,
+      lastName: "Mkandawire",
+      gender: "MALE",
+      dob: "2007-10-01",
+      parentName: "Tamandani Mkandawire",
+      parentPhone: "+265991112313",
+    },
+    {
+      code: "SPP-F4-2026-019",
+      classId: classes[3].id,
+      firstName: "Tiyamike",
+      middleName: null,
+      lastName: "Gondwe",
+      gender: "FEMALE",
+      dob: "2008-05-09",
+      parentName: "Madalitso Gondwe",
+      parentPhone: "+265991112314",
+    },
+    {
+      code: "SPP-F4-2026-020",
+      classId: classes[3].id,
+      firstName: "Yankho",
+      middleName: null,
+      lastName: "Chirambo",
+      gender: "MALE",
+      dob: "2007-12-25",
+      parentName: "Steven Chirambo",
+      parentPhone: "+265991112315",
+    },
+  ];
+
+  const students = {};
+  for (const s of studentsData) {
+    const fullName = [s.firstName, s.middleName, s.lastName]
+      .filter(Boolean)
+      .join(" ");
+
+    const created = await prisma.student.upsert({
+      where: { studentCode: s.code },
+      update: { academicYear: "2026-2027" },
+      create: {
+        schoolId: school.id,
+        classId: s.classId,
+        studentCode: s.code,
+        firstName: s.firstName,
+        middleName: s.middleName,
+        lastName: s.lastName,
+        fullName,
+        dateOfBirth: new Date(s.dob),
+        gender: s.gender,
+        parentName: s.parentName,
+        parentPhone: s.parentPhone,
+        parentPhone2: s.parentPhone2 || null,
+        parentEmail: s.parentEmail || null,
+        academicYear: "2026-2027",
+      },
+    });
+    students[s.code] = created;
+  }
+  console.log(` Students ready (${studentsData.length} across Form 1–4)`);
 
   // ============ TERM ACTIVATION HISTORY ============
   await prisma.termActivation.upsert({
@@ -308,86 +511,199 @@ async function main() {
   console.log(" Term activation recorded");
 
   // ============ TEST PAYMENTS ============
-  // Story: Roosevelt paid full term fee (2.5M) and overpaid by 3.5M
-  //        Grace paid a partial 100k against 450k
-  //        John hasn't paid (Form 3, 2.8M owing)
-  const payments = [
+  // Payment distribution per class:
+  //   Some paid in full, some partial (debtor), some nothing at all.
+  // Roosevelt overpaid → 3.5M credit for next term.
+  const paymentsData = [
+    // ===== Form 1 (fee: 2,500,000) =====
     {
-      receiptNumber: "RCP-2026-2027-00001",
-      studentId: student3.id,
+      receipt: "RCP-2026-2027-00001",
+      code: "SPP-F1-2026-001",
       amount: 5000000,
       method: "AIRTEL_MONEY",
       notes: "Term 1 fee payment",
-      required: 2500000,
     },
     {
-      receiptNumber: "RCP-2026-2027-00002",
-      studentId: student3.id,
+      receipt: "RCP-2026-2027-00002",
+      code: "SPP-F1-2026-001",
       amount: 500000,
       method: "AIRTEL_MONEY",
       notes: "Second instalment",
-      required: 2500000,
     },
     {
-      receiptNumber: "RCP-2026-2027-00003",
-      studentId: student3.id,
+      receipt: "RCP-2026-2027-00003",
+      code: "SPP-F1-2026-001",
       amount: 400000,
       method: "CASH",
       notes: "Third instalment",
-      required: 2500000,
     },
     {
-      receiptNumber: "RCP-2026-2027-00004",
-      studentId: student3.id,
+      receipt: "RCP-2026-2027-00004",
+      code: "SPP-F1-2026-001",
       amount: 100000,
       method: "CASH",
       notes: "Fourth instalment",
-      required: 2500000,
     },
     {
-      receiptNumber: "RCP-2026-2027-00005",
-      studentId: student2.id,
+      receipt: "RCP-2026-2027-00005",
+      code: "SPP-F1-2026-003",
+      amount: 2500000,
+      method: "CASH",
+      notes: "Full term payment",
+    },
+    {
+      receipt: "RCP-2026-2027-00006",
+      code: "SPP-F1-2026-004",
+      amount: 1000000,
+      method: "AIRTEL_MONEY",
+      notes: "Partial payment",
+    },
+    {
+      receipt: "RCP-2026-2027-00007",
+      code: "SPP-F1-2026-005",
+      amount: 500000,
+      method: "CASH",
+      notes: "Partial payment",
+    },
+    // Emmanuel Kachale (002) has no payment → full debtor
+
+    // ===== Form 2 (fee: 2,200,000) =====
+    {
+      receipt: "RCP-2026-2027-00008",
+      code: "SPP-F2-2026-007",
+      amount: 800000,
+      method: "AIRTEL_MONEY",
+      notes: "Partial payment",
+    },
+    {
+      receipt: "RCP-2026-2027-00009",
+      code: "SPP-F2-2026-008",
+      amount: 2200000,
+      method: "CASH",
+      notes: "Full term payment",
+    },
+    {
+      receipt: "RCP-2026-2027-00010",
+      code: "SPP-F2-2026-009",
+      amount: 500000,
+      method: "AIRTEL_MONEY",
+      notes: "Partial payment",
+    },
+    {
+      receipt: "RCP-2026-2027-00011",
+      code: "SPP-F2-2026-010",
+      amount: 1500000,
+      method: "CASH",
+      notes: "Partial payment",
+    },
+    // Chisomo Mvula (006) has no payment → full debtor
+
+    // ===== Form 3 (fee: 2,800,000) =====
+    {
+      receipt: "RCP-2026-2027-00012",
+      code: "SPP-F3-2026-012",
+      amount: 2800000,
+      method: "CASH",
+      notes: "Full term payment",
+    },
+    {
+      receipt: "RCP-2026-2027-00013",
+      code: "SPP-F3-2026-013",
+      amount: 2800000,
+      method: "CASH",
+      notes: "Full term payment",
+    },
+    {
+      receipt: "RCP-2026-2027-00014",
+      code: "SPP-F3-2026-014",
+      amount: 1000000,
+      method: "AIRTEL_MONEY",
+      notes: "Partial payment",
+    },
+    {
+      receipt: "RCP-2026-2027-00015",
+      code: "SPP-F3-2026-015",
+      amount: 500000,
+      method: "CASH",
+      notes: "Partial payment",
+    },
+    // John Banda (011) has no payment → full debtor
+
+    // ===== Form 4 (fee: 450,000) =====
+    {
+      receipt: "RCP-2026-2027-00016",
+      code: "SPP-F4-2026-016",
       amount: 100000,
       method: "CASH",
-      notes: "Term 1 partial payment",
-      required: 450000,
+      notes: "Partial payment",
     },
+    {
+      receipt: "RCP-2026-2027-00017",
+      code: "SPP-F4-2026-017",
+      amount: 450000,
+      method: "CASH",
+      notes: "Full term payment",
+    },
+    {
+      receipt: "RCP-2026-2027-00018",
+      code: "SPP-F4-2026-018",
+      amount: 200000,
+      method: "AIRTEL_MONEY",
+      notes: "Partial payment",
+    },
+    {
+      receipt: "RCP-2026-2027-00019",
+      code: "SPP-F4-2026-020",
+      amount: 450000,
+      method: "CASH",
+      notes: "Full term payment",
+    },
+    // Tiyamike Gondwe (019) has no payment → full debtor
   ];
 
-  for (const p of payments) {
+  // Fee per class (looked up by classId) — used for requiredAmount on each payment
+  const feeByClassId = {};
+  for (const f of feeData) feeByClassId[f.classId] = f.total;
+
+  for (const p of paymentsData) {
+    const student = students[p.code];
+    if (!student) continue;
+
+    const required = feeByClassId[student.classId] || 0;
+
     await prisma.feePayment.upsert({
-      where: { receiptNumber: p.receiptNumber },
+      where: { receiptNumber: p.receipt },
       update: {
         amount: p.amount,
         term: "TERM_1",
         academicYear: "2026-2027",
-        requiredAmount: p.required,
+        requiredAmount: required,
         status: "VERIFIED",
       },
       create: {
         schoolId: school.id,
-        studentId: p.studentId,
+        studentId: student.id,
         amount: p.amount,
         paymentMethod: p.method,
         term: "TERM_1",
         academicYear: "2026-2027",
-        receiptNumber: p.receiptNumber,
+        receiptNumber: p.receipt,
         submittedBy: "BURSAR",
         status: "VERIFIED",
         notes: p.notes,
         recordedById: bursar.id,
         verifiedById: bursar.id,
         verifiedAt: new Date(),
-        requiredAmount: p.required,
+        requiredAmount: required,
       },
     });
   }
-  console.log(" Test payments recorded (5 verified)");
+  console.log(` Test payments recorded (${paymentsData.length} verified)`);
 
   // ============ CREDIT BALANCE ============
   // Roosevelt: 6,000,000 paid − 2,500,000 required = 3,500,000 credit
   await prisma.student.update({
-    where: { id: student3.id },
+    where: { id: students["SPP-F1-2026-001"].id },
     data: { creditBalance: 3500000 },
   });
 
@@ -403,11 +719,39 @@ async function main() {
    - Admin   admin@stpeters.mw   / Admin@2025
    - Bursar  bursar@stpeters.mw  / Bursar@2025
 
-  Students:
-   - John Banda        Form 3  STP-2026-001  Paid MWK 0       (owing 2.8M)
-   - Grace Mary Phiri  Form 4  STP-2026-002  Paid MWK 100,000 (owing 350,000)
-   - Roosevelt Chisomo Form 1  STP-2026-003  Paid MWK 6,000,000
-                                              → 3.5M credit for next term
+  Students: 20 (5 per class)
+   Form 1 (2,500,000 each):
+    - Roosevelt Chisomo     SPP-F1-2026-001  Paid 6,000,000  → 3.5M credit
+    - Emmanuel Kachale      SPP-F1-2026-002  Paid 0          → owing
+    - Grace Chunga          SPP-F1-2026-003  Paid 2,500,000  → paid
+    - Dalitso Nkhoma        SPP-F1-2026-004  Paid 1,000,000  → owing
+    - Faith Msukwa          SPP-F1-2026-005  Paid 500,000    → owing
+
+   Form 2 (2,200,000 each):
+    - Chisomo Mvula         SPP-F2-2026-006  Paid 0          → owing
+    - Innocent Chimwendo    SPP-F2-2026-007  Paid 800,000    → owing
+    - Ruth Kalua            SPP-F2-2026-008  Paid 2,200,000  → paid
+    - Patrick Nyasulu       SPP-F2-2026-009  Paid 500,000    → owing
+    - Memory Chizuma        SPP-F2-2026-010  Paid 1,500,000  → owing
+
+   Form 3 (2,800,000 each):
+    - John Banda            SPP-F3-2026-011  Paid 0          → owing
+    - Wisdom Nkhata         SPP-F3-2026-012  Paid 2,800,000  → paid
+    - Joyce Manda           SPP-F3-2026-013  Paid 2,800,000  → paid
+    - Thokozani Phiri       SPP-F3-2026-014  Paid 1,000,000  → owing
+    - Blessings Tembo       SPP-F3-2026-015  Paid 500,000    → owing
+
+   Form 4 (450,000 each):
+    - Grace Mary Phiri      SPP-F4-2026-016  Paid 100,000    → owing
+    - Mphatso Banda         SPP-F4-2026-017  Paid 450,000    → paid
+    - Chimwemwe Mkandawire  SPP-F4-2026-018  Paid 200,000    → owing
+    - Tiyamike Gondwe       SPP-F4-2026-019  Paid 0          → owing
+    - Yankho Chirambo       SPP-F4-2026-020  Paid 450,000    → paid
+
+  Shared guardians:
+   - Mr Chingwalu (+265882781930) → Roosevelt (Form 1) + Thokozani (Form 3)
+   - +265995049331 (secondary) → Roosevelt (Form 1) + John (Form 3)
+   - +265882781930 also on Grace Phiri (Form 4)
 
   Fee structures: Form 1–4 • Term 1 • 2026-2027
   Term history: 1 record (Term 1)

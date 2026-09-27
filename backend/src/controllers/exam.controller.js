@@ -592,8 +592,6 @@ const discardPendingRow = async (req, res) => {
   }
 };
 
-// ==================== PARENT VIEW ====================
-
 const getStudentResults = async (req, res) => {
   try {
     const { studentId } = req.params;
@@ -632,6 +630,7 @@ const getStudentResults = async (req, res) => {
       });
     }
 
+    // ============ THIS STUDENT'S MARKS ============
     const results = await prisma.examResult.findMany({
       where: { studentId, examPeriodId: period.id },
       include: { subject: { select: { name: true } } },
@@ -640,6 +639,74 @@ const getStudentResults = async (req, res) => {
 
     const totalMarks = results.reduce((sum, r) => sum + r.mark, 0);
     const gradingSystem = student.class.gradingSystem;
+
+    // ============ CLASS RANKING ============
+    // Pull every active classmate, compute their ranking metric, sort, find this student.
+    const classMates = await prisma.student.findMany({
+      where: {
+        schoolId: req.student.schoolId,
+        classId: student.classId,
+        isActive: true,
+      },
+      select: { id: true, fullName: true },
+    });
+
+    const metrics = []; // [{ studentId, fullName, metric, displayValue }]
+
+    for (const s of classMates) {
+      const rs = await prisma.examResult.findMany({
+        where: { studentId: s.id, examPeriodId: period.id },
+      });
+      if (rs.length === 0) continue; // only rank students who sat the exam
+
+      if (gradingSystem === "LETTER") {
+        const avg = rs.reduce((sum, r) => sum + r.mark, 0) / rs.length;
+        metrics.push({
+          studentId: s.id,
+          fullName: s.fullName,
+          metric: avg,
+          displayValue: Math.round(avg * 10) / 10,
+        });
+      } else {
+        // POINTS — best 6 subjects, lower total = better
+        const withPoints = rs.filter((r) => r.gradePoint != null);
+        const sorted = [...withPoints].sort(
+          (a, b) => a.gradePoint - b.gradePoint,
+        );
+        const best6 = sorted.slice(0, 6);
+        const total = best6.reduce((sum, r) => sum + r.gradePoint, 0);
+        metrics.push({
+          studentId: s.id,
+          fullName: s.fullName,
+          metric: total,
+          displayValue: total,
+        });
+      }
+    }
+
+    // Sort — LETTER: higher avg = better; POINTS: lower total = better
+    if (gradingSystem === "LETTER") {
+      metrics.sort((a, b) => b.metric - a.metric);
+    } else {
+      metrics.sort((a, b) => a.metric - b.metric);
+    }
+
+    const myIndex = metrics.findIndex((m) => m.studentId === studentId);
+    const position = myIndex >= 0 ? myIndex + 1 : null;
+    const classSize = metrics.length;
+
+    const topThree = metrics.slice(0, 3).map((m, i) => ({
+      position: i + 1,
+      fullName: m.fullName,
+      value: m.displayValue,
+      isCurrentStudent: m.studentId === studentId,
+    }));
+
+    // "Top X% of the class" — position 1 of 42 = top 2%, position 21 of 42 = top 50%
+    const percentile =
+      position && classSize > 0
+        ? Math.max(1, Math.round((position / classSize) * 100))
+        : null;
 
     const baseData = {
       student: {
@@ -654,6 +721,10 @@ const getStudentResults = async (req, res) => {
       },
       gradingSystem,
       totalMarks,
+      position,
+      classSize,
+      percentile,
+      topThree,
     };
 
     if (gradingSystem === "LETTER") {
@@ -681,7 +752,7 @@ const getStudentResults = async (req, res) => {
       });
     }
 
-    // POINTS system — best 6 subjects, lower point = better
+    // POINTS — best 6
     const withPoints = results.filter(
       (r) => r.gradePoint !== null && r.gradePoint !== undefined,
     );
@@ -710,7 +781,8 @@ const getStudentResults = async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to get results" });
   }
-};
+}; // ==================== PARENT VIEW ====================
+
 const getClassResults = async (req, res) => {
   try {
     const { classId, examPeriodId } = req.query;

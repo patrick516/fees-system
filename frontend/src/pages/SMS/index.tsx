@@ -9,6 +9,8 @@ import {
   CheckCircle,
   AlertTriangle,
   RefreshCw,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import api from "../../lib/axios";
 import {
@@ -18,6 +20,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+} from "../../components/ui/pagination";
 import { useActiveTerm } from "../../hooks/useActiveTerm";
 
 const smsTypes = [
@@ -68,6 +75,8 @@ const typeColor: Record<string, string> = {
   unpaid: "bg-red-100 text-red-700",
 };
 
+const PER_PAGE = 10;
+
 const SMSPage = () => {
   const [selectedType, setSelectedType] = useState("");
   const [message, setMessage] = useState("");
@@ -79,32 +88,45 @@ const SMSPage = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [logFilter, setLogFilter] = useState<string>("");
+  const [page, setPage] = useState(1);
+  const [pagination, setPagination] = useState<any>(null);
 
   const { activeTerm: currentTerm } = useActiveTerm();
 
-  // Sync term with the activated term once loaded
   useEffect(() => {
     if (currentTerm) setTerm(currentTerm);
   }, [currentTerm]);
 
-  const fetchLogs = async () => {
+  const fetchLogs = async (targetPage = page) => {
     setLogsLoading(true);
     try {
       const params = new URLSearchParams();
       if (logFilter) params.set("type", logFilter);
-      params.set("limit", "100");
+      params.set("page", String(targetPage));
+      params.set("limit", String(PER_PAGE));
       const res = await api.get(`/sms/logs?${params}`);
       setLogs(res.data.data || []);
+      setPagination(res.data.pagination || null);
     } catch {
       setLogs([]);
+      setPagination(null);
     } finally {
       setLogsLoading(false);
     }
   };
 
+  // Refetch when filter changes — always reset to page 1
   useEffect(() => {
-    fetchLogs();
+    setPage(1);
+    fetchLogs(1);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [logFilter]);
+
+  const goToPage = (p: number) => {
+    if (p < 1 || (pagination && p > pagination.totalPages)) return;
+    setPage(p);
+    fetchLogs(p);
+  };
 
   const handleSend = async () => {
     if (!selectedType) return;
@@ -119,8 +141,9 @@ const SMSPage = () => {
         term,
       });
       setResult(res.data);
-      // Refresh the log table so the new entries appear immediately
-      await fetchLogs();
+      // Fresh send → jump back to page 1 so user sees newest logs
+      setPage(1);
+      await fetchLogs(1);
     } catch (err: any) {
       setError(err.response?.data?.message || "Failed to send SMS");
     } finally {
@@ -139,6 +162,28 @@ const SMSPage = () => {
     });
   };
 
+  // Build a small window of page numbers around the current page
+  const getPageNumbers = (): number[] => {
+    if (!pagination) return [];
+    const { totalPages } = pagination;
+    const current = page;
+    const pages: number[] = [];
+    const window = 1; // show current ± 1
+
+    pages.push(1);
+    for (
+      let i = Math.max(2, current - window);
+      i <= Math.min(totalPages - 1, current + window);
+      i++
+    ) {
+      pages.push(i);
+    }
+    if (totalPages > 1) pages.push(totalPages);
+    return pages;
+  };
+
+  const pageNumbers = getPageNumbers();
+
   return (
     <div className="w-full space-y-4">
       <div>
@@ -150,13 +195,11 @@ const SMSPage = () => {
 
       {/* ==================== SEND SECTION ==================== */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
-        {/* SMS Type Selection */}
         <div className="lg:col-span-2 space-y-3">
           <p className="text-sm font-medium text-gray-700">
             Select message type
           </p>
 
-          {/* Made horizontal and compact */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {smsTypes.map((type) => (
               <button
@@ -183,7 +226,6 @@ const SMSPage = () => {
             ))}
           </div>
 
-          {/* About bulk SMS (compact) */}
           <div className="bg-gray-50 rounded-xl p-3 border border-gray-100">
             <div className="flex items-start gap-2.5">
               <Users size={14} className="text-gray-400 mt-0.5 shrink-0" />
@@ -201,7 +243,6 @@ const SMSPage = () => {
           </div>
         </div>
 
-        {/* Form card */}
         <div className="lg:col-span-1">
           {selectedType ? (
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
@@ -312,7 +353,11 @@ const SMSPage = () => {
           <div>
             <h3 className="font-medium text-gray-800 text-sm">SMS History</h3>
             <p className="text-[11px] text-gray-500 mt-0.5">
-              A record of every message sent — with date, category, and status
+              {pagination
+                ? `Showing ${
+                    pagination.total === 0 ? 0 : (page - 1) * PER_PAGE + 1
+                  }–${Math.min(page * PER_PAGE, pagination.total)} of ${pagination.total} messages`
+                : "A record of every message sent"}
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -337,7 +382,7 @@ const SMSPage = () => {
               ))}
             </div>
             <button
-              onClick={fetchLogs}
+              onClick={() => fetchLogs(page)}
               disabled={logsLoading}
               className="p-1.5 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50 disabled:opacity-40"
               title="Refresh"
@@ -357,9 +402,11 @@ const SMSPage = () => {
         ) : logs.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <MessageSquare size={28} className="mx-auto mb-2 text-gray-200" />
-            <p className="text-sm text-gray-400 font-medium">No SMS sent yet</p>
+            <p className="text-sm text-gray-400 font-medium">No SMS found</p>
             <p className="text-[11px] text-gray-300 mt-1">
-              Sent messages will appear here
+              {logFilter
+                ? "No messages match the selected filter"
+                : "Sent messages will appear here"}
             </p>
           </div>
         ) : (
@@ -429,6 +476,71 @@ const SMSPage = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* ==================== PAGINATION ==================== */}
+        {pagination && pagination.totalPages > 1 && (
+          <div className="border-t border-gray-100 px-4 py-3">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-2">
+              <p className="text-xs text-gray-500">
+                Page {page} of {pagination.totalPages}
+              </p>
+
+              <Pagination className="mx-0 w-auto">
+                <PaginationContent>
+                  {/* Previous */}
+                  <PaginationItem>
+                    <button
+                      onClick={() => goToPage(page - 1)}
+                      disabled={page === 1 || logsLoading}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <ChevronLeft size={14} />
+                      <span className="hidden sm:inline">Previous</span>
+                    </button>
+                  </PaginationItem>
+
+                  {/* Page numbers */}
+                  {pageNumbers.map((p, idx) => {
+                    const prev = pageNumbers[idx - 1];
+                    const showEllipsis = prev !== undefined && p - prev > 1;
+                    return (
+                      <span key={p} className="flex items-center">
+                        {showEllipsis && (
+                          <span className="px-2 text-xs text-gray-400">…</span>
+                        )}
+                        <PaginationItem>
+                          <button
+                            onClick={() => goToPage(p)}
+                            disabled={logsLoading}
+                            className={`min-w-[32px] h-8 px-2 text-xs font-medium rounded-md transition-colors disabled:opacity-40 ${
+                              p === page
+                                ? "bg-blue-900 text-white"
+                                : "text-gray-600 hover:bg-gray-100"
+                            }`}
+                          >
+                            {p}
+                          </button>
+                        </PaginationItem>
+                      </span>
+                    );
+                  })}
+
+                  {/* Next */}
+                  <PaginationItem>
+                    <button
+                      onClick={() => goToPage(page + 1)}
+                      disabled={page === pagination.totalPages || logsLoading}
+                      className="inline-flex items-center gap-1 px-2.5 py-1.5 text-xs font-medium rounded-md text-gray-600 hover:bg-gray-100 disabled:opacity-40 disabled:cursor-not-allowed"
+                    >
+                      <span className="hidden sm:inline">Next</span>
+                      <ChevronRight size={14} />
+                    </button>
+                  </PaginationItem>
+                </PaginationContent>
+              </Pagination>
+            </div>
           </div>
         )}
       </div>

@@ -12,6 +12,7 @@ import {
 import { format } from "date-fns";
 import api from "../lib/axios";
 import { useAuthStore } from "../store/authStore";
+import { applyTheme } from "../lib/theme";
 import { Calendar } from "../components/ui/calendar";
 import {
   Popover,
@@ -19,9 +20,6 @@ import {
   PopoverTrigger,
 } from "../components/ui/popover";
 type LoginMethod = "student-id" | "phone";
-
-const NAVY = "#0B1F44";
-const NAVY_HOVER = "#0A1A3A";
 
 /** Turn a relative logo path from the API into an absolute URL */
 const resolveLogo = (logo?: string | null): string | null => {
@@ -56,18 +54,21 @@ export default function LoginPage() {
     name: string;
     logo: string | null;
     motto?: string | null;
+    primaryColor?: string | null;
   } | null>(null);
 
   useEffect(() => {
     const loadBranding = async () => {
       const slug = process.env.NEXT_PUBLIC_SCHOOL_SLUG;
 
-      // 1. Same endpoint the admin portal uses — reliably includes the logo.
+      // 1. Same endpoint the admin portal uses — reliably includes the logo + color.
       if (slug) {
         try {
           const res = await api.get(`/schools/by-slug/${slug}`);
           if (res.data?.data) {
             setSchoolBranding(res.data.data);
+            // Apply the school's brand color immediately
+            applyTheme(res.data.data.primaryColor);
             return;
           }
         } catch {
@@ -75,7 +76,7 @@ export default function LoginPage() {
         }
       }
 
-      // 2. Fallback: public endpoint (may or may not include the logo).
+      // 2. Fallback: public endpoint
       try {
         const res = await api.get("/schools/public");
         const data = Array.isArray(res.data?.data)
@@ -83,6 +84,7 @@ export default function LoginPage() {
           : res.data?.data;
         if (data) {
           setSchoolBranding(data);
+          applyTheme(data.primaryColor);
           return;
         }
       } catch {
@@ -174,7 +176,7 @@ export default function LoginPage() {
             className="h-16 w-auto max-w-[180px] object-contain mb-4"
           />
         ) : (
-          <div className="w-16 h-16 bg-[#0B1F44] rounded-2xl flex items-center justify-center mb-4 overflow-hidden shadow-sm">
+          <div className="w-16 h-16 bg-[var(--color-primary)] rounded-2xl flex items-center justify-center mb-4 overflow-hidden shadow-sm">
             <School size={30} className="text-white" />
           </div>
         )}
@@ -195,7 +197,6 @@ export default function LoginPage() {
       <div className="w-full max-w-sm bg-white border border-gray-200 rounded-2xl p-6 animate-fade-in-up">
         {/* Method Toggle */}
         <div className="relative flex bg-gray-100 rounded-xl p-1 mb-6">
-          {/* Sliding pill */}
           <span
             className={`absolute top-1 bottom-1 w-[calc(50%-0.25rem)] rounded-lg bg-white shadow-sm transition-transform duration-300 ease-out ${
               method === "student-id"
@@ -212,7 +213,7 @@ export default function LoginPage() {
             }}
             className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
               method === "student-id"
-                ? "text-[#0B1F44]"
+                ? "text-[var(--color-primary)]"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -226,7 +227,7 @@ export default function LoginPage() {
             }}
             className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
               method === "phone"
-                ? "text-[#0B1F44]"
+                ? "text-[var(--color-primary)]"
                 : "text-gray-500 hover:text-gray-700"
             }`}
           >
@@ -260,16 +261,16 @@ export default function LoginPage() {
                 type="text"
                 value={studentCode}
                 onChange={(e) => setStudentCode(e.target.value.toUpperCase())}
-                placeholder="eg. STP-2025-001"
+                placeholder="eg. SPP-F3-2026-001"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm font-mono text-gray-900 placeholder-gray-400 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm font-mono text-gray-900 placeholder-gray-400 outline-none transition-all duration-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
               />
               <p className="text-xs text-gray-400 mt-1.5">
                 Found on your child&apos;s admission letter
               </p>
             </div>
 
-            {/* Child's DOB — shadcn DatePicker */}
+            {/* Child's DOB */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Child&apos;s Date of Birth
@@ -278,7 +279,7 @@ export default function LoginPage() {
                 <PopoverTrigger asChild>
                   <button
                     type="button"
-                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-xl text-sm text-left outline-none transition-all duration-300 focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent"
+                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-xl text-sm text-left outline-none transition-all duration-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
                   >
                     <span
                       className={
@@ -319,7 +320,7 @@ export default function LoginPage() {
             <button
               type="submit"
               disabled={loading}
-              className="group w-full flex items-center justify-center gap-2 bg-[#0B1F44] text-white py-3 rounded-xl font-medium text-sm transition-all duration-300 hover:bg-[#0A1A3A] disabled:bg-[#0B1F44]/50 disabled:cursor-not-allowed"
+              className="group w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-3 rounded-xl font-medium text-sm transition-all duration-300 hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
                 <>
@@ -350,10 +351,9 @@ export default function LoginPage() {
                   className={`flex-1 flex items-stretch border rounded-xl overflow-hidden transition-all duration-200 ${
                     otpSent
                       ? "bg-gray-50 border-gray-200"
-                      : "bg-white border-gray-300 focus-within:border-[#0B1F44] focus-within:shadow-[0_0_0_3px_rgba(11,31,68,0.12)]"
+                      : "bg-white border-gray-300 focus-within:border-[var(--color-primary)] focus-within:shadow-[0_0_0_3px_var(--color-primary-ring)]"
                   }`}
                 >
-                  {/* Fixed +265 prefix */}
                   <span
                     className={`flex items-center pl-4 pr-1 text-sm font-medium select-none ${
                       otpSent ? "text-gray-500" : "text-gray-700"
@@ -382,7 +382,7 @@ export default function LoginPage() {
                     type="button"
                     onClick={handleRequestOTP}
                     disabled={otpLoading || phone.length < 9}
-                    className="px-4 py-3 bg-[#0B1F44] text-white rounded-xl text-sm font-medium transition-all duration-300 hover:bg-[#0A1A3A] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap flex items-center justify-center min-w-[92px]"
+                    className="px-4 py-3 bg-[var(--color-primary)] text-white rounded-xl text-sm font-medium transition-all duration-300 hover:bg-[var(--color-primary-dark)] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap flex items-center justify-center min-w-[92px]"
                   >
                     {otpLoading ? (
                       <Loader2 size={16} className="animate-spin" />
@@ -415,7 +415,7 @@ export default function LoginPage() {
                     maxLength={6}
                     required
                     autoFocus
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-center text-lg font-mono tracking-[0.5em] text-gray-900 placeholder-gray-300 outline-none transition-all duration-300 focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-center text-lg font-mono tracking-[0.5em] text-gray-900 placeholder-gray-300 outline-none transition-all duration-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
                   />
                   <p className="text-xs text-gray-400 mt-1.5 text-center">
                     Code sent to +265{phone}
@@ -424,7 +424,7 @@ export default function LoginPage() {
                 <button
                   type="submit"
                   disabled={loading || otp.length < 6}
-                  className="group w-full flex items-center justify-center gap-2 bg-[#0B1F44] text-white py-3 rounded-xl font-medium text-sm transition-all duration-300 hover:bg-[#0A1A3A] disabled:bg-[#0B1F44]/50 disabled:cursor-not-allowed"
+                  className="group w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-3 rounded-xl font-medium text-sm transition-all duration-300 hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? (
                     <>
