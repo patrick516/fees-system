@@ -71,7 +71,7 @@ const typeLabel: Record<string, string> = {
 
 const typeColor: Record<string, string> = {
   reminder: "bg-yellow-100 text-yellow-700",
-  announcement: "bg-blue-100 text-blue-700",
+  announcement: "bg-blue-100 text-[var(--color-primary-dark)]",
   unpaid: "bg-red-100 text-red-700",
 };
 
@@ -278,7 +278,7 @@ const SMSPage = () => {
                     onChange={(e) => setMessage(e.target.value)}
                     placeholder="Type your message to all parents..."
                     rows={3}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
                   />
                   <p className="text-[11px] text-gray-400 mt-1">
                     {message.length} characters
@@ -320,7 +320,7 @@ const SMSPage = () => {
                   loading ||
                   (selectedType === "announcement" && !message.trim())
                 }
-                className="w-full flex items-center justify-center gap-2 bg-blue-900 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-blue-800 disabled:opacity-40"
+                className="w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-2.5 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
               >
                 {loading ? (
                   <>
@@ -373,7 +373,7 @@ const SMSPage = () => {
                   onClick={() => setLogFilter(f.value)}
                   className={`px-3 py-1 text-[11px] font-medium rounded-md transition-colors ${
                     logFilter === f.value
-                      ? "bg-white shadow-sm text-blue-900"
+                      ? "bg-white shadow-sm text-[var(--color-primary)]"
                       : "text-gray-500 hover:text-gray-700"
                   }`}
                 >
@@ -516,7 +516,7 @@ const SMSPage = () => {
                             disabled={logsLoading}
                             className={`min-w-[32px] h-8 px-2 text-xs font-medium rounded-md transition-colors disabled:opacity-40 ${
                               p === page
-                                ? "bg-blue-900 text-white"
+                                ? "bg-[var(--color-primary)] text-white"
                                 : "text-gray-600 hover:bg-gray-100"
                             }`}
                           >

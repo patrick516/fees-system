@@ -296,7 +296,7 @@ const ResultsPage = () => {
                 }}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                   boundarySystem === "POINTS"
-                    ? "bg-white shadow-sm text-blue-900"
+                    ? "bg-white shadow-sm text-[var(--color-primary)]"
                     : "text-gray-500"
                 }`}
               >
@@ -309,7 +309,7 @@ const ResultsPage = () => {
                 }}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                   boundarySystem === "LETTER"
-                    ? "bg-white shadow-sm text-blue-900"
+                    ? "bg-white shadow-sm text-[var(--color-primary)]"
                     : "text-gray-500"
                 }`}
               >
@@ -320,7 +320,7 @@ const ResultsPage = () => {
           {!editingBoundaries && (
             <button
               onClick={() => setEditingBoundaries(true)}
-              className="flex items-center gap-1.5 text-sm font-medium text-blue-900 hover:text-blue-700 transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition-colors"
             >
               <Pencil size={14} /> Edit
             </button>
@@ -395,7 +395,7 @@ const ResultsPage = () => {
                       { minPercent: 0, maxPercent: 0, gradeLabel: "" },
                     ])
                   }
-                  className="text-xs text-blue-700 font-medium mt-1"
+                  className="text-xs text-[var(--color-primary-dark)] font-medium mt-1"
                 >
                   + Add grade row
                 </button>
@@ -405,7 +405,7 @@ const ResultsPage = () => {
               <button
                 onClick={handleSaveBoundaries}
                 disabled={savingBoundaries}
-                className="flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 disabled:opacity-40"
+                className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
               >
                 {savingBoundaries ? (
                   <Loader2 size={14} className="animate-spin" />
@@ -503,7 +503,7 @@ const ResultsPage = () => {
         </div>
         <button
           onClick={handleCreatePeriod}
-          className="flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800"
+          className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)]"
         >
           <Plus size={14} /> Create Exam Period
         </button>
@@ -602,7 +602,7 @@ const ResultsPage = () => {
                 disabled={savingGradingSystem}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                   selectedClassObj.gradingSystem === "POINTS"
-                    ? "bg-blue-900 text-white"
+                    ? "bg-[var(--color-primary)] text-white"
                     : "text-gray-500"
                 }`}
               >
@@ -613,7 +613,7 @@ const ResultsPage = () => {
                 disabled={savingGradingSystem}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
                   selectedClassObj.gradingSystem === "LETTER"
-                    ? "bg-blue-900 text-white"
+                    ? "bg-[var(--color-primary)] text-white"
                     : "text-gray-500"
                 }`}
               >
@@ -626,7 +626,7 @@ const ResultsPage = () => {
         <button
           onClick={handleUpload}
           disabled={uploading}
-          className="flex items-center gap-2 bg-blue-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-800 disabled:opacity-40"
+          className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
         >
           {uploading ? (
             <Loader2 size={14} className="animate-spin" />
@@ -643,7 +643,7 @@ const ResultsPage = () => {
         <button
           onClick={handleViewResults}
           disabled={loadingResults}
-          className="mt-3 flex items-center gap-2 text-sm text-blue-900 font-medium hover:text-blue-700 transition-colors"
+          className="mt-3 flex items-center gap-2 text-sm text-[var(--color-primary)] font-medium hover:text-[var(--color-primary-dark)] transition-colors"
         >
           {loadingResults ? (
             <Loader2 size={14} className="animate-spin" />
@@ -781,7 +781,7 @@ const ResultsPage = () => {
                           <td className="px-4 py-2 text-gray-600">
                             {row.averageMark}%
                           </td>
-                          <td className="px-4 py-2 font-semibold text-blue-900">
+                          <td className="px-4 py-2 font-semibold text-[var(--color-primary)]">
                             {row.overallGrade}
                             <span className="ml-2 text-xs text-gray-400">
                               {expandedStudent === row.studentId ? "▲" : "▼"}
@@ -789,7 +789,7 @@ const ResultsPage = () => {
                           </td>
                         </>
                       ) : (
-                        <td className="px-4 py-2 font-semibold text-blue-900">
+                        <td className="px-4 py-2 font-semibold text-[var(--color-primary)]">
                           {row.totalPoints}
                           <span className="ml-2 text-xs text-gray-400">
                             {expandedStudent === row.studentId ? "▲" : "▼"}

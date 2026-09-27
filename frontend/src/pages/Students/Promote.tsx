@@ -257,7 +257,7 @@ const Promote = () => {
                   <div
                     className={`w-9 h-9 rounded-lg flex items-center justify-center ${
                       map?.toClass
-                        ? "bg-blue-100 text-blue-700"
+                        ? "bg-blue-100 text-[var(--color-primary-dark)]"
                         : "bg-yellow-100 text-yellow-700"
                     }`}
                   >
@@ -278,7 +278,7 @@ const Promote = () => {
                 </div>
                 <button
                   onClick={() => toggleClass(group.class.id, !allChecked)}
-                  className="text-xs font-medium text-blue-700 hover:text-blue-900"
+                  className="text-xs font-medium text-[var(--color-primary-dark)] hover:text-[var(--color-primary)]"
                 >
                   {allChecked ? "Unselect all" : "Select all"}
                 </button>
@@ -295,7 +295,7 @@ const Promote = () => {
                       type="checkbox"
                       checked={!!selected[student.id]}
                       onChange={() => toggleStudent(student.id)}
-                      className="w-4 h-4 rounded border-gray-300 text-blue-900 focus:ring-blue-500"
+                      className="w-4 h-4 rounded border-gray-300 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-800 truncate">

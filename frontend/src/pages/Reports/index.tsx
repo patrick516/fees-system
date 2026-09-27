@@ -779,7 +779,7 @@ export default function ReportsPage() {
       {/* History banner */}
       {generatedFromHistory && (
         <div className="flex items-center gap-2.5 bg-blue-50 border border-blue-200 rounded-xl p-3">
-          <History size={15} className="text-blue-700 shrink-0" />
+          <History size={15} className="text-[var(--color-primary-dark)] shrink-0" />
           <p className="text-xs text-blue-800">
             Viewing historical report for{" "}
             <span className="font-semibold">
@@ -789,7 +789,7 @@ export default function ReportsPage() {
           </p>
           <button
             onClick={() => setGeneratedFromHistory(false)}
-            className="ml-auto text-xs text-blue-700 font-medium hover:text-blue-900"
+            className="ml-auto text-xs text-[var(--color-primary-dark)] font-medium hover:text-[var(--color-primary)]"
           >
             Dismiss
           </button>
@@ -813,7 +813,7 @@ export default function ReportsPage() {
                 setFilters({ ...filters, academicYear: e.target.value })
               }
               placeholder="eg. 2025-2026"
-              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             />
           </div>
           <div>
@@ -958,7 +958,7 @@ export default function ReportsPage() {
             </div>
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-5">
               <p className="text-xs text-gray-500 mb-1">Total Required</p>
-              <p className="text-xl font-bold text-blue-900">
+              <p className="text-xl font-bold text-[var(--color-primary)]">
                 {formatMWK(report.summary.totalRequired)}
               </p>
               <div className="mt-2 bg-gray-200 rounded-full h-1.5">

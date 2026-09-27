@@ -142,7 +142,7 @@ const StudentDetail = () => {
                     ? "bg-red-100 text-red-700"
                     : summary?.totalPaid > 0
                       ? "bg-green-100 text-green-700"
-                      : "bg-blue-100 text-blue-900"
+                      : "bg-[var(--color-primary-light)] text-[var(--color-primary)]"
               }`}
             >
               {student.fullName.charAt(0)}
@@ -221,7 +221,7 @@ const StudentDetail = () => {
                 state: { studentId: student.id, studentName: student.fullName },
               })
             }
-            className="mt-5 w-full flex items-center justify-center gap-2 bg-blue-900 text-white py-2.5 rounded-xl text-sm font-medium hover:bg-blue-800 transition-colors"
+            className="mt-5 w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-2.5 rounded-xl text-sm font-medium hover:bg-[var(--color-primary-dark)] transition-colors"
           >
             <CreditCard size={16} />
             Record Payment
@@ -320,7 +320,7 @@ const StudentDetail = () => {
           {feeStructures && feeStructures.length > 0 && (
             <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
-                <TrendingUp size={16} className="text-blue-900" />
+                <TrendingUp size={16} className="text-[var(--color-primary)]" />
                 <h3 className="font-medium text-gray-800">
                   Fee Structure — {student.class.name}
                 </h3>
@@ -370,7 +370,7 @@ const StudentDetail = () => {
                       {/* Progress bar */}
                       <div className="w-full bg-gray-100 rounded-full h-2 mb-3">
                         <div
-                          className={`h-2 rounded-full transition-all ${isTermPaid ? "bg-green-500" : "bg-blue-500"}`}
+                          className={`h-2 rounded-full transition-all ${isTermPaid ? "bg-green-500" : "bg-[var(--color-primary)]"}`}
                           style={{
                             width: `${Math.min(100, (paidForTerm / fee.totalAmount) * 100)}%`,
                           }}
@@ -410,28 +410,28 @@ const StudentDetail = () => {
                           </p>
                           <div className="flex flex-wrap gap-2">
                             {fee.tuitionFee && (
-                              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                              <span className="text-xs bg-blue-50 text-[var(--color-primary-dark)] px-2 py-1 rounded">
                                 Tuition: MWK {fee.tuitionFee.toLocaleString()}
                               </span>
                             )}
                             {fee.examFee && (
-                              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                              <span className="text-xs bg-blue-50 text-[var(--color-primary-dark)] px-2 py-1 rounded">
                                 Exam: MWK {fee.examFee.toLocaleString()}
                               </span>
                             )}
                             {fee.buildingLevy && (
-                              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                              <span className="text-xs bg-blue-50 text-[var(--color-primary-dark)] px-2 py-1 rounded">
                                 Building: MWK{" "}
                                 {fee.buildingLevy.toLocaleString()}
                               </span>
                             )}
                             {fee.uniformFee && (
-                              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                              <span className="text-xs bg-blue-50 text-[var(--color-primary-dark)] px-2 py-1 rounded">
                                 Uniform: MWK {fee.uniformFee.toLocaleString()}
                               </span>
                             )}
                             {fee.bookFee && (
-                              <span className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded">
+                              <span className="text-xs bg-blue-50 text-[var(--color-primary-dark)] px-2 py-1 rounded">
                                 Books: MWK {fee.bookFee.toLocaleString()}
                               </span>
                             )}
@@ -451,7 +451,7 @@ const StudentDetail = () => {
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Receipt size={16} className="text-blue-900" />
+            <Receipt size={16} className="text-[var(--color-primary)]" />
             <h3 className="font-medium text-gray-800">Payment History</h3>
           </div>
           <div className="flex items-center gap-3 text-xs text-gray-500">

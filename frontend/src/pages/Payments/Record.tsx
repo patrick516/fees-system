@@ -277,7 +277,7 @@ const RecordPayment = () => {
               placeholder="Search by name, student ID, or parent phone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               autoFocus
             />
           </div>
@@ -370,16 +370,16 @@ const RecordPayment = () => {
                 {termStatus.termStatus.hasFeeStructure ? (
                   <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
                     <div className="flex items-center justify-between mb-2">
-                      <p className="text-sm font-semibold text-blue-900">
+                      <p className="text-sm font-semibold text-[var(--color-primary)]">
                         Term Fee Breakdown
                       </p>
-                      <span className="text-sm font-bold text-blue-900">
+                      <span className="text-sm font-bold text-[var(--color-primary)]">
                         MWK{" "}
                         {termStatus.termStatus.requiredAmount?.toLocaleString()}
                       </span>
                     </div>
                     {termStatus.feeStructure?.tuitionFee && (
-                      <div className="space-y-1 text-xs text-blue-700">
+                      <div className="space-y-1 text-xs text-[var(--color-primary-dark)]">
                         {termStatus.feeStructure.tuitionFee && (
                           <div className="flex justify-between">
                             <span>Tuition</span>
@@ -412,7 +412,7 @@ const RecordPayment = () => {
                     <div className="border-t border-blue-200 mt-2 pt-2 grid grid-cols-3 gap-2 text-center">
                       <div>
                         <p className="text-xs text-blue-600">Already Paid</p>
-                        <p className="text-sm font-bold text-blue-900">
+                        <p className="text-sm font-bold text-[var(--color-primary)]">
                           MWK{" "}
                           {termStatus.termStatus.totalPaidThisTerm.toLocaleString()}
                         </p>
@@ -490,7 +490,7 @@ const RecordPayment = () => {
                   required
                   min="1"
                   placeholder="eg. 50000"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 />
               </div>
 
@@ -554,7 +554,7 @@ const RecordPayment = () => {
                     setForm({ ...form, academicYear: e.target.value })
                   }
                   placeholder="eg. 2025-2026"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 />
               </div>
             </div>
@@ -567,7 +567,7 @@ const RecordPayment = () => {
                 value={form.notes}
                 onChange={(e) => setForm({ ...form, notes: e.target.value })}
                 placeholder="eg. Partial payment, balance by Friday"
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               />
             </div>
           </div>

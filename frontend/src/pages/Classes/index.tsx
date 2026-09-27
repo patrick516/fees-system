@@ -464,7 +464,7 @@ const ClassesPage = () => {
                 setActivateError("");
                 setActivateSuccess("");
               }}
-              className="flex items-center gap-1.5 text-sm font-medium text-blue-900 hover:text-blue-700 transition-colors"
+              className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition-colors"
             >
               <Edit2 size={14} /> Change
             </button>
@@ -577,7 +577,7 @@ const ClassesPage = () => {
                     })
                   }
                   placeholder="eg. 2025-2026"
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-32 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-32 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] bg-white"
                 />
               </div>
 
@@ -594,7 +594,7 @@ const ClassesPage = () => {
                       startDate: e.target.value,
                     })
                   }
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] bg-white"
                 />
               </div>
 
@@ -611,7 +611,7 @@ const ClassesPage = () => {
                       endDate: e.target.value,
                     })
                   }
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] bg-white"
                 />
               </div>
 
@@ -660,7 +660,7 @@ const ClassesPage = () => {
       {/* Term History */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-          <History size={16} className="text-blue-900" />
+          <History size={16} className="text-[var(--color-primary)]" />
           <div>
             <h3 className="font-medium text-gray-800">Term History</h3>
             <p className="text-xs text-gray-500 mt-0.5">
@@ -774,7 +774,7 @@ const ClassesPage = () => {
                               `/reports?term=${t.term}&academicYear=${t.academicYear}`,
                             )
                           }
-                          className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:text-blue-900"
+                          className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary-dark)] hover:text-[var(--color-primary)]"
                         >
                           <FileBarChart size={12} /> View Report
                         </button>
@@ -799,7 +799,7 @@ const ClassesPage = () => {
             }
             placeholder="Class name (eg. Form 1, Form 3)"
             required
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
           />
           <input
             type="number"
@@ -809,7 +809,7 @@ const ClassesPage = () => {
             }
             placeholder="Level"
             required
-            className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
           />
           <button
             type="submit"
@@ -902,7 +902,7 @@ const ClassesPage = () => {
                             className="border border-gray-200 rounded-lg p-4"
                           >
                             <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs font-medium text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
+                              <span className="text-xs font-medium text-[var(--color-primary-dark)] bg-[var(--color-primary-light)] px-2 py-0.5 rounded">
                                 {termLabel(fee.term)} {fee.academicYear}
                               </span>
                               <button
@@ -1003,7 +1003,7 @@ const ClassesPage = () => {
                                 })
                               }
                               placeholder="eg. 2025-2026"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                             />
                           </div>
                         </div>
@@ -1035,7 +1035,7 @@ const ClassesPage = () => {
                                   handleFeeChange(field, e.target.value)
                                 }
                                 placeholder="0"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                               />
                             </div>
                           ))}
@@ -1060,7 +1060,7 @@ const ClassesPage = () => {
                           }
                           required
                           placeholder="eg. 150000"
-                          className="w-full px-3 py-3 border border-gray-300 rounded-lg text-lg font-bold focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          className="w-full px-3 py-3 border border-gray-300 rounded-lg text-lg font-bold focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                         />
                       </div>
 
@@ -1150,7 +1150,7 @@ const ClassesPage = () => {
                         setNewBank({ ...newBank, bankName: e.target.value })
                       }
                       placeholder="eg. National Bank"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                     />
                   </div>
                   <div>
@@ -1163,7 +1163,7 @@ const ClassesPage = () => {
                         setNewBank({ ...newBank, accountName: e.target.value })
                       }
                       placeholder="eg. St Peters Private School"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                     />
                   </div>
                   <div>
@@ -1179,7 +1179,7 @@ const ClassesPage = () => {
                         })
                       }
                       placeholder="eg. 1234567890"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                     />
                   </div>
                   <div>
@@ -1192,7 +1192,7 @@ const ClassesPage = () => {
                         setNewBank({ ...newBank, branch: e.target.value })
                       }
                       placeholder="eg. Blantyre Branch"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                     />
                   </div>
                 </div>
@@ -1304,7 +1304,7 @@ const ClassesPage = () => {
                     })
                   }
                   placeholder="eg. 0999 000 000"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 />
               </div>
               <div>
@@ -1320,7 +1320,7 @@ const ClassesPage = () => {
                     })
                   }
                   placeholder="eg. 0888 000 000"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
                 />
               </div>
             </div>
@@ -1340,7 +1340,7 @@ const ClassesPage = () => {
               }
               placeholder="eg. Use your child's Student ID as the payment reference. Send screenshot to school office after payment."
               rows={3}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
             />
           </div>
 
@@ -1379,7 +1379,7 @@ const ClassesPage = () => {
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
-                  <AlertCircle size={20} className="text-blue-700" />
+                  <AlertCircle size={20} className="text-[var(--color-primary-dark)]" />
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-gray-800">
@@ -1434,10 +1434,10 @@ const ClassesPage = () => {
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                <p className="text-[11px] text-blue-700 uppercase font-medium mb-1">
+                <p className="text-[11px] text-[var(--color-primary-dark)] uppercase font-medium mb-1">
                   New active term
                 </p>
-                <p className="text-sm font-semibold text-blue-900">
+                <p className="text-sm font-semibold text-[var(--color-primary)]">
                   {termLabel(activateForm.term)} • {activateForm.academicYear}
                 </p>
                 {(activateForm.startDate || activateForm.endDate) && (
