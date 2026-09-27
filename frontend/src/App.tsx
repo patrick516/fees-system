@@ -18,6 +18,7 @@ import ReportsPage from "./pages/Reports/index";
 import SettingsPage from "./pages/Settings/index";
 import ResultsPage from "./pages/Results/index";
 import Promote from "./pages/Students/Promote";
+import RateLimitModal from "./components/shared/RateLimitModal";
 
 // Layout
 import MainLayout from "./components/Layout/MainLayout";
@@ -71,6 +72,7 @@ function App() {
         {/* Catch all */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
+      <RateLimitModal />
     </BrowserRouter>
   );
 }
