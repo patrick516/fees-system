@@ -700,7 +700,7 @@ const ResultsPage = () => {
                       key={c.id}
                       onClick={() => handleResolvePendingRow(row.id, c.id)}
                       disabled={resolvingRowId === row.id}
-                      className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-lg px-3 py-1.5 hover:border-blue-400 hover:bg-blue-50 disabled:opacity-40"
+                      className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-lg px-3 py-1.5 hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)] disabled:opacity-40"
                     >
                       {resolvingRowId === row.id ? (
                         <Loader2 size={12} className="animate-spin" />

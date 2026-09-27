@@ -76,7 +76,7 @@ const Dashboard = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-900" />
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]" />
       </div>
     );
   }
@@ -90,7 +90,7 @@ const Dashboard = () => {
           title="Total Required"
           value={formatMWK(summary?.totalRequired || 0)}
           icon={Target}
-          color="bg-blue-700"
+          color="bg-[var(--color-primary)]"
           subtitle="Fees expected this term"
         />
         <StatCard

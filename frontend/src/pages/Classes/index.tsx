@@ -907,7 +907,7 @@ const ClassesPage = () => {
                               </span>
                               <button
                                 onClick={() => openFeeForm(cls.id, fee)}
-                                className="p-1 text-gray-400 hover:text-blue-600"
+                                className="p-1 text-gray-400 hover:text-[var(--color-primary)]"
                               >
                                 <Edit2 size={12} />
                               </button>
@@ -931,7 +931,7 @@ const ClassesPage = () => {
                   {showFeeForm !== cls.id ? (
                     <button
                       onClick={() => openFeeForm(cls.id)}
-                      className="flex items-center gap-2 text-blue-600 hover:text-blue-800 text-sm font-medium"
+                      className="flex items-center gap-2 text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm font-medium"
                     >
                       <Plus size={16} />
                       {cls.feeStructures?.length > 0

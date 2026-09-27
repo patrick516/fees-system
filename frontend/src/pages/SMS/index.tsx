@@ -71,7 +71,7 @@ const typeLabel: Record<string, string> = {
 
 const typeColor: Record<string, string> = {
   reminder: "bg-yellow-100 text-yellow-700",
-  announcement: "bg-blue-100 text-[var(--color-primary-dark)]",
+  announcement: "bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]",
   unpaid: "bg-red-100 text-red-700",
 };
 
@@ -207,7 +207,7 @@ const SMSPage = () => {
                 onClick={() => setSelectedType(type.id)}
                 className={`flex items-start gap-3 p-3 border-2 rounded-xl text-left transition-all ${
                   selectedType === type.id
-                    ? "border-blue-500 bg-blue-50"
+                    ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]"
                     : type.color
                 }`}
               >
