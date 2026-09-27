@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const multer = require("multer");
 const {
   addStudent,
   getStudents,
@@ -7,6 +8,8 @@ const {
   updateStudent,
   searchStudents,
   getStudentByCode,
+  bulkImportPreview,
+  bulkImport,
 } = require("../controllers/student.controller");
 const {
   previewPromotion,
@@ -16,10 +19,31 @@ const {
 const { verifyStaff, verifyParent } = require("../middleware/auth");
 const { isBursar, isAdmin } = require("../middleware/role");
 
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+});
+
 // Public — parent login page
 router.get("/by-code/:code", getStudentByCode);
 
-// Promotion (register BEFORE /:id so it doesn't get captured)
+// Bulk import — must come before /:id
+router.post(
+  "/bulk/preview",
+  verifyStaff,
+  isBursar,
+  upload.single("file"),
+  bulkImportPreview,
+);
+router.post(
+  "/bulk/import",
+  verifyStaff,
+  isBursar,
+  upload.single("file"),
+  bulkImport,
+);
+
+// Promotion — before /:id
 router.get("/promote/preview", verifyStaff, isAdmin, previewPromotion);
 router.post("/promote", verifyStaff, isAdmin, promoteStudents);
 

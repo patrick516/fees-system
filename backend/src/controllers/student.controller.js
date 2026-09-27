@@ -5,6 +5,166 @@ const {
   generateReceiptNumber,
 } = require("../lib/utils");
 
+const XLSX = require("xlsx");
+
+// Normalize a phone number to +265XXXXXXXXX
+const normalizePhone = (raw) => {
+  if (!raw) return null;
+  const digits = String(raw).replace(/\D/g, "");
+  if (digits.length === 12 && digits.startsWith("265")) return `+${digits}`;
+  if (digits.length === 10 && digits.startsWith("0"))
+    return `+265${digits.slice(1)}`;
+  if (digits.length === 9) return `+265${digits}`;
+  return null;
+};
+
+// Validate a single row. Returns { rowNumber, valid, errors, data }
+const validateImportRow = (row, rowNumber, classes, fallbackYear) => {
+  const errors = [];
+
+  const firstName = String(row["First Name"] || "").trim();
+  const middleName = String(row["Middle Name"] || "").trim();
+  const lastName = String(row["Last Name"] || "").trim();
+  const dobRaw = String(row["Date of Birth"] || "").trim();
+  const gender = String(row["Gender"] || "")
+    .trim()
+    .toUpperCase();
+  const className = String(row["Class"] || "").trim();
+  const parentName = String(row["Parent Name"] || "").trim();
+  const phoneRaw = String(row["Parent Phone"] || "").trim();
+  const phone2Raw = String(row["Parent Phone 2"] || "").trim();
+  const parentEmail = String(row["Parent Email"] || "").trim();
+  const rowYear = String(row["Academic Year"] || "").trim() || fallbackYear;
+
+  if (!firstName) errors.push("Missing first name");
+  if (!lastName) errors.push("Missing last name");
+  if (!dobRaw) errors.push("Missing date of birth");
+  if (!gender) errors.push("Missing gender");
+  if (!className) errors.push("Missing class");
+  if (!parentName) errors.push("Missing parent name");
+  if (!phoneRaw) errors.push("Missing parent phone");
+
+  // DOB
+  let dob = null;
+  if (dobRaw) {
+    dob = new Date(dobRaw);
+    if (isNaN(dob.getTime())) errors.push(`Invalid date of birth: "${dobRaw}"`);
+    else if (dob > new Date()) errors.push("Date of birth is in the future");
+  }
+
+  // Gender
+  if (gender && !["MALE", "FEMALE"].includes(gender)) {
+    errors.push(`Gender must be MALE or FEMALE (got "${gender}")`);
+  }
+
+  // Class
+  let classMatch = null;
+  if (className) {
+    classMatch = classes.find(
+      (c) => c.name.toLowerCase() === className.toLowerCase(),
+    );
+    if (!classMatch) errors.push(`Class "${className}" not found`);
+  }
+
+  // Phones
+  const parentPhone = phoneRaw ? normalizePhone(phoneRaw) : null;
+  if (phoneRaw && !parentPhone)
+    errors.push(`Invalid parent phone: "${phoneRaw}"`);
+
+  let parentPhone2 = null;
+  if (phone2Raw) {
+    parentPhone2 = normalizePhone(phone2Raw);
+    if (!parentPhone2) errors.push(`Invalid second phone: "${phone2Raw}"`);
+  }
+
+  return {
+    rowNumber,
+    valid: errors.length === 0,
+    errors,
+    data: {
+      firstName,
+      middleName: middleName || null,
+      lastName,
+      dateOfBirth: dob ? dob.toISOString().slice(0, 10) : null,
+      gender: gender || null,
+      classId: classMatch?.id || null,
+      className,
+      parentName,
+      parentPhone,
+      parentPhone2,
+      parentEmail: parentEmail || null,
+      academicYear: rowYear,
+    },
+  };
+};
+
+// Parse the uploaded workbook + validate every row
+const parseAndValidate = async (buffer, schoolId) => {
+  const classes = await prisma.class.findMany({
+    where: { schoolId, isActive: true },
+  });
+  if (classes.length === 0) {
+    throw new Error(
+      "No classes exist yet. Create classes before importing students.",
+    );
+  }
+
+  const school = await prisma.school.findUnique({ where: { id: schoolId } });
+  const fallbackYear =
+    school?.activeAcademicYear || new Date().getFullYear().toString();
+
+  const wb = XLSX.read(buffer, { type: "buffer" });
+  const sheet = wb.Sheets[wb.SheetNames[0]];
+  const rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
+
+  if (rows.length === 0) throw new Error("Sheet is empty");
+
+  // Skip fully-empty rows silently (bursars often leave a blank row at the bottom)
+  const results = [];
+  rows.forEach((row, i) => {
+    const isEmpty = Object.values(row).every(
+      (v) => v === null || v === undefined || String(v).trim() === "",
+    );
+    if (isEmpty) return;
+    results.push(validateImportRow(row, i + 2, classes, fallbackYear));
+  });
+
+  // Duplicate within the file
+  const seen = new Map();
+  for (const r of results) {
+    if (!r.valid) continue;
+    const key =
+      `${r.data.parentPhone}|${r.data.firstName}|${r.data.lastName}`.toLowerCase();
+    if (seen.has(key)) {
+      r.valid = false;
+      r.errors.push(`Duplicate of row ${seen.get(key)} in this file`);
+    } else {
+      seen.set(key, r.rowNumber);
+    }
+  }
+
+  // Already in DB
+  for (const r of results) {
+    if (!r.valid) continue;
+    const fullName = [r.data.firstName, r.data.middleName, r.data.lastName]
+      .filter(Boolean)
+      .join(" ");
+    const existing = await prisma.student.findFirst({
+      where: {
+        schoolId,
+        parentPhone: r.data.parentPhone,
+        fullName: { equals: fullName, mode: "insensitive" },
+      },
+    });
+    if (existing) {
+      r.valid = false;
+      r.errors.push(`Already in system as ${existing.studentCode}`);
+    }
+  }
+
+  return { classes, school, fallbackYear, results };
+};
+
 // Merge name parts into a single display name. Returns "" if no firstName/lastName.
 const buildFullName = (firstName, middleName, lastName) =>
   [firstName, middleName, lastName]
@@ -12,9 +172,6 @@ const buildFullName = (firstName, middleName, lastName) =>
     .map((p) => String(p).trim())
     .join(" ");
 
-// ==================== ADD STUDENT ====================
-// POST /api/students
-// ==================== ADD STUDENT ====================
 // POST /api/students
 const addStudent = async (req, res) => {
   try {
@@ -99,8 +256,9 @@ const addStudent = async (req, res) => {
       where: { id: req.schoolId },
     });
 
-    const studentCount = await prisma.student.count({
-      where: { schoolId: req.schoolId },
+    // Count only students in THIS class — each class has its own sequence
+    const classCount = await prisma.student.count({
+      where: { schoolId: req.schoolId, classId },
     });
 
     const studentCode = generateStudentCode(
@@ -108,7 +266,7 @@ const addStudent = async (req, res) => {
       classExists.name,
       classExists.level,
       year,
-      studentCount + 1,
+      classCount + 1,
     );
 
     // Create student
@@ -576,6 +734,151 @@ const getStudentByCode = async (req, res) => {
   }
 };
 
+// ==================== BULK IMPORT HELPERS ====================
+
+// ==================== PREVIEW ====================
+// POST /api/students/bulk/preview  (multipart: file)
+const bulkImportPreview = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No file uploaded" });
+    }
+
+    const { results } = await parseAndValidate(req.file.buffer, req.schoolId);
+    const validCount = results.filter((r) => r.valid).length;
+
+    return res.json({
+      success: true,
+      data: {
+        totalRows: results.length,
+        validCount,
+        errorCount: results.length - validCount,
+        rows: results,
+      },
+    });
+  } catch (err) {
+    console.error("Bulk preview error:", err);
+    return res.status(400).json({
+      success: false,
+      message: err.message || "Failed to read file",
+    });
+  }
+};
+
+// ==================== IMPORT ====================
+// POST /api/students/bulk/import  (multipart: file)
+const bulkImport = async (req, res) => {
+  try {
+    if (!req.file) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No file uploaded" });
+    }
+
+    const { classes, school, results } = await parseAndValidate(
+      req.file.buffer,
+      req.schoolId,
+    );
+
+    const invalidRows = results.filter((r) => !r.valid);
+    if (invalidRows.length > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `${invalidRows.length} row(s) have errors. Fix the sheet and try again.`,
+        data: {
+          totalRows: results.length,
+          validCount: results.length - invalidRows.length,
+          errorCount: invalidRows.length,
+          rows: results,
+        },
+      });
+    }
+
+    const created = [];
+    const failed = [];
+
+    const classCounts = {};
+    for (const cls of classes) {
+      classCounts[cls.id] = await prisma.student.count({
+        where: { schoolId: req.schoolId, classId: cls.id },
+      });
+    }
+
+    for (const r of results) {
+      try {
+        const d = r.data;
+        const classObj = classes.find((c) => c.id === d.classId);
+        classCounts[d.classId] = (classCounts[d.classId] || 0) + 1;
+        const seq = classCounts[d.classId];
+
+        const studentCode = generateStudentCode(
+          school.name,
+          classObj.name,
+          classObj.level,
+          d.academicYear,
+          seq,
+        );
+
+        const fullName = [d.firstName, d.middleName, d.lastName]
+          .filter(Boolean)
+          .join(" ");
+
+        const student = await prisma.student.create({
+          data: {
+            schoolId: req.schoolId,
+            classId: d.classId,
+            studentCode,
+            firstName: d.firstName,
+            middleName: d.middleName,
+            lastName: d.lastName,
+            fullName,
+            dateOfBirth: new Date(d.dateOfBirth),
+            gender: d.gender,
+            parentName: d.parentName,
+            parentPhone: d.parentPhone,
+            parentPhone2: d.parentPhone2,
+            parentEmail: d.parentEmail,
+            academicYear: d.academicYear,
+          },
+        });
+
+        created.push({
+          row: r.rowNumber,
+          studentCode: student.studentCode,
+          fullName: student.fullName,
+          className: classObj.name,
+        });
+      } catch (err) {
+        failed.push({ row: r.rowNumber, error: err.message });
+      }
+    }
+
+    await prisma.auditLog.create({
+      data: {
+        schoolId: req.schoolId,
+        staffId: req.staff.id,
+        action: "STUDENTS_BULK_IMPORTED",
+        entity: "Student",
+        changes: { imported: created.length, failed: failed.length },
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: `Imported ${created.length} student(s)${failed.length ? `, ${failed.length} failed` : ""}`,
+      data: { created, failed },
+    });
+  } catch (err) {
+    console.error("Bulk import error:", err);
+    return res.status(400).json({
+      success: false,
+      message: err.message || "Failed to import students",
+    });
+  }
+};
+
 module.exports = {
   addStudent,
   getStudents,
@@ -583,4 +886,6 @@ module.exports = {
   updateStudent,
   searchStudents,
   getStudentByCode,
+  bulkImportPreview,
+  bulkImport,
 };
