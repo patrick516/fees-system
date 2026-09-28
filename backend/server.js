@@ -103,6 +103,18 @@ app.use("/api/auth", authLimiter);
 app.use("/api/", readLimiter);
 
 // ============ HEALTH ============
+// ============ ROOT ============
+// Health monitors ping "/" — return 200 so logs don't fill with 404s
+app.get("/", (req, res) => {
+  res.json({
+    success: true,
+    message: "SchoolPay API",
+    status: "running",
+    docs: "/api/health for detailed status",
+  });
+});
+
+// ============ HEALTH ============
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,

@@ -21,7 +21,7 @@ Bursar login: bursar@stpeters.mw / Bursar@2025
 
 Test Students:
 
-- John Banda | ID: STP-2025-001 | DOB: 1010-03-15
+- John Banda | ID: STP-2025-001 | DOB: 2010-03-15
 - # Grace Phiri | ID: STP-2025-002 | DOB: 2009-07-22
 
 ┌──(patrics㉿kali)-[~/Desktop/INCLUDES/PROJECTS/school-fees-system/backend]
