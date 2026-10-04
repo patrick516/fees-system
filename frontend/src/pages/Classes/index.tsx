@@ -71,6 +71,16 @@ const ClassesPage = () => {
   });
   const [paymentDetailsLoading, setPaymentDetailsLoading] = useState(false);
   const [paymentDetailsSaved, setPaymentDetailsSaved] = useState(false);
+  const [isEditingPayment, setIsEditingPayment] = useState(false);
+  const [hasSavedPayment, setHasSavedPayment] = useState(false);
+  const [savedPayment, setSavedPayment] = useState<{
+    bankAccounts: any[];
+    mobileMoney: {
+      airtelMoneyNumber: string;
+      mpambaNumber: string;
+      paymentInstructions: string;
+    };
+  } | null>(null);
   const [showAddBank, setShowAddBank] = useState(false);
   const [newBank, setNewBank] = useState({
     bankName: "",
@@ -197,12 +207,23 @@ const ClassesPage = () => {
     try {
       const res = await api.get("/schools/me");
       const school = res.data.data;
-      setBankAccounts(school.bankAccounts || []);
-      setMobileMoney({
+      const banks = school.bankAccounts || [];
+      const mm = {
         airtelMoneyNumber: school.airtelMoneyNumber || "",
         mpambaNumber: school.mpambaNumber || "",
         paymentInstructions: school.paymentInstructions || "",
-      });
+      };
+      setBankAccounts(banks);
+      setMobileMoney(mm);
+      setSavedPayment({ bankAccounts: banks, mobileMoney: mm });
+
+      const hasData =
+        banks.length > 0 ||
+        !!mm.airtelMoneyNumber ||
+        !!mm.mpambaNumber ||
+        !!mm.paymentInstructions;
+      setHasSavedPayment(hasData);
+      setIsEditingPayment(!hasData);
     } catch {}
   };
 
@@ -221,6 +242,10 @@ const ClassesPage = () => {
         bankAccounts,
         ...mobileMoney,
       });
+      setSavedPayment({ bankAccounts, mobileMoney });
+      setHasSavedPayment(true);
+      setIsEditingPayment(false);
+      setShowAddBank(false);
       setPaymentDetailsSaved(true);
       setTimeout(() => setPaymentDetailsSaved(false), 3000);
     } catch (err: any) {
@@ -228,6 +253,15 @@ const ClassesPage = () => {
     } finally {
       setPaymentDetailsLoading(false);
     }
+  };
+
+  const handleCancelPaymentEdit = () => {
+    if (savedPayment) {
+      setBankAccounts(savedPayment.bankAccounts);
+      setMobileMoney(savedPayment.mobileMoney);
+    }
+    setShowAddBank(false);
+    setIsEditingPayment(false);
   };
 
   const handleAddBank = () => {
@@ -1108,262 +1142,383 @@ const ClassesPage = () => {
 
       {/* Payment Details Section */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="font-medium text-gray-800">
-            Payment Details for Parents
-          </h3>
-          <p className="text-xs text-gray-500 mt-0.5">
-            Parents will see these details on their portal so they know where to
-            pay fees
-          </p>
-        </div>
-
-        <form onSubmit={handleSavePaymentDetails} className="p-6 space-y-6">
+        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
           <div>
-            <div className="flex items-center justify-between mb-3">
-              <p className="text-sm font-semibold text-gray-700">
-                Bank Accounts
-              </p>
+            <h3 className="font-medium text-gray-800">
+              Payment Details for Parents
+            </h3>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Parents will see these details on their portal so they know where
+              to pay fees
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {paymentDetailsSaved && (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
+                <CheckCircle size={12} /> Saved
+              </span>
+            )}
+            {hasSavedPayment && !isEditingPayment && (
               <button
                 type="button"
-                onClick={() => setShowAddBank(true)}
-                className="flex items-center gap-1.5 text-sm text-blue-600 font-medium hover:text-blue-800"
+                onClick={() => setIsEditingPayment(true)}
+                className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition-colors"
               >
-                <Plus size={14} />
-                Add Bank Account
+                <Edit2 size={14} /> Edit Details
               </button>
-            </div>
+            )}
+            {hasSavedPayment && isEditingPayment && (
+              <button
+                type="button"
+                onClick={handleCancelPaymentEdit}
+                className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </div>
 
-            {showAddBank && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 space-y-3">
-                <p className="text-sm font-medium text-blue-800">
-                  Add New Bank Account
+        {isEditingPayment ? (
+          <form onSubmit={handleSavePaymentDetails} className="p-6 space-y-6">
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-sm font-semibold text-gray-700">
+                  Bank Accounts
                 </p>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      Bank Name *
-                    </label>
-                    <input
-                      value={newBank.bankName}
-                      onChange={(e) =>
-                        setNewBank({ ...newBank, bankName: e.target.value })
-                      }
-                      placeholder="eg. National Bank"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    />
+                <button
+                  type="button"
+                  onClick={() => setShowAddBank(true)}
+                  className="flex items-center gap-1.5 text-sm text-blue-600 font-medium hover:text-blue-800"
+                >
+                  <Plus size={14} />
+                  Add Bank Account
+                </button>
+              </div>
+
+              {showAddBank && (
+                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 space-y-3">
+                  <p className="text-sm font-medium text-blue-800">
+                    Add New Bank Account
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">
+                        Bank Name *
+                      </label>
+                      <input
+                        value={newBank.bankName}
+                        onChange={(e) =>
+                          setNewBank({ ...newBank, bankName: e.target.value })
+                        }
+                        placeholder="eg. National Bank"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">
+                        Account Name *
+                      </label>
+                      <input
+                        value={newBank.accountName}
+                        onChange={(e) =>
+                          setNewBank({
+                            ...newBank,
+                            accountName: e.target.value,
+                          })
+                        }
+                        placeholder="eg. St Peters Private School"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">
+                        Account Number *
+                      </label>
+                      <input
+                        value={newBank.accountNumber}
+                        onChange={(e) =>
+                          setNewBank({
+                            ...newBank,
+                            accountNumber: e.target.value,
+                          })
+                        }
+                        placeholder="eg. 1234567890"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs text-gray-600 mb-1">
+                        Branch (optional)
+                      </label>
+                      <input
+                        value={newBank.branch}
+                        onChange={(e) =>
+                          setNewBank({ ...newBank, branch: e.target.value })
+                        }
+                        placeholder="eg. Blantyre Branch"
+                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                      />
+                    </div>
                   </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      Account Name *
-                    </label>
-                    <input
-                      value={newBank.accountName}
-                      onChange={(e) =>
-                        setNewBank({ ...newBank, accountName: e.target.value })
-                      }
-                      placeholder="eg. St Peters Private School"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      Account Number *
-                    </label>
-                    <input
-                      value={newBank.accountNumber}
-                      onChange={(e) =>
+                  <div className="flex gap-2">
+                    <button
+                      type="button"
+                      onClick={handleAddBank}
+                      disabled={!newBank.bankName || !newBank.accountNumber}
+                      className="flex items-center gap-1.5 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm disabled:opacity-40 hover:bg-[var(--color-primary-dark)]"
+                    >
+                      <Plus size={14} />
+                      Add
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowAddBank(false);
                         setNewBank({
-                          ...newBank,
-                          accountNumber: e.target.value,
-                        })
-                      }
-                      placeholder="eg. 1234567890"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-gray-600 mb-1">
-                      Branch (optional)
-                    </label>
-                    <input
-                      value={newBank.branch}
-                      onChange={(e) =>
-                        setNewBank({ ...newBank, branch: e.target.value })
-                      }
-                      placeholder="eg. Blantyre Branch"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    />
+                          bankName: "",
+                          accountName: "",
+                          accountNumber: "",
+                          branch: "",
+                        });
+                      }}
+                      className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50"
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </div>
-                <div className="flex gap-2">
-                  <button
-                    type="button"
-                    onClick={handleAddBank}
-                    disabled={!newBank.bankName || !newBank.accountNumber}
-                    className="flex items-center gap-1.5 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm disabled:opacity-40 hover:bg-[var(--color-primary-dark)]"
-                  >
-                    <Plus size={14} />
-                    Add
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowAddBank(false);
-                      setNewBank({
-                        bankName: "",
-                        accountName: "",
-                        accountNumber: "",
-                        branch: "",
-                      });
-                    }}
-                    className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              </div>
-            )}
+              )}
 
-            {bankAccounts.length === 0 ? (
-              <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
-                <p className="text-sm text-gray-400">
-                  No bank accounts added yet
-                </p>
-                <p className="text-xs text-gray-300 mt-1">
-                  Click "Add Bank Account" to add one
-                </p>
-              </div>
-            ) : (
-              <div className="border border-gray-200 rounded-xl overflow-hidden">
-                <table className="w-full text-sm">
-                  <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                        Bank
-                      </th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                        Account Name
-                      </th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                        Account Number
-                      </th>
-                      <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                        Branch
-                      </th>
-                      <th className="px-4 py-3"></th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {bankAccounts.map((bank: any, index: number) => (
-                      <tr key={index} className="hover:bg-gray-50">
-                        <td className="px-4 py-3 font-medium text-gray-800">
-                          {bank.bankName}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {bank.accountName}
-                        </td>
-                        <td className="px-4 py-3 font-mono text-gray-700">
-                          {bank.accountNumber}
-                        </td>
-                        <td className="px-4 py-3 text-gray-500">
-                          {bank.branch || "—"}
-                        </td>
-                        <td className="px-4 py-3">
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteBank(index)}
-                            className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50"
-                          >
-                            <Trash2 size={14} />
-                          </button>
-                        </td>
+              {bankAccounts.length === 0 ? (
+                <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
+                  <p className="text-sm text-gray-400">
+                    No bank accounts added yet
+                  </p>
+                  <p className="text-xs text-gray-300 mt-1">
+                    Click "Add Bank Account" to add one
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                          Bank
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                          Account Name
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                          Account Number
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                          Branch
+                        </th>
+                        <th className="px-4 py-3"></th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-          </div>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {bankAccounts.map((bank: any, index: number) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-800">
+                            {bank.bankName}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            {bank.accountName}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-gray-700">
+                            {bank.accountNumber}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500">
+                            {bank.branch || "—"}
+                          </td>
+                          <td className="px-4 py-3">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteBank(index)}
+                              className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
 
-          <div>
-            <p className="text-sm font-semibold text-gray-700 mb-3">
-              Mobile Money
-            </p>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                  Airtel Money Number
-                </label>
-                <input
-                  value={mobileMoney.airtelMoneyNumber}
-                  onChange={(e) =>
-                    setMobileMoney({
-                      ...mobileMoney,
-                      airtelMoneyNumber: e.target.value,
-                    })
-                  }
-                  placeholder="eg. 0999 000 000"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                  TNM Mpamba Number
-                </label>
-                <input
-                  value={mobileMoney.mpambaNumber}
-                  onChange={(e) =>
-                    setMobileMoney({
-                      ...mobileMoney,
-                      mpambaNumber: e.target.value,
-                    })
-                  }
-                  placeholder="eg. 0888 000 000"
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                />
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">
+                Mobile Money
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                    Airtel Money Number
+                  </label>
+                  <input
+                    value={mobileMoney.airtelMoneyNumber}
+                    onChange={(e) =>
+                      setMobileMoney({
+                        ...mobileMoney,
+                        airtelMoneyNumber: e.target.value,
+                      })
+                    }
+                    placeholder="eg. 0999 000 000"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                    TNM Mpamba Number
+                  </label>
+                  <input
+                    value={mobileMoney.mpambaNumber}
+                    onChange={(e) =>
+                      setMobileMoney({
+                        ...mobileMoney,
+                        mpambaNumber: e.target.value,
+                      })
+                    }
+                    placeholder="eg. 0888 000 000"
+                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
               </div>
             </div>
-          </div>
 
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-              Payment Instructions
-            </label>
-            <textarea
-              value={mobileMoney.paymentInstructions}
-              onChange={(e) =>
-                setMobileMoney({
-                  ...mobileMoney,
-                  paymentInstructions: e.target.value,
-                })
-              }
-              placeholder="eg. Use your child's Student ID as the payment reference. Send screenshot to school office after payment."
-              rows={3}
-              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
-            />
-          </div>
-
-          {paymentDetailsSaved && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
-              Payment details saved successfully
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
+                Payment Instructions
+              </label>
+              <textarea
+                value={mobileMoney.paymentInstructions}
+                onChange={(e) =>
+                  setMobileMoney({
+                    ...mobileMoney,
+                    paymentInstructions: e.target.value,
+                  })
+                }
+                placeholder="eg. Use your child's Student ID as the payment reference. Send screenshot to school office after payment."
+                rows={3}
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
+              />
             </div>
-          )}
 
-          <button
-            type="submit"
-            disabled={paymentDetailsLoading}
-            className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
-          >
-            {paymentDetailsLoading ? (
-              <>
-                <Loader2 size={14} className="animate-spin" /> Saving...
-              </>
-            ) : (
-              "Save Payment Details"
-            )}
-          </button>
-        </form>
+            <div className="flex items-center gap-3">
+              <button
+                type="submit"
+                disabled={paymentDetailsLoading}
+                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
+              >
+                {paymentDetailsLoading ? (
+                  <>
+                    <Loader2 size={14} className="animate-spin" /> Saving...
+                  </>
+                ) : (
+                  "Save Payment Details"
+                )}
+              </button>
+              {hasSavedPayment && (
+                <button
+                  type="button"
+                  onClick={handleCancelPaymentEdit}
+                  disabled={paymentDetailsLoading}
+                  className="px-6 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-40"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          </form>
+        ) : (
+          <div className="p-6 space-y-6">
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">
+                Bank Accounts
+              </p>
+              {bankAccounts.length === 0 ? (
+                <p className="text-sm text-gray-400">No bank accounts added</p>
+              ) : (
+                <div className="border border-gray-200 rounded-xl overflow-hidden">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-50 border-b border-gray-200">
+                      <tr>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                          Bank
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                          Account Name
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                          Account Number
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                          Branch
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {bankAccounts.map((bank: any, index: number) => (
+                        <tr key={index}>
+                          <td className="px-4 py-3 font-medium text-gray-800">
+                            {bank.bankName}
+                          </td>
+                          <td className="px-4 py-3 text-gray-600">
+                            {bank.accountName}
+                          </td>
+                          <td className="px-4 py-3 font-mono text-gray-700">
+                            {bank.accountNumber}
+                          </td>
+                          <td className="px-4 py-3 text-gray-500">
+                            {bank.branch || "—"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-3">
+                Mobile Money
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">
+                    Airtel Money Number
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {mobileMoney.airtelMoneyNumber || "—"}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-1">
+                    TNM Mpamba Number
+                  </p>
+                  <p className="text-sm text-gray-800">
+                    {mobileMoney.mpambaNumber || "—"}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-gray-700 mb-1.5">
+                Payment Instructions
+              </p>
+              <p className="text-sm text-gray-700 whitespace-pre-wrap">
+                {mobileMoney.paymentInstructions || "—"}
+              </p>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ==================== CONFIRM ACTIVATION MODAL ==================== */}
@@ -1379,7 +1534,10 @@ const ClassesPage = () => {
             <div className="flex items-start justify-between mb-4">
               <div className="flex items-start gap-3">
                 <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
-                  <AlertCircle size={20} className="text-[var(--color-primary-dark)]" />
+                  <AlertCircle
+                    size={20}
+                    className="text-[var(--color-primary-dark)]"
+                  />
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-gray-800">
