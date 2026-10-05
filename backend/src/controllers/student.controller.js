@@ -371,9 +371,9 @@ const getStudents = async (req, res) => {
         where,
         include: {
           class: {
-            select: { id: true, name: true },
-            // Include fee structure for the active term to calculate correct balance
-            include: {
+            select: {
+              id: true,
+              name: true,
               feeStructures: {
                 where: {
                   isActive: true,
