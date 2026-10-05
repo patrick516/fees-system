@@ -7,7 +7,6 @@ const {
 
 const XLSX = require("xlsx");
 
-// Normalize a phone number to +265XXXXXXXXX
 const normalizePhone = (raw) => {
   if (!raw) return null;
   const digits = String(raw).replace(/\D/g, "");
@@ -326,6 +325,8 @@ const addStudent = async (req, res) => {
 };
 
 // ==================== GET ALL STUDENTS ====================
+
+// ==================== GET ALL STUDENTS ====================
 // GET /api/students
 const getStudents = async (req, res) => {
   try {
@@ -343,9 +344,17 @@ const getStudents = async (req, res) => {
     } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
 
+    // 1. Resolve the school's active term and academic year
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: { activeTerm: true, activeAcademicYear: true },
+    });
+
+    const activeYear = academicYear || school?.activeAcademicYear;
+    const activeTerm = school?.activeTerm;
+
     const where = { schoolId: req.schoolId };
     if (classId) where.classId = classId;
-    if (academicYear) where.academicYear = academicYear;
     if (isActive !== undefined) where.isActive = isActive === "true";
 
     if (search) {
@@ -361,18 +370,30 @@ const getStudents = async (req, res) => {
       prisma.student.findMany({
         where,
         include: {
-          class: { select: { id: true, name: true } },
-          payments: {
-            where: { status: "VERIFIED" },
-            select: {
-              amount: true,
-              term: true,
-              academicYear: true,
-              isDebtor: true,
-              balance: true,
-              requiredAmount: true,
+          class: {
+            select: { id: true, name: true },
+            // Include fee structure for the active term to calculate correct balance
+            include: {
+              feeStructures: {
+                where: {
+                  isActive: true,
+                  ...(activeTerm && activeYear
+                    ? { term: activeTerm, academicYear: activeYear }
+                    : {}),
+                },
+                take: 1,
+              },
             },
-            orderBy: { createdAt: "desc" },
+          },
+          payments: {
+            where: {
+              status: "VERIFIED",
+              // Only fetch payments for the active term
+              ...(activeTerm && activeYear
+                ? { term: activeTerm, academicYear: activeYear }
+                : {}),
+            },
+            select: { amount: true },
           },
         },
         orderBy: { fullName: "asc" },
@@ -383,44 +404,47 @@ const getStudents = async (req, res) => {
     ]);
 
     const studentsWithSummary = students.map((student) => {
-      const verifiedPayments = student.payments;
-      const totalPaid = verifiedPayments.reduce((sum, p) => sum + p.amount, 0);
+      // 2. Sum the actual payments made this term
+      const totalPaid = student.payments.reduce((sum, p) => sum + p.amount, 0);
 
-      // Student is debtor if their latest payment for any term shows isDebtor=true
-      const isDebtorStudent = verifiedPayments.some((p) => p.isDebtor);
+      // 3. Get the required fee for the active term
+      const requiredAmount = student.class.feeStructures[0]?.totalAmount || 0;
 
-      // Total outstanding balance across all terms
-      const totalBalance = verifiedPayments
-        .filter((p) => p.isDebtor && p.balance)
-        .reduce((sum, p) => sum + (p.balance || 0), 0);
+      // 4. Correctly calculate the outstanding balance
+      let outstandingBalance = 0;
+      let isDebtorStudent = false;
+
+      if (requiredAmount > 0) {
+        outstandingBalance = Math.max(0, requiredAmount - totalPaid);
+        isDebtorStudent = outstandingBalance > 0;
+      }
 
       return {
         ...student,
         totalPaid,
         isDebtor: isDebtorStudent,
-        outstandingBalance: totalBalance,
+        outstandingBalance,
         creditBalance: student.creditBalance || 0,
-        payments: undefined,
+        payments: undefined, // Clean up raw payments from response
+        class: {
+          id: student.class.id,
+          name: student.class.name,
+        },
       };
     });
 
-    // If filtering by debtor status
     // Apply status filters in memory after fetching
     let filteredStudents = studentsWithSummary;
 
     if (isDebtor === "true") {
-      // Students with balances
       filteredStudents = studentsWithSummary.filter((s) => s.isDebtor);
     } else if (isPaidFull === "true") {
-      // Students who finished paying
       filteredStudents = studentsWithSummary.filter(
         (s) => !s.isDebtor && s.totalPaid > 0 && s.outstandingBalance === 0,
       );
     } else if (noPayment === "true") {
-      // Students who never paid anything
       filteredStudents = studentsWithSummary.filter((s) => s.totalPaid === 0);
     } else if (hasCredit === "true") {
-      // Students with extra money/credit
       filteredStudents = studentsWithSummary.filter(
         (s) => (s.creditBalance || 0) > 0,
       );
@@ -443,9 +467,8 @@ const getStudents = async (req, res) => {
       .json({ success: false, message: "Failed to get students" });
   }
 };
-
 // ==================== GET SINGLE STUDENT ====================
-// GET /api/students/:id
+
 const getStudent = async (req, res) => {
   try {
     const { id } = req.params;
