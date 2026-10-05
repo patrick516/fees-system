@@ -468,11 +468,12 @@ const getStudents = async (req, res) => {
   }
 };
 // ==================== GET SINGLE STUDENT ====================
-
+// GET /api/students/:id
 const getStudent = async (req, res) => {
   try {
     const { id } = req.params;
 
+    // 1. Fetch the student and their payments
     const student = await prisma.student.findFirst({
       where: { id, schoolId: req.schoolId },
       include: {
@@ -494,19 +495,54 @@ const getStudent = async (req, res) => {
         .json({ success: false, message: "Student not found" });
     }
 
+    // 2. Resolve the school's active term and academic year
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: { activeTerm: true, activeAcademicYear: true },
+    });
+
+    const activeYear = school?.activeAcademicYear;
+    const activeTerm = school?.activeTerm;
+
     const verifiedPayments = student.payments.filter(
       (p) => p.status === "VERIFIED",
     );
-    const totalPaid = verifiedPayments.reduce((sum, p) => sum + p.amount, 0);
     const pendingPayments = student.payments.filter(
       (p) => p.status === "PENDING",
     );
-    const isDebtor = verifiedPayments.some((p) => p.isDebtor);
-    const outstandingBalance = verifiedPayments
-      .filter((p) => p.isDebtor && p.balance)
-      .reduce((sum, p) => sum + (p.balance || 0), 0);
 
-    // Get fee structures for this student's class
+    // 3. Filter payments to only the active term
+    const activeTermPayments = verifiedPayments.filter(
+      (p) => p.term === activeTerm && p.academicYear === activeYear,
+    );
+
+    const totalPaid = activeTermPayments.reduce((sum, p) => sum + p.amount, 0);
+
+    // 4. Get the required amount for the active term
+    let requiredAmount = 0;
+    if (activeTerm && activeYear) {
+      const feeStructure = await prisma.feeStructure.findFirst({
+        where: {
+          schoolId: req.schoolId,
+          classId: student.classId,
+          term: activeTerm,
+          academicYear: activeYear,
+          isActive: true,
+        },
+      });
+      requiredAmount = feeStructure?.totalAmount || 0;
+    }
+
+    // 5. Calculate the correct outstanding balance
+    let outstandingBalance = 0;
+    let isDebtor = false;
+
+    if (requiredAmount > 0) {
+      outstandingBalance = Math.max(0, requiredAmount - totalPaid);
+      isDebtor = outstandingBalance > 0;
+    }
+
+    // Get all fee structures for this student's class (to display in the UI)
     const feeStructures = await prisma.feeStructure.findMany({
       where: {
         schoolId: req.schoolId,
@@ -538,10 +574,6 @@ const getStudent = async (req, res) => {
   }
 };
 
-// ==================== UPDATE STUDENT ====================
-// PUT /api/students/:id
-// ==================== UPDATE STUDENT ====================
-// PUT /api/students/:id
 const updateStudent = async (req, res) => {
   try {
     const { id } = req.params;
