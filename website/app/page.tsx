@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   School,
@@ -41,8 +41,45 @@ export default function LoginPage() {
 
   // Student ID login
   const [studentCode, setStudentCode] = useState("");
-  const [dateOfBirth, setDateOfBirth] = useState<Date | undefined>(undefined);
-  const [dobOpen, setDobOpen] = useState(false);
+  const [dobDay, setDobDay] = useState("");
+  const [dobMonth, setDobMonth] = useState("");
+  const [dobYear, setDobYear] = useState("");
+  const dayRef = useRef<HTMLInputElement>(null);
+  const monthRef = useRef<HTMLInputElement>(null);
+  const yearRef = useRef<HTMLInputElement>(null);
+
+  const onlyDigits = (v: string) => v.replace(/\D/g, "");
+
+  const handleDobDay = (raw: string) => {
+    let v = onlyDigits(raw).slice(0, 2);
+    if (v.length === 1 && Number(v) > 3) v = "0" + v; // 4-9 becomes 04-09
+    if (v.length === 2 && Number(v) > 31) v = "31";
+    if (v === "00") v = "01";
+    setDobDay(v);
+    if (v.length === 2) monthRef.current?.focus();
+  };
+
+  const handleDobMonth = (raw: string) => {
+    let v = onlyDigits(raw).slice(0, 2);
+    if (v.length === 1 && Number(v) > 1) v = "0" + v; // 2-9 becomes 02-09
+    if (v.length === 2 && Number(v) > 12) v = "12";
+    if (v === "00") v = "01";
+    setDobMonth(v);
+    if (v.length === 2) yearRef.current?.focus();
+  };
+
+  const handleDobYear = (raw: string) => {
+    setDobYear(onlyDigits(raw).slice(0, 4));
+  };
+
+  // Backspace on an empty box goes back to the previous box
+  const dobBackspace = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    current: string,
+    prev?: React.RefObject<HTMLInputElement | null>,
+  ) => {
+    if (e.key === "Backspace" && current === "") prev?.current?.focus();
+  };
 
   // Phone OTP login
   const [phone, setPhone] = useState("");
@@ -101,8 +138,22 @@ export default function LoginPage() {
     e.preventDefault();
     setError("");
 
-    if (!dateOfBirth) {
-      setError("Please select your child's date of birth");
+    const d = Number(dobDay);
+    const m = Number(dobMonth);
+    const y = Number(dobYear);
+    const dobDate = new Date(y, m - 1, d);
+    const dobValid =
+      dobDay.length === 2 &&
+      dobMonth.length === 2 &&
+      dobYear.length === 4 &&
+      y >= 1950 &&
+      dobDate.getFullYear() === y &&
+      dobDate.getMonth() === m - 1 &&
+      dobDate.getDate() === d &&
+      dobDate <= new Date();
+
+    if (!dobValid) {
+      setError("Please enter a valid date of birth (DD-MM-YYYY)");
       return;
     }
 
@@ -110,7 +161,7 @@ export default function LoginPage() {
     try {
       const res = await api.post("/auth/parent/login-student-id", {
         studentCode: studentCode.toUpperCase().trim(),
-        dateOfBirth: format(dateOfBirth, "yyyy-MM-dd"),
+        dateOfBirth: `${dobYear}-${dobMonth}-${dobDay}`,
       });
       const { token, student } = res.data.data;
       login(token, student);
@@ -275,46 +326,45 @@ export default function LoginPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Child&apos;s Date of Birth
               </label>
-              <Popover open={dobOpen} onOpenChange={setDobOpen}>
-                <PopoverTrigger asChild>
-                  <button
-                    type="button"
-                    className="w-full flex items-center justify-between px-4 py-3 border border-gray-300 rounded-xl text-sm text-left outline-none transition-all duration-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-                  >
-                    <span
-                      className={
-                        dateOfBirth ? "text-gray-900" : "text-gray-400"
-                      }
-                    >
-                      {dateOfBirth
-                        ? format(dateOfBirth, "dd/MM/yyyy")
-                        : "dd/mm/yyyy"}
-                    </span>
-                    <CalendarIcon size={16} className="text-gray-400" />
-                  </button>
-                </PopoverTrigger>
-                <PopoverContent
-                  className="w-[300px] p-0 bg-white border border-gray-200 rounded-xl shadow-lg"
-                  align="start"
-                >
-                  <Calendar
-                    mode="single"
-                    selected={dateOfBirth}
-                    onSelect={(d) => {
-                      setDateOfBirth(d);
-                      setDobOpen(false);
-                    }}
-                    disabled={(d) =>
-                      d > new Date() || d < new Date("1950-01-01")
-                    }
-                    captionLayout="dropdown"
-                    startMonth={new Date(1950, 0)}
-                    endMonth={new Date(new Date().getFullYear(), 11)}
-                    defaultMonth={dateOfBirth || new Date(2015, 0, 1)}
-                    autoFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              <div className="w-full flex items-center px-4 py-3 border border-gray-300 rounded-xl text-sm transition-all duration-300 focus-within:ring-2 focus-within:ring-[var(--color-primary)] focus-within:border-transparent">
+                <input
+                  ref={dayRef}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="DD"
+                  value={dobDay}
+                  onChange={(e) => handleDobDay(e.target.value)}
+                  maxLength={2}
+                  autoComplete="off"
+                  className="w-8 text-center bg-transparent outline-none text-gray-900 placeholder-gray-400"
+                />
+                <span className="text-gray-400 mx-1">-</span>
+                <input
+                  ref={monthRef}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="MM"
+                  value={dobMonth}
+                  onChange={(e) => handleDobMonth(e.target.value)}
+                  onKeyDown={(e) => dobBackspace(e, dobMonth, dayRef)}
+                  maxLength={2}
+                  autoComplete="off"
+                  className="w-8 text-center bg-transparent outline-none text-gray-900 placeholder-gray-400"
+                />
+                <span className="text-gray-400 mx-1">-</span>
+                <input
+                  ref={yearRef}
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="YYYY"
+                  value={dobYear}
+                  onChange={(e) => handleDobYear(e.target.value)}
+                  onKeyDown={(e) => dobBackspace(e, dobYear, monthRef)}
+                  maxLength={4}
+                  autoComplete="off"
+                  className="w-12 text-center bg-transparent outline-none text-gray-900 placeholder-gray-400"
+                />
+              </div>
             </div>
 
             <button
