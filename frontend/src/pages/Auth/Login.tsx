@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import api from "../../lib/axios";
 import { School, Eye, EyeOff, Loader2 } from "lucide-react";
@@ -44,8 +44,10 @@ const Login = () => {
 
     try {
       const res = await api.post("/auth/staff/login", form);
-      const { token, staff } = res.data.data;
-      login(token, staff);
+      const { token, staff, mustChangePassword } = res.data.data;
+
+      // NEW: persist token + staff + forced-change flag
+      login(token, staff, !!mustChangePassword);
 
       if (staff.school) {
         localStorage.setItem(
@@ -57,11 +59,23 @@ const Login = () => {
           }),
         );
       }
-      navigate("/dashboard");
+
+      // NEW: route based on mustChangePassword
+      if (mustChangePassword) {
+        navigate("/force-change-password");
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err: any) {
-      setError(
-        err.response?.data?.message || "Login failed. Please try again.",
-      );
+      const data = err.response?.data;
+
+      // NEW: unverified email → send them to the OTP page
+      if (data?.code === "EMAIL_NOT_VERIFIED") {
+        navigate(`/verify-email?email=${encodeURIComponent(form.email)}`);
+        return;
+      }
+
+      setError(data?.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -108,13 +122,13 @@ const Login = () => {
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Username
+                Email
               </label>
               <input
                 type="email"
                 value={form.email}
                 onChange={(e) => setForm({ ...form, email: e.target.value })}
-                placeholder="stAndrews"
+                placeholder="you@yourschool.mw"
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all duration-300"
               />
@@ -133,7 +147,7 @@ const Login = () => {
                   }
                   placeholder="••••••••"
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[#0B1F44] focus:border-transparent transition-all duration-300 pr-12"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all duration-300 pr-12"
                 />
                 <button
                   type="button"
@@ -155,6 +169,17 @@ const Login = () => {
               {loading ? "Signing in..." : "Sign in"}
             </button>
           </form>
+
+          {/* NEW: Signup link */}
+          <p className="text-xs text-gray-500 text-center mt-6">
+            Don&apos;t have an account?{" "}
+            <Link
+              to="/signup"
+              className="text-[var(--color-primary)] font-medium hover:underline"
+            >
+              Create one
+            </Link>
+          </p>
         </div>
 
         {/* Divider */}
