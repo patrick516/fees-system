@@ -219,8 +219,8 @@ async function main() {
   console.log(" Fee structures ready — Form 1–4 • Term 1 • 2026-2027");
 
   // ============ STUDENTS ============
-  // 20 students across 4 classes. Codes: SPP-F{level}-2026-{001..020}
-  // Special case: Mr Chingwalu (+265882781930) is guardian for TWO students
+  // 20 students across 4 classes. Codes use per-class sequences: 001–005 per class.
+  // Special case: Mr Chingwalu (+265998333060) is guardian for TWO students
   // (Roosevelt Chisomo in Form 1, Thokozani Phiri in Form 3).
   const studentsData = [
     // ===== Form 1 (LETTER) =====
@@ -284,7 +284,7 @@ async function main() {
 
     // ===== Form 2 (LETTER) =====
     {
-      code: "SPP-F2-2026-006",
+      code: "SPP-F2-2026-001",
       classId: classes[1].id,
       firstName: "Chisomo",
       middleName: null,
@@ -295,7 +295,7 @@ async function main() {
       parentPhone: "+265899110469",
     },
     {
-      code: "SPP-F2-2026-007",
+      code: "SPP-F2-2026-002",
       classId: classes[1].id,
       firstName: "Innocent",
       middleName: "K",
@@ -306,7 +306,7 @@ async function main() {
       parentPhone: "+265991112305",
     },
     {
-      code: "SPP-F2-2026-008",
+      code: "SPP-F2-2026-003",
       classId: classes[1].id,
       firstName: "Ruth",
       middleName: null,
@@ -317,7 +317,7 @@ async function main() {
       parentPhone: "+265991112306",
     },
     {
-      code: "SPP-F2-2026-009",
+      code: "SPP-F2-2026-004",
       classId: classes[1].id,
       firstName: "Patrick",
       middleName: null,
@@ -328,7 +328,7 @@ async function main() {
       parentPhone: "+265991112307",
     },
     {
-      code: "SPP-F2-2026-010",
+      code: "SPP-F2-2026-005",
       classId: classes[1].id,
       firstName: "Memory",
       middleName: "T",
@@ -341,7 +341,7 @@ async function main() {
 
     // ===== Form 3 (POINTS) =====
     {
-      code: "SPP-F3-2026-011",
+      code: "SPP-F3-2026-001",
       classId: classes[2].id,
       firstName: "John",
       middleName: null,
@@ -352,7 +352,7 @@ async function main() {
       parentPhone: "+265995049331",
     },
     {
-      code: "SPP-F3-2026-012",
+      code: "SPP-F3-2026-002",
       classId: classes[2].id,
       firstName: "Wisdom",
       middleName: null,
@@ -363,7 +363,7 @@ async function main() {
       parentPhone: "+265991112309",
     },
     {
-      code: "SPP-F3-2026-013",
+      code: "SPP-F3-2026-003",
       classId: classes[2].id,
       firstName: "Joyce",
       middleName: null,
@@ -375,7 +375,7 @@ async function main() {
     },
     {
       // Second child of Mr Chingwalu — shares the same parent phone as Roosevelt
-      code: "SPP-F3-2026-014",
+      code: "SPP-F3-2026-004",
       classId: classes[2].id,
       firstName: "Thokozani",
       middleName: null,
@@ -386,7 +386,7 @@ async function main() {
       parentPhone: "+265998333060",
     },
     {
-      code: "SPP-F3-2026-015",
+      code: "SPP-F3-2026-005",
       classId: classes[2].id,
       firstName: "Blessings",
       middleName: null,
@@ -399,7 +399,7 @@ async function main() {
 
     // ===== Form 4 (POINTS) =====
     {
-      code: "SPP-F4-2026-016",
+      code: "SPP-F4-2026-001",
       classId: classes[3].id,
       firstName: "Grace",
       middleName: "Mary",
@@ -410,7 +410,7 @@ async function main() {
       parentPhone: "+265882781930",
     },
     {
-      code: "SPP-F4-2026-017",
+      code: "SPP-F4-2026-002",
       classId: classes[3].id,
       firstName: "Mphatso",
       middleName: null,
@@ -421,7 +421,7 @@ async function main() {
       parentPhone: "+265991112312",
     },
     {
-      code: "SPP-F4-2026-018",
+      code: "SPP-F4-2026-003",
       classId: classes[3].id,
       firstName: "Chimwemwe",
       middleName: null,
@@ -432,7 +432,7 @@ async function main() {
       parentPhone: "+265991112313",
     },
     {
-      code: "SPP-F4-2026-019",
+      code: "SPP-F4-2026-004",
       classId: classes[3].id,
       firstName: "Tiyamike",
       middleName: null,
@@ -443,7 +443,7 @@ async function main() {
       parentPhone: "+265991112314",
     },
     {
-      code: "SPP-F4-2026-020",
+      code: "SPP-F4-2026-005",
       classId: classes[3].id,
       firstName: "Yankho",
       middleName: null,
@@ -511,9 +511,6 @@ async function main() {
   console.log(" Term activation recorded");
 
   // ============ TEST PAYMENTS ============
-  // Payment distribution per class:
-  //   Some paid in full, some partial (debtor), some nothing at all.
-  // Roosevelt overpaid → 3.5M credit for next term.
   const paymentsData = [
     // ===== Form 1 (fee: 2,500,000) =====
     {
@@ -570,95 +567,95 @@ async function main() {
     // ===== Form 2 (fee: 2,200,000) =====
     {
       receipt: "RCP-2026-2027-00008",
-      code: "SPP-F2-2026-007",
+      code: "SPP-F2-2026-002",
       amount: 800000,
       method: "AIRTEL_MONEY",
       notes: "Partial payment",
     },
     {
       receipt: "RCP-2026-2027-00009",
-      code: "SPP-F2-2026-008",
+      code: "SPP-F2-2026-003",
       amount: 2200000,
       method: "CASH",
       notes: "Full term payment",
     },
     {
       receipt: "RCP-2026-2027-00010",
-      code: "SPP-F2-2026-009",
+      code: "SPP-F2-2026-004",
       amount: 500000,
       method: "AIRTEL_MONEY",
       notes: "Partial payment",
     },
     {
       receipt: "RCP-2026-2027-00011",
-      code: "SPP-F2-2026-010",
+      code: "SPP-F2-2026-005",
       amount: 1500000,
       method: "CASH",
       notes: "Partial payment",
     },
-    // Chisomo Mvula (006) has no payment → full debtor
+    // Chisomo Mvula (001) has no payment → full debtor
 
     // ===== Form 3 (fee: 2,800,000) =====
     {
       receipt: "RCP-2026-2027-00012",
-      code: "SPP-F3-2026-012",
+      code: "SPP-F3-2026-002",
       amount: 2800000,
       method: "CASH",
       notes: "Full term payment",
     },
     {
       receipt: "RCP-2026-2027-00013",
-      code: "SPP-F3-2026-013",
+      code: "SPP-F3-2026-003",
       amount: 2800000,
       method: "CASH",
       notes: "Full term payment",
     },
     {
       receipt: "RCP-2026-2027-00014",
-      code: "SPP-F3-2026-014",
+      code: "SPP-F3-2026-004",
       amount: 1000000,
       method: "AIRTEL_MONEY",
       notes: "Partial payment",
     },
     {
       receipt: "RCP-2026-2027-00015",
-      code: "SPP-F3-2026-015",
+      code: "SPP-F3-2026-005",
       amount: 500000,
       method: "CASH",
       notes: "Partial payment",
     },
-    // John Banda (011) has no payment → full debtor
+    // John Banda (001) has no payment → full debtor
 
     // ===== Form 4 (fee: 450,000) =====
     {
       receipt: "RCP-2026-2027-00016",
-      code: "SPP-F4-2026-016",
+      code: "SPP-F4-2026-001",
       amount: 100000,
       method: "CASH",
       notes: "Partial payment",
     },
     {
       receipt: "RCP-2026-2027-00017",
-      code: "SPP-F4-2026-017",
+      code: "SPP-F4-2026-002",
       amount: 450000,
       method: "CASH",
       notes: "Full term payment",
     },
     {
       receipt: "RCP-2026-2027-00018",
-      code: "SPP-F4-2026-018",
+      code: "SPP-F4-2026-003",
       amount: 200000,
       method: "AIRTEL_MONEY",
       notes: "Partial payment",
     },
     {
       receipt: "RCP-2026-2027-00019",
-      code: "SPP-F4-2026-020",
+      code: "SPP-F4-2026-005",
       amount: 450000,
       method: "CASH",
       notes: "Full term payment",
     },
-    // Tiyamike Gondwe (019) has no payment → full debtor
+    // Tiyamike Gondwe (004) has no payment → full debtor
   ];
 
   // Fee per class (looked up by classId) — used for requiredAmount on each payment
@@ -719,7 +716,7 @@ async function main() {
    - Admin   admin@stpeters.mw   / Admin@2025
    - Bursar  bursar@stpeters.mw  / Bursar@2025
 
-  Students: 20 (5 per class)
+  Students: 20 (5 per class, per-class sequences)
    Form 1 (2,500,000 each):
     - Roosevelt Chisomo     SPP-F1-2026-001  Paid 6,000,000  → 3.5M credit
     - Emmanuel Kachale      SPP-F1-2026-002  Paid 0          → owing
@@ -728,30 +725,30 @@ async function main() {
     - Faith Msukwa          SPP-F1-2026-005  Paid 500,000    → owing
 
    Form 2 (2,200,000 each):
-    - Chisomo Mvula         SPP-F2-2026-006  Paid 0          → owing
-    - Innocent Chimwendo    SPP-F2-2026-007  Paid 800,000    → owing
-    - Ruth Kalua            SPP-F2-2026-008  Paid 2,200,000  → paid
-    - Patrick Nyasulu       SPP-F2-2026-009  Paid 500,000    → owing
-    - Memory Chizuma        SPP-F2-2026-010  Paid 1,500,000  → owing
+    - Chisomo Mvula         SPP-F2-2026-001  Paid 0          → owing
+    - Innocent Chimwendo    SPP-F2-2026-002  Paid 800,000    → owing
+    - Ruth Kalua            SPP-F2-2026-003  Paid 2,200,000  → paid
+    - Patrick Nyasulu       SPP-F2-2026-004  Paid 500,000    → owing
+    - Memory Chizuma        SPP-F2-2026-005  Paid 1,500,000  → owing
 
    Form 3 (2,800,000 each):
-    - John Banda            SPP-F3-2026-011  Paid 0          → owing
-    - Wisdom Nkhata         SPP-F3-2026-012  Paid 2,800,000  → paid
-    - Joyce Manda           SPP-F3-2026-013  Paid 2,800,000  → paid
-    - Thokozani Phiri       SPP-F3-2026-014  Paid 1,000,000  → owing
-    - Blessings Tembo       SPP-F3-2026-015  Paid 500,000    → owing
+    - John Banda            SPP-F3-2026-001  Paid 0          → owing
+    - Wisdom Nkhata         SPP-F3-2026-002  Paid 2,800,000  → paid
+    - Joyce Manda           SPP-F3-2026-003  Paid 2,800,000  → paid
+    - Thokozani Phiri       SPP-F3-2026-004  Paid 1,000,000  → owing
+    - Blessings Tembo       SPP-F3-2026-005  Paid 500,000    → owing
 
    Form 4 (450,000 each):
-    - Grace Mary Phiri      SPP-F4-2026-016  Paid 100,000    → owing
-    - Mphatso Banda         SPP-F4-2026-017  Paid 450,000    → paid
-    - Chimwemwe Mkandawire  SPP-F4-2026-018  Paid 200,000    → owing
-    - Tiyamike Gondwe       SPP-F4-2026-019  Paid 0          → owing
-    - Yankho Chirambo       SPP-F4-2026-020  Paid 450,000    → paid
+    - Grace Mary Phiri      SPP-F4-2026-001  Paid 100,000    → owing
+    - Mphatso Banda         SPP-F4-2026-002  Paid 450,000    → paid
+    - Chimwemwe Mkandawire  SPP-F4-2026-003  Paid 200,000    → owing
+    - Tiyamike Gondwe       SPP-F4-2026-004  Paid 0          → owing
+    - Yankho Chirambo       SPP-F4-2026-005  Paid 450,000    → paid
 
   Shared guardians:
-   - Mr Chingwalu (+265882781930) → Roosevelt (Form 1) + Thokozani (Form 3)
+   - Mr Chingwalu (+265998333060) → Roosevelt (Form 1) + Thokozani (Form 3)
    - +265995049331 (secondary) → Roosevelt (Form 1) + John (Form 3)
-   - +265882781930 also on Grace Phiri (Form 4)
+   - +265882781930 → Grace Phiri (Form 4)
 
   Fee structures: Form 1–4 • Term 1 • 2026-2027
   Term history: 1 record (Term 1)

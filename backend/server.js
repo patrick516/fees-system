@@ -47,14 +47,6 @@ app.use(
   }),
 );
 
-// ============ RATE LIMITING ============
-// Three tiers:
-//   1. OTP — very strict (3/min in prod)
-//   2. Auth (login, refresh) — strict (20/15min in prod)
-//   3. Everything else (reads, writes) — generous (1500/15min in prod)
-//
-// In development, all tiers are effectively disabled so you can test freely.
-
 const isProd = process.env.NODE_ENV === "production";
 
 // Strict OTP limiter
@@ -83,8 +75,7 @@ const authLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Generous limiter for everything else — reads, writes, uploads, etc.
-// The admin dashboard alone fires ~5 requests per load + ~1 every 30s for the bell.
+// Generous limiter for everything else
 const readLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isProd ? 1500 : 20000,
@@ -99,11 +90,13 @@ const readLimiter = rateLimit({
 
 // Apply the strictest first (Express matches in order)
 app.use("/api/auth/parent/request-otp", otpLimiter);
+app.use("/api/auth/register", authLimiter); // NEW: protect signup
+app.use("/api/auth/verify-email", otpLimiter); // NEW: protect OTP verify
+app.use("/api/auth/resend-otp", otpLimiter); // NEW: protect OTP resend
+app.use("/api/auth/accept-invitation", authLimiter); // NEW
 app.use("/api/auth", authLimiter);
 app.use("/api/", readLimiter);
 
-// ============ HEALTH ============
-// ============ ROOT ============
 // Health monitors ping "/" — return 200 so logs don't fill with 404s
 app.get("/", (req, res) => {
   res.json({
@@ -132,6 +125,8 @@ const schoolRoutes = require("./src/routes/school.routes");
 const smsRoutes = require("./src/routes/sms.routes");
 const reportRoutes = require("./src/routes/report.routes");
 const examRoutes = require("./src/routes/exam.routes");
+const staffRoutes = require("./src/routes/staff.routes"); // NEW
+const departmentRoutes = require("./src/routes/department.routes"); // NEW
 
 app.use("/api/auth", authRoutes);
 app.use("/api/students", studentRoutes);
@@ -140,6 +135,8 @@ app.use("/api/schools", schoolRoutes);
 app.use("/api/sms", smsRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/exams", examRoutes);
+app.use("/api/staff", staffRoutes); // NEW
+app.use("/api/departments", departmentRoutes); // NEW
 
 // ============ 404 ============
 app.use((req, res) => {

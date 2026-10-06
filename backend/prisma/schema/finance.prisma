@@ -1,0 +1,120 @@
+enum PaymentMethod {
+  CASH
+  AIRTEL_MONEY
+  TNM_MPAMBA
+  NATIONAL_BANK
+  STANDARD_BANK
+  FDH_BANK
+  NBS_BANK
+  OTHER_BANK
+}
+
+enum PaymentStatus {
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+enum SubmittedBy {
+  BURSAR
+  PARENT
+}
+
+model FeeStructure {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId  String
+  class    Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+
+  academicYear String
+  term         Term
+  totalAmount  Float
+  currency     String @default("MWK")
+
+  tuitionFee           Float?
+  examFee              Float?
+  buildingLevy         Float?
+  uniformFee           Float?
+  bookFee              Float?
+  otherFees            Float?
+  otherFeesDescription String?
+
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([schoolId, classId, academicYear, term])
+  @@map("fee_structures")
+}
+
+model FeePayment {
+  id        String  @id @default(uuid())
+  schoolId  String
+  school    School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  amount        Float
+  currency      String        @default("MWK")
+  paymentMethod PaymentMethod
+  term          Term
+  academicYear  String
+
+  receiptNumber String  @unique
+  receiptImage  String?
+  notes         String?
+
+  submittedBy SubmittedBy
+  status      PaymentStatus @default(PENDING)
+
+  parentPhone   String?
+  bankReference String?
+
+  recordedById    String?
+  recordedBy      Staff?    @relation("RecordedBy", fields: [recordedById], references: [id], onDelete: SetNull)
+  verifiedById    String?
+  verifiedBy      Staff?    @relation("VerifiedBy", fields: [verifiedById], references: [id], onDelete: SetNull)
+  verifiedAt      DateTime?
+  rejectionReason String?
+
+  requiredAmount Float?
+  balance        Float?
+  isDebtor       Boolean @default(false)
+  creditApplied  Float   @default(0)
+  overpayment    Float   @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  smsLogs SmsLog[]
+
+  @@index([schoolId])
+  @@index([studentId])
+  @@index([status])
+  @@index([term, academicYear])
+  @@map("fee_payments")
+}
+
+model SmsLog {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  phone     String
+  message   String
+  type      String
+  status    String
+  paymentId String?
+  payment   FeePayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  sentById  String?
+  sentBy    Staff?      @relation(fields: [sentById], references: [id], onDelete: SetNull)
+
+  messageId    String?
+  cost         String?
+  errorMessage String?
+
+  createdAt DateTime @default(now())
+
+  @@map("sms_logs")
+}

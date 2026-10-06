@@ -1,0 +1,86 @@
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum GradingSystem {
+  POINTS
+  LETTER
+}
+
+model Class {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  name          String
+  level         Int
+  isActive      Boolean       @default(true)
+  gradingSystem GradingSystem @default(POINTS)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  students        Student[]
+  feeStructures   FeeStructure[]
+  subjects        Subject[]
+  pendingExamRows PendingExamRow[]
+
+  @@unique([schoolId, name])
+  @@map("classes")
+}
+
+model Student {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  classId  String
+  class    Class  @relation(fields: [classId], references: [id])
+
+  studentCode        String   @unique
+  formerStudentCodes String[] @default([])
+
+  firstName  String
+  middleName String?
+  lastName   String
+  fullName   String
+
+  dateOfBirth DateTime
+  gender      Gender
+  photo       String?
+  isActive    Boolean  @default(true)
+
+  parentName   String
+  parentPhone  String
+  parentPhone2 String?
+  parentEmail  String?
+
+  academicYear  String @default("2025")
+  creditBalance Float  @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments    FeePayment[]
+  examResults ExamResult[]
+
+  @@map("students")
+}
+
+model TermActivation {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  term         Term
+  academicYear String
+  startDate    DateTime?
+  endDate      DateTime?
+
+  activatedAt   DateTime @default(now())
+  activatedById String?
+
+  @@unique([schoolId, term, academicYear])
+  @@index([schoolId])
+  @@map("term_activations")
+}

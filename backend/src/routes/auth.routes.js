@@ -2,9 +2,19 @@ const express = require("express");
 const router = express.Router();
 
 const {
+  // Staff (existing)
   staffLogin,
   getStaffProfile,
   changePassword,
+  // Admin registration + verification (NEW)
+  registerAdmin,
+  verifyEmail,
+  resendOtp,
+  // Invitation (NEW)
+  acceptInvitation,
+  // Rich profile (NEW)
+  getMe,
+  // Parent (existing)
   parentLoginWithStudentId,
   requestOTP,
   verifyOTP,
@@ -19,6 +29,12 @@ router.get("/test", (req, res) => {
     message: "Auth routes are working",
   });
 });
+
+// ================= ADMIN REGISTRATION (NEW) =================
+// Public — no auth needed
+router.post("/register", registerAdmin);
+router.post("/verify-email", verifyEmail);
+router.post("/resend-otp", resendOtp);
 
 // ================= STAFF ROUTES =================
 
@@ -35,7 +51,11 @@ router.get("/staff/me", verifyStaff, getStaffProfile);
 
 router.post("/staff/change-password", verifyStaff, changePassword);
 
-// ================= PARENT ROUTES =================
+// Public — the token in the body authenticates the request
+router.post("/accept-invitation", acceptInvitation);
+
+// Alternative endpoint for the new frontend that needs department info
+router.get("/me", verifyStaff, getMe);
 
 router.post("/parent/login-student-id", parentLoginWithStudentId);
 

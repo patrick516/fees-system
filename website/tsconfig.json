@@ -28,7 +28,9 @@
     "**/*.tsx",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
-    "**/*.mts"
+    "**/*.mts",
+    "../frontend/src/lib/passwordPolicy.ts",
+    "../frontend/src/components/shared/PasswordStrengthMeter.tsx"
   ],
   "exclude": ["node_modules"]
 }

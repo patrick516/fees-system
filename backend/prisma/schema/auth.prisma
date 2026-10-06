@@ -1,0 +1,185 @@
+
+enum StaffRole {
+  SUPER_ADMIN
+  SCHOOL_ADMIN
+  BURSAR
+  FINANCE
+  TEACHER
+  REGISTRAR
+  OTHER
+}
+
+enum Term {
+  TERM_1
+  TERM_2
+  TERM_3
+}
+
+// ==================== PLATFORM ====================
+model Platform {
+  id        String   @id @default(uuid())
+  name      String   @default("SchoolPay Malawi")
+  email     String
+  phone     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  schools School[]
+
+  @@map("platform")
+}
+
+// ==================== SCHOOL ====================
+model School {
+  id         String   @id @default(uuid())
+  platformId String
+  platform   Platform @relation(fields: [platformId], references: [id])
+
+  name         String
+  slug         String? @unique
+  address      String
+  city         String
+  phone        String
+  email        String?
+  logo         String?
+  motto        String?
+  primaryColor String  @default("#1e3a8a")
+
+  isActive         Boolean   @default(true)
+  subscriptionPaid Boolean   @default(false)
+  subscriptionDate DateTime?
+  nextPaymentDate  DateTime?
+
+  bankAccounts        Json?
+  airtelMoneyNumber   String?
+  mpambaNumber        String?
+  paymentInstructions String?
+
+  activeTerm          Term?
+  activeAcademicYear  String?
+  activeTermStartDate DateTime?
+  activeTermEndDate   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  staff           Staff[]
+  departments     Department[]
+  classes         Class[]
+  students        Student[]
+  payments        FeePayment[]
+  smsLogs         SmsLog[]
+  feeStructures   FeeStructure[]
+  examPeriods     ExamPeriod[]
+  subjects        Subject[]
+  gradeBoundaries GradeBoundary[]
+  examResults     ExamResult[]
+  pendingExamRows PendingExamRow[]
+  termActivations TermActivation[]
+
+  @@map("schools")
+}
+
+// ==================== DEPARTMENT (NEW) ====================
+// Created by admin in Settings, e.g. "Finance", "Bursary", "Academics"
+model Department {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  isActive    Boolean @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  staff Staff[]
+
+  @@unique([schoolId, name])
+  @@map("departments")
+}
+
+// ==================== STAFF (REWRITTEN) ====================
+model Staff {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  departmentId String?
+  department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
+
+  fullName String
+  email    String  @unique
+  phone    String
+  role     StaffRole
+  avatar   String?
+
+  // Password is nullable because invited staff don't have one until accepted
+  passwordHash String?
+
+  isActive  Boolean   @default(true)
+  lastLogin DateTime?
+
+  // ---------- Email Verification (admin registration) ----------
+  emailVerified            Boolean   @default(false)
+  emailVerificationOtp     String?
+  emailVerificationExpires DateTime?
+
+  // ---------- Password Management ----------
+  mustChangePassword Boolean   @default(false)
+  passwordChangedAt  DateTime?
+
+  // ---------- Invitation (staff invited by admin) ----------
+  invitedById       String?
+  invitedBy         Staff?    @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  invited           Staff[]   @relation("InvitedBy")
+  invitedAt         DateTime?
+  invitationToken   String?   @unique
+  invitationExpires DateTime?
+
+  // ---------- Password Reset ----------
+  passwordResetToken   String?   @unique
+  passwordResetExpires DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  paymentsRecorded FeePayment[] @relation("RecordedBy")
+  paymentsVerified FeePayment[] @relation("VerifiedBy")
+  smsSent          SmsLog[]
+
+  @@index([schoolId])
+  @@index([email])
+  @@map("staff")
+}
+
+// ==================== PARENT OTP (phone login) ====================
+model OtpCode {
+  id        String   @id @default(uuid())
+  phone     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([phone])
+  @@map("otp_codes")
+}
+
+// ==================== AUDIT LOG ====================
+model AuditLog {
+  id        String   @id @default(uuid())
+  schoolId  String?
+  staffId   String?
+  action    String
+  entity    String
+  entityId  String?
+  changes   Json?
+  ipAddress String?
+  createdAt DateTime @default(now())
+
+  @@index([schoolId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

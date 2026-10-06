@@ -40,6 +40,72 @@ const verifyStaff = async (req, res, next) => {
   }
 };
 
+const authenticate = async (req, res, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Not authenticated" });
+    }
+    const token = authHeader.slice(7);
+
+    let decoded;
+    try {
+      decoded = jwt.verify(token, process.env.JWT_SECRET);
+    } catch {
+      return res.status(401).json({ success: false, message: "Invalid token" });
+    }
+
+    const staff = await prisma.staff.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        schoolId: true,
+        role: true,
+        email: true,
+        fullName: true,
+        isActive: true,
+        mustChangePassword: true,
+      },
+    });
+
+    if (!staff)
+      return res
+        .status(401)
+        .json({ success: false, message: "User not found" });
+    if (!staff.isActive)
+      return res
+        .status(403)
+        .json({ success: false, message: "Account deactivated" });
+
+    // Block everything except change-password if user must change password
+    if (staff.mustChangePassword) {
+      const allowedPaths = [
+        "/api/auth/change-password",
+        "/api/auth/me",
+        "/api/auth/logout",
+      ];
+      if (
+        !allowedPaths.includes(req.path) &&
+        !req.path.startsWith("/api/auth/change-password")
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "You must change your password before continuing",
+          code: "MUST_CHANGE_PASSWORD",
+        });
+      }
+    }
+
+    req.staff = staff;
+    req.schoolId = staff.schoolId;
+    next();
+  } catch (err) {
+    console.error("Auth middleware error:", err);
+    return res.status(500).json({ success: false, message: "Auth failed" });
+  }
+};
 // Verify parent session (simpler - uses studentId stored in token)
 const verifyParent = async (req, res, next) => {
   try {
@@ -148,4 +214,9 @@ const verifyStaffOrParent = async (req, res, next) => {
   }
 };
 
-module.exports = { verifyStaff, verifyParent, verifyStaffOrParent };
+module.exports = {
+  authenticate,
+  verifyStaff,
+  verifyParent,
+  verifyStaffOrParent,
+};

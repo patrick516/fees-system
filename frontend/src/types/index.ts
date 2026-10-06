@@ -1,3 +1,12 @@
+// ==================== DEPARTMENT (NEW) ====================
+export interface Department {
+  id: string;
+  name: string;
+  description?: string | null;
+  isActive: boolean;
+  _count?: { staff: number };
+}
+
 // ==================== SCHOOL ====================
 export interface School {
   id: string;
@@ -12,15 +21,32 @@ export interface School {
   isActive: boolean;
 }
 
-// ==================== STAFF ====================
+// ==================== STAFF (UPDATED) ====================
+export type StaffRole =
+  | "SUPER_ADMIN"
+  | "SCHOOL_ADMIN"
+  | "BURSAR"
+  | "FINANCE"
+  | "TEACHER"
+  | "REGISTRAR"
+  | "OTHER";
+
 export interface Staff {
   id: string;
   fullName: string;
   email: string;
   phone: string;
-  role: "SUPER_ADMIN" | "SCHOOL_ADMIN" | "BURSAR";
+  role: StaffRole;
   avatar: string | null;
   school: School;
+  department?: Department | null; // NEW
+  mustChangePassword?: boolean; // NEW
+  emailVerified?: boolean; // NEW
+  isActive?: boolean;
+  lastLogin?: string | null;
+  invitedAt?: string | null;
+  invitationExpires?: string | null;
+  createdAt?: string;
 }
 
 // ==================== CLASS ====================
@@ -111,27 +137,23 @@ export interface Payment {
 }
 
 // ==================== PAYMENT SUMMARY ====================
-// One canonical shape — used by the Dashboard's /payments/summary endpoint.
 export interface PaymentSummary {
-  // ===== Accounting =====
-  totalRequired: number; // sum of every student's fee for the term
-  totalCollected: number; // per-student MIN(paid, required), summed
-  outstandingBalance: number; // required − collected
-  totalCredit: number; // overpayments held for next term
-  totalCashReceived: number; // raw sum of verified payments (audit)
+  totalRequired: number;
+  totalCollected: number;
+  outstandingBalance: number;
+  totalCredit: number;
+  totalCashReceived: number;
   todayCollected: number;
 
-  // ===== Counts =====
   pendingCount: number;
   verifiedCount: number;
   rejectedCount: number;
   totalStudents: number;
-  paidStudents: number; // students who've fully paid
-  unpaidStudents: number; // same as debtorCount (kept for compat)
-  debtorCount: number; // students with a balance owing
-  noFeeCount: number; // students whose class has no fee set
+  paidStudents: number;
+  unpaidStudents: number;
+  debtorCount: number;
+  noFeeCount: number;
 
-  // ===== Meta =====
   academicYear?: string;
   term?: string | null;
 }
