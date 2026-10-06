@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import {
   UserPlus,
   Loader2,
-  Mail,
   RefreshCw,
   MoreVertical,
   CheckCircle2,
