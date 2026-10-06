@@ -14,10 +14,19 @@ import {
   FileText,
   X,
   Menu,
+  UserCog,
 } from "lucide-react";
 import { useAuthStore } from "../../../store/authStore";
 
-const navItems = [
+type NavItem = {
+  to: string;
+  icon: typeof LayoutDashboard;
+  label: string;
+  end?: boolean;
+  adminOnly?: boolean; // NEW: hide from non-admins
+};
+
+const navItems: NavItem[] = [
   { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", end: true },
   { to: "/students", icon: Users, label: "Students" },
   { to: "/payments", icon: CreditCard, label: "Payments", end: true },
@@ -26,6 +35,7 @@ const navItems = [
   { to: "/reports", icon: BarChart2, label: "Reports" },
   { to: "/sms", icon: MessageSquare, label: "Send SMS" },
   { to: "/results", icon: FileText, label: "Exam Results" },
+  { to: "/staff", icon: UserCog, label: "Staff", adminOnly: true }, // NEW
   { to: "/settings", icon: Settings, label: "Settings" },
 ];
 
@@ -33,6 +43,10 @@ const Sidebar = () => {
   const { staff, logout } = useAuthStore();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+
+  const visibleNavItems = navItems.filter(
+    (item) => !item.adminOnly || staff?.role === "SCHOOL_ADMIN",
+  );
 
   const handleLogout = () => {
     logout();
@@ -76,7 +90,7 @@ const Sidebar = () => {
 
       {/* Navigation */}
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {navItems.map((item) => (
+        {visibleNavItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}

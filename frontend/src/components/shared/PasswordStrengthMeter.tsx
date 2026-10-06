@@ -4,16 +4,18 @@ import { validatePassword, getRequirements } from "../../lib/passwordPolicy";
 
 interface Props {
   password: string;
-  /** Optional: show the checklist of requirements below the bar */
+  /** Show the checklist of requirements below the bar */
   showChecklist?: boolean;
+  /** Compact mode: inline chips instead of a vertical list (for tight layouts) */
+  compact?: boolean;
 }
 
 const SCORE_COLORS = [
-  "bg-gray-200", // 0 - empty
-  "bg-red-500", // 1 - very weak
-  "bg-orange-500", // 2 - weak
-  "bg-yellow-500", // 3 - fair
-  "bg-green-500", // 4 - strong
+  "bg-gray-200",
+  "bg-red-500",
+  "bg-orange-500",
+  "bg-yellow-500",
+  "bg-green-500",
 ];
 
 const TEXT_COLORS = [
@@ -24,15 +26,18 @@ const TEXT_COLORS = [
   "text-green-600",
 ];
 
-const PasswordStrengthMeter = ({ password, showChecklist = true }: Props) => {
+const PasswordStrengthMeter = ({
+  password,
+  showChecklist = true,
+  compact = false,
+}: Props) => {
   const { score, label, valid } = validatePassword(password);
   const requirements = getRequirements(password);
 
-  // Nothing to show if the field is empty
   if (!password) return null;
 
   return (
-    <div className="mt-2 space-y-2">
+    <div className={compact ? "mt-1.5 space-y-1.5" : "mt-2 space-y-2"}>
       {/* Strength bar */}
       <div className="flex items-center gap-2">
         <div className="flex-1 flex gap-1">
@@ -46,14 +51,35 @@ const PasswordStrengthMeter = ({ password, showChecklist = true }: Props) => {
           ))}
         </div>
         <span
-          className={`text-xs font-medium ${TEXT_COLORS[score]} min-w-[80px] text-right`}
+          className={`text-xs font-medium ${TEXT_COLORS[score]} ${
+            compact ? "min-w-[70px]" : "min-w-[80px]"
+          } text-right`}
         >
           {label}
         </span>
       </div>
 
-      {/* Requirements checklist */}
-      {showChecklist && (
+      {/* COMPACT: inline chips */}
+      {compact && showChecklist && (
+        <div className="flex flex-wrap gap-1">
+          {requirements.map((req) => (
+            <span
+              key={req.label}
+              className={`text-[10px] px-1.5 py-0.5 rounded-full font-medium transition-colors ${
+                req.met
+                  ? "bg-green-100 text-green-700"
+                  : "bg-gray-100 text-gray-400"
+              }`}
+            >
+              {req.met ? "✓ " : ""}
+              {req.short}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* FULL: vertical checklist */}
+      {!compact && showChecklist && (
         <ul className="space-y-1 pt-1">
           {requirements.map((req) => (
             <li
@@ -73,8 +99,7 @@ const PasswordStrengthMeter = ({ password, showChecklist = true }: Props) => {
         </ul>
       )}
 
-      {/* "All requirements met" nudge */}
-      {valid && (
+      {valid && !compact && (
         <p className="text-xs text-green-600 font-medium flex items-center gap-1">
           <Check size={12} strokeWidth={3} /> Password meets all requirements
         </p>

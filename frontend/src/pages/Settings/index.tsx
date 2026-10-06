@@ -9,6 +9,7 @@ import {
 import { useSchoolSettings } from "../../hooks/useSchoolSettings";
 import { useAuthStore } from "../../store/authStore";
 import { applyTheme } from "../../lib/theme";
+import DepartmentsCard from "../../components/Settings/DepartmentsCard";
 
 const SettingsPage = () => {
   const {
@@ -108,7 +109,10 @@ const SettingsPage = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 size={24} className="animate-spin text-[var(--color-primary)]" />
+        <Loader2
+          size={24}
+          className="animate-spin text-[var(--color-primary)]"
+        />
       </div>
     );
   }
@@ -329,6 +333,7 @@ const SettingsPage = () => {
           )}
         </div>
       </div>
+      <DepartmentsCard />
     </div>
   );
 };

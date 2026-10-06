@@ -3,8 +3,14 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
 import { applyTheme } from "./lib/theme";
 
-// Pages
+// Pages — Auth
 import Login from "./pages/Auth/Login";
+import Signup from "./pages/Auth/Signup";
+import VerifyEmail from "./pages/Auth/VerifyEmail";
+import AcceptInvitation from "./pages/Auth/AcceptInvitation";
+import ForceChangePassword from "./pages/Auth/ForceChangePassword";
+
+// Pages — App
 import Dashboard from "./pages/Dashboard/index";
 import StudentsPage from "./pages/Students/index";
 import AddStudent from "./pages/Students/Add";
@@ -19,15 +25,33 @@ import SettingsPage from "./pages/Settings/index";
 import ResultsPage from "./pages/Results/index";
 import Promote from "./pages/Students/Promote";
 import BulkImport from "./pages/Students/BulkImport";
+import StaffPage from "./pages/Staff/index"; // NEW
 import RateLimitModal from "./components/shared/RateLimitModal";
 
 // Layout
 import MainLayout from "./components/Layout/MainLayout";
 
-// Protected route wrapper
+// ==================== GUARDS ====================
+
+// Standard protected route — redirects to /login or /force-change-password
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated } = useAuthStore();
+  const { isAuthenticated, mustChangePassword } = useAuthStore();
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (mustChangePassword)
+    return <Navigate to="/force-change-password" replace />;
+
+  return <>{children}</>;
+};
+
+// Only accessible when logged in AND mustChangePassword is true.
+// Otherwise, send them where they belong.
+const ForcePasswordRoute = ({ children }: { children: React.ReactNode }) => {
+  const { isAuthenticated, mustChangePassword } = useAuthStore();
+
+  if (!isAuthenticated) return <Navigate to="/login" replace />;
+  if (!mustChangePassword) return <Navigate to="/dashboard" replace />;
+
   return <>{children}</>;
 };
 
@@ -41,11 +65,24 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* Public */}
+        {/* ==================== PUBLIC ==================== */}
         <Route path="/login" element={<Login />} />
         <Route path="/login/:slug" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/verify-email" element={<VerifyEmail />} />
+        <Route path="/accept-invitation" element={<AcceptInvitation />} />
 
-        {/* Protected */}
+        {/* ==================== FORCE PASSWORD CHANGE ==================== */}
+        <Route
+          path="/force-change-password"
+          element={
+            <ForcePasswordRoute>
+              <ForceChangePassword />
+            </ForcePasswordRoute>
+          }
+        />
+
+        {/* ==================== PROTECTED (MainLayout) ==================== */}
         <Route
           path="/"
           element={
@@ -69,6 +106,7 @@ function App() {
           <Route path="reports" element={<ReportsPage />} />
           <Route path="settings" element={<SettingsPage />} />
           <Route path="results" element={<ResultsPage />} />
+          <Route path="staff" element={<StaffPage />} /> {/* NEW */}
         </Route>
 
         {/* Catch all */}

@@ -248,8 +248,6 @@ const changePassword = async (req, res) => {
   }
 };
 
-// ==================== ADMIN REGISTRATION (NEW) ====================
-
 // POST /api/auth/register
 const registerAdmin = async (req, res) => {
   try {
@@ -263,6 +261,16 @@ const registerAdmin = async (req, res) => {
       city,
       schoolPhone,
     } = req.body;
+    // Block registration if a school already exists — setup is one-time only
+    const existingSchoolCount = await prisma.school.count();
+    if (existingSchoolCount > 0) {
+      return res.status(403).json({
+        success: false,
+        message:
+          "Setup is already complete. Please contact your school administrator.",
+        code: "SETUP_ALREADY_COMPLETE",
+      });
+    }
 
     if (
       !fullName ||
@@ -548,6 +556,32 @@ const getMe = async (req, res) => {
     return res.status(500).json({ success: false, message: "Failed" });
   }
 };
+// GET /api/auth/setup-status
+// Public — tells the frontend whether signup is still allowed
+const getSetupStatus = async (req, res) => {
+  try {
+    const schoolCount = await prisma.school.count();
+    const setupComplete = schoolCount > 0;
+
+    let schoolName;
+    if (setupComplete) {
+      const school = await prisma.school.findFirst({
+        select: { name: true },
+      });
+      schoolName = school?.name;
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: { setupComplete, schoolName },
+    });
+  } catch (err) {
+    console.error("Setup status error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to check setup status" });
+  }
+};
 
 // ==================== PARENT AUTH (UNCHANGED) ====================
 
@@ -830,17 +864,15 @@ const verifyOTP = async (req, res) => {
 };
 
 module.exports = {
-  // Staff (existing + upgraded)
   staffLogin,
   getStaffProfile,
   changePassword,
-  // New admin/staff onboarding
   registerAdmin,
   verifyEmail,
   resendOtp,
   acceptInvitation,
   getMe,
-  // Parent (unchanged)
+  getSetupStatus,
   parentLoginWithStudentId,
   requestOTP,
   verifyOTP,

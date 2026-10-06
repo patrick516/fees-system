@@ -47,7 +47,6 @@ export const validatePassword = (password: string): PasswordCheck => {
   if (COMMON_PASSWORDS.has(password.toLowerCase()))
     errors.push("Password is too common");
 
-  // Score: 0–4
   let score = 0;
   if (password.length >= 8) score++;
   if (password.length >= 12) score++;
@@ -60,7 +59,6 @@ export const validatePassword = (password: string): PasswordCheck => {
   if (/[^A-Za-z0-9]/.test(password)) score++;
   if (score > 4) score = 4;
 
-  // Downgrade score to 0/1 if it fails basic checks
   if (
     !/[A-Z]/.test(password) ||
     !/[a-z]/.test(password) ||
@@ -85,15 +83,36 @@ export const validatePassword = (password: string): PasswordCheck => {
   };
 };
 
-// Requirement checks in a structured way (for the checklist UI)
+// UPDATED: added `short` labels for the compact meter
 export const getRequirements = (password: string) => [
-  { label: "At least 8 characters", met: password.length >= 8 },
-  { label: "One uppercase letter (A-Z)", met: /[A-Z]/.test(password) },
-  { label: "One lowercase letter (a-z)", met: /[a-z]/.test(password) },
-  { label: "One number (0-9)", met: /[0-9]/.test(password) },
-  { label: "One symbol (!@#$%...)", met: /[^A-Za-z0-9]/.test(password) },
+  {
+    label: "At least 8 characters",
+    short: "8+ chars",
+    met: password.length >= 8,
+  },
+  {
+    label: "One uppercase letter (A-Z)",
+    short: "A-Z",
+    met: /[A-Z]/.test(password),
+  },
+  {
+    label: "One lowercase letter (a-z)",
+    short: "a-z",
+    met: /[a-z]/.test(password),
+  },
+  {
+    label: "One number (0-9)",
+    short: "0-9",
+    met: /[0-9]/.test(password),
+  },
+  {
+    label: "One symbol (!@#$%...)",
+    short: "symbol",
+    met: /[^A-Za-z0-9]/.test(password),
+  },
   {
     label: "Not a common password",
+    short: "not common",
     met: password.length > 0 && !COMMON_PASSWORDS.has(password.toLowerCase()),
   },
 ];
