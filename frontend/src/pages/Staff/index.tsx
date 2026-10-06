@@ -10,17 +10,29 @@ import {
   Building2,
   UserMinus,
   Edit2,
+  X,
+  ShieldAlert,
 } from "lucide-react";
 import api from "../../lib/axios";
 import InviteStaffModal from "../../components/Staff/InviteStaffModal";
+import EditStaffModal from "../../components/Staff/EditStaffModal";
+import { useAuthStore } from "../../store/authStore";
 import type { Staff, Department } from "../../types";
 
 const StaffPage = () => {
+  const { staff: currentUser } = useAuthStore();
+
   const [staff, setStaff] = useState<Staff[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
   const [showInvite, setShowInvite] = useState(false);
-  const [actionMenu, setActionMenu] = useState<string | null>(null);
+
+  // Modal state — replaces the old dropdown
+  const [selectedMember, setSelectedMember] = useState<Staff | null>(null);
+  const [editMember, setEditMember] = useState<Staff | null>(null);
+  const [confirmDeactivate, setConfirmDeactivate] = useState<Staff | null>(
+    null,
+  );
   const [busyId, setBusyId] = useState<string | null>(null);
 
   const fetchAll = async () => {
@@ -43,18 +55,12 @@ const StaffPage = () => {
     fetchAll();
   }, []);
 
-  // Close action menu when clicking outside
-  useEffect(() => {
-    const close = () => setActionMenu(null);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, []);
-
   const handleResend = async (id: string) => {
     setBusyId(id);
     try {
       await api.post(`/staff/${id}/resend-invite`);
       await fetchAll();
+      setSelectedMember(null);
     } catch (err: any) {
       alert(err.response?.data?.message || "Failed to resend");
     } finally {
@@ -62,13 +68,15 @@ const StaffPage = () => {
     }
   };
 
-  const handleRemove = async (id: string, name: string) => {
-    if (!confirm(`Deactivate ${name}? They will no longer be able to log in.`))
-      return;
+  const confirmRemove = async () => {
+    if (!confirmDeactivate) return;
+    const id = confirmDeactivate.id;
     setBusyId(id);
     try {
       await api.delete(`/staff/${id}`);
       await fetchAll();
+      setConfirmDeactivate(null);
+      setSelectedMember(null);
     } catch (err: any) {
       alert(err.response?.data?.message || "Failed to remove");
     } finally {
@@ -100,6 +108,8 @@ const StaffPage = () => {
 
   const formatRole = (role: string) =>
     role.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
+
+  const isSelf = (member: Staff) => member.id === currentUser?.id;
 
   return (
     <div className="space-y-6">
@@ -169,8 +179,13 @@ const StaffPage = () => {
                           {member.fullName.charAt(0)}
                         </div>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium text-gray-800 truncate">
+                          <p className="text-sm font-medium text-gray-800 truncate flex items-center gap-2">
                             {member.fullName}
+                            {isSelf(member) && (
+                              <span className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-[var(--color-primary-light)] text-[var(--color-primary)]">
+                                You
+                              </span>
+                            )}
                           </p>
                           <p className="text-xs text-gray-400 truncate">
                             {member.email}
@@ -197,61 +212,18 @@ const StaffPage = () => {
                     </td>
                     <td className="px-6 py-4">{getStatusBadge(member)}</td>
                     <td className="px-6 py-4 text-right">
-                      <div
-                        className="relative inline-block"
-                        onClick={(e) => e.stopPropagation()}
+                      <button
+                        onClick={() => setSelectedMember(member)}
+                        disabled={busyId === member.id}
+                        className="p-1.5 rounded hover:bg-gray-100 text-gray-500 disabled:opacity-40"
+                        title="Manage"
                       >
-                        <button
-                          onClick={() =>
-                            setActionMenu(
-                              actionMenu === member.id ? null : member.id,
-                            )
-                          }
-                          disabled={busyId === member.id}
-                          className="p-1.5 rounded hover:bg-gray-100 text-gray-500 disabled:opacity-40"
-                        >
-                          {busyId === member.id ? (
-                            <Loader2 size={14} className="animate-spin" />
-                          ) : (
-                            <MoreVertical size={14} />
-                          )}
-                        </button>
-                        {actionMenu === member.id && (
-                          <div className="absolute right-0 top-full mt-1 w-48 bg-white border border-gray-200 rounded-lg shadow-lg z-10 py-1">
-                            {!member.emailVerified && (
-                              <button
-                                onClick={() => {
-                                  handleResend(member.id);
-                                  setActionMenu(null);
-                                }}
-                                className="w-full text-left px-3 py-2 text-sm text-gray-700 hover:bg-gray-50 flex items-center gap-2"
-                              >
-                                <RefreshCw size={12} />
-                                Resend Invitation
-                              </button>
-                            )}
-                            <button
-                              disabled
-                              className="w-full text-left px-3 py-2 text-sm text-gray-300 cursor-not-allowed flex items-center gap-2"
-                            >
-                              <Edit2 size={12} />
-                              Edit Role (coming soon)
-                            </button>
-                            {member.isActive && (
-                              <button
-                                onClick={() => {
-                                  handleRemove(member.id, member.fullName);
-                                  setActionMenu(null);
-                                }}
-                                className="w-full text-left px-3 py-2 text-sm text-red-600 hover:bg-red-50 flex items-center gap-2"
-                              >
-                                <UserMinus size={12} />
-                                Deactivate
-                              </button>
-                            )}
-                          </div>
+                        {busyId === member.id ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          <MoreVertical size={16} />
                         )}
-                      </div>
+                      </button>
                     </td>
                   </tr>
                 ))}
@@ -278,13 +250,186 @@ const StaffPage = () => {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Invite modal */}
       <InviteStaffModal
         open={showInvite}
         onClose={() => setShowInvite(false)}
         onInvited={fetchAll}
         departments={departments}
       />
+      {/* Edit modal */}
+      <EditStaffModal
+        member={editMember}
+        departments={departments}
+        onClose={() => setEditMember(null)}
+        onUpdated={fetchAll}
+      />
+
+      {/* ==================== MANAGE MEMBER MODAL ==================== */}
+      {selectedMember && !confirmDeactivate && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setSelectedMember(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-sm w-full shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between p-5 border-b border-gray-100">
+              <div className="flex items-center gap-3 min-w-0">
+                <div className="w-10 h-10 rounded-full bg-[var(--color-primary-light)] text-[var(--color-primary)] flex items-center justify-center text-sm font-bold shrink-0">
+                  {selectedMember.fullName.charAt(0)}
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">
+                    {selectedMember.fullName}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate">
+                    {selectedMember.email}
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedMember(null)}
+                className="p-1 text-gray-400 hover:text-gray-600 rounded shrink-0"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            {/* Actions */}
+            <div className="p-3 space-y-1">
+              {!selectedMember.emailVerified && (
+                <button
+                  onClick={() => handleResend(selectedMember.id)}
+                  disabled={busyId === selectedMember.id}
+                  className="w-full text-left px-3 py-3 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-3 disabled:opacity-50"
+                >
+                  {busyId === selectedMember.id ? (
+                    <Loader2 size={16} className="animate-spin" />
+                  ) : (
+                    <RefreshCw size={16} className="text-gray-400" />
+                  )}
+                  <div>
+                    <p className="font-medium">Resend Invitation</p>
+                    <p className="text-xs text-gray-400">
+                      Send a fresh invite with a new password
+                    </p>
+                  </div>
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setEditMember(selectedMember);
+                  setSelectedMember(null);
+                }}
+                className="w-full text-left px-3 py-3 text-sm text-gray-700 hover:bg-gray-50 rounded-lg flex items-center gap-3"
+              >
+                <Edit2 size={16} className="text-gray-400" />
+                <div>
+                  <p className="font-medium">Edit Role & Department</p>
+                  <p className="text-xs text-gray-400">
+                    Change access level or reassign department
+                  </p>
+                </div>
+              </button>
+
+              {isSelf(selectedMember) ? (
+                // Self — cannot deactivate
+                <div className="px-3 py-3 rounded-lg bg-gray-50 border border-gray-100 flex items-start gap-3">
+                  <ShieldAlert
+                    size={16}
+                    className="text-gray-400 shrink-0 mt-0.5"
+                  />
+                  <div>
+                    <p className="text-sm font-medium text-gray-600">
+                      This is your account
+                    </p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      You cannot deactivate yourself. Ask another admin to do
+                      this if needed.
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                selectedMember.isActive && (
+                  <button
+                    onClick={() => setConfirmDeactivate(selectedMember)}
+                    disabled={busyId === selectedMember.id}
+                    className="w-full text-left px-3 py-3 text-sm text-red-600 hover:bg-red-50 rounded-lg flex items-center gap-3 disabled:opacity-50"
+                  >
+                    <UserMinus size={16} />
+                    <div>
+                      <p className="font-medium">Deactivate</p>
+                      <p className="text-xs text-red-400">
+                        They will no longer be able to log in
+                      </p>
+                    </div>
+                  </button>
+                )
+              )}
+            </div>
+
+            {/* Footer */}
+            <div className="p-3 border-t border-gray-100">
+              <button
+                onClick={() => setSelectedMember(null)}
+                className="w-full py-2.5 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-lg"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== CONFIRM DEACTIVATE MODAL ==================== */}
+      {confirmDeactivate && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setConfirmDeactivate(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex flex-col items-center text-center mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center mb-3">
+                <UserMinus size={22} className="text-red-600" />
+              </div>
+              <h3 className="text-base font-semibold text-gray-800">
+                Deactivate {confirmDeactivate.fullName}?
+              </h3>
+              <p className="text-xs text-gray-500 mt-1 leading-relaxed">
+                They will no longer be able to log in. Their records and history
+                will remain intact, and you can reactivate them later if needed.
+              </p>
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                onClick={() => setConfirmDeactivate(null)}
+                disabled={busyId === confirmDeactivate.id}
+                className="flex-1 border border-gray-300 text-gray-700 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmRemove}
+                disabled={busyId === confirmDeactivate.id}
+                className="flex-1 flex items-center justify-center gap-2 bg-red-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-40"
+              >
+                {busyId === confirmDeactivate.id && (
+                  <Loader2 size={14} className="animate-spin" />
+                )}
+                Yes, Deactivate
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
