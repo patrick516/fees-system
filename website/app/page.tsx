@@ -326,7 +326,7 @@ export default function LoginPage() {
               <label className="block text-sm font-medium text-gray-700 mb-1.5">
                 Child&apos;s Date of Birth
               </label>
-              <div className="w-full flex items-center px-4 py-3 border border-gray-300 rounded-xl text-sm transition-all duration-300 focus-within:ring-2 focus-within:ring-[var(--color-primary)] focus-within:border-transparent">
+              <div className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-xl text-sm transition-all duration-300 focus-within:ring-2 focus-within:ring-[var(--color-primary)] focus-within:border-transparent">
                 <input
                   ref={dayRef}
                   type="text"
@@ -336,9 +336,9 @@ export default function LoginPage() {
                   onChange={(e) => handleDobDay(e.target.value)}
                   maxLength={2}
                   autoComplete="off"
-                  className="w-8 text-center bg-transparent outline-none text-gray-900 placeholder-gray-400"
+                  className="w-14 py-1 text-center text-base bg-transparent border-0 outline-none ring-0 focus:ring-0 text-gray-900 placeholder-gray-400"
                 />
-                <span className="text-gray-400 mx-1">-</span>
+                <span className="text-gray-400">-</span>
                 <input
                   ref={monthRef}
                   type="text"
@@ -349,9 +349,9 @@ export default function LoginPage() {
                   onKeyDown={(e) => dobBackspace(e, dobMonth, dayRef)}
                   maxLength={2}
                   autoComplete="off"
-                  className="w-8 text-center bg-transparent outline-none text-gray-900 placeholder-gray-400"
+                  className="w-14 py-1 text-center text-base bg-transparent border-0 outline-none ring-0 focus:ring-0 text-gray-900 placeholder-gray-400"
                 />
-                <span className="text-gray-400 mx-1">-</span>
+                <span className="text-gray-400">-</span>
                 <input
                   ref={yearRef}
                   type="text"
@@ -362,7 +362,7 @@ export default function LoginPage() {
                   onKeyDown={(e) => dobBackspace(e, dobYear, monthRef)}
                   maxLength={4}
                   autoComplete="off"
-                  className="w-12 text-center bg-transparent outline-none text-gray-900 placeholder-gray-400"
+                  className="w-20 py-1 text-center text-base bg-transparent border-0 outline-none ring-0 focus:ring-0 text-gray-900 placeholder-gray-400"
                 />
               </div>
             </div>
