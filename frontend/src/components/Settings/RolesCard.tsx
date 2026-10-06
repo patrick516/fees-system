@@ -9,7 +9,6 @@ import {
   Lock,
   Users,
   Check,
-  X,
 } from "lucide-react";
 import api from "../../lib/axios";
 import AddRoleModal from "./AddRoleModal";
