@@ -106,9 +106,6 @@ const StaffPage = () => {
     );
   };
 
-  const formatRole = (role: string) =>
-    role.replace("_", " ").replace(/\b\w/g, (c) => c.toUpperCase());
-
   const isSelf = (member: Staff) => member.id === currentUser?.id;
 
   return (
@@ -195,7 +192,7 @@ const StaffPage = () => {
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-gray-700">
-                        {formatRole(member.role)}
+                        {member.role?.name || "—"}
                       </span>
                     </td>
                     <td className="px-6 py-4">

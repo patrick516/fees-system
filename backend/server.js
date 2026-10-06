@@ -90,10 +90,10 @@ const readLimiter = rateLimit({
 
 // Apply the strictest first (Express matches in order)
 app.use("/api/auth/parent/request-otp", otpLimiter);
-app.use("/api/auth/register", authLimiter); // NEW: protect signup
-app.use("/api/auth/verify-email", otpLimiter); // NEW: protect OTP verify
-app.use("/api/auth/resend-otp", otpLimiter); // NEW: protect OTP resend
-app.use("/api/auth/accept-invitation", authLimiter); // NEW
+app.use("/api/auth/register", authLimiter);
+app.use("/api/auth/verify-email", otpLimiter);
+app.use("/api/auth/resend-otp", otpLimiter);
+app.use("/api/auth/accept-invitation", authLimiter);
 app.use("/api/auth", authLimiter);
 app.use("/api/", readLimiter);
 
@@ -107,7 +107,6 @@ app.get("/", (req, res) => {
   });
 });
 
-// ============ HEALTH ============
 app.get("/api/health", (req, res) => {
   res.json({
     success: true,
@@ -117,7 +116,6 @@ app.get("/api/health", (req, res) => {
   });
 });
 
-// ============ ROUTES ============
 const authRoutes = require("./src/routes/auth.routes");
 const studentRoutes = require("./src/routes/student.routes");
 const paymentRoutes = require("./src/routes/payment.routes");
@@ -125,8 +123,9 @@ const schoolRoutes = require("./src/routes/school.routes");
 const smsRoutes = require("./src/routes/sms.routes");
 const reportRoutes = require("./src/routes/report.routes");
 const examRoutes = require("./src/routes/exam.routes");
-const staffRoutes = require("./src/routes/staff.routes"); // NEW
-const departmentRoutes = require("./src/routes/department.routes"); // NEW
+const staffRoutes = require("./src/routes/staff.routes");
+const departmentRoutes = require("./src/routes/department.routes");
+const roleRoutes = require("./src/routes/role.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/students", studentRoutes);
@@ -135,8 +134,9 @@ app.use("/api/schools", schoolRoutes);
 app.use("/api/sms", smsRoutes);
 app.use("/api/reports", reportRoutes);
 app.use("/api/exams", examRoutes);
-app.use("/api/staff", staffRoutes); // NEW
-app.use("/api/departments", departmentRoutes); // NEW
+app.use("/api/staff", staffRoutes);
+app.use("/api/departments", departmentRoutes);
+app.use("/api/roles", roleRoutes);
 
 // ============ 404 ============
 app.use((req, res) => {

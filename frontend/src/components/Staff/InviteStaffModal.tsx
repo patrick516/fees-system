@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
-import type { Department, StaffRole } from "../../types";
+import type { Department, Role } from "../../types";
 
 interface Props {
   open: boolean;
@@ -17,51 +17,65 @@ interface Props {
   departments: Department[];
 }
 
-const ROLES: { value: StaffRole; label: string; hint: string }[] = [
-  {
-    value: "BURSAR",
-    label: "Bursar",
-    hint: "Records payments and manages finance",
-  },
-  {
-    value: "FINANCE",
-    label: "Finance",
-    hint: "Views reports and reconciles accounts",
-  },
-  {
-    value: "REGISTRAR",
-    label: "Registrar",
-    hint: "Manages students and enrollment",
-  },
-  {
-    value: "TEACHER",
-    label: "Teacher",
-    hint: "Views results and student records",
-  },
-  { value: "OTHER", label: "Other", hint: "Custom role" },
-];
+const TITLES = ["Mr", "Mrs", "Ms", "Miss", "Dr", "Prof"];
+
+// Strip non-digits and any leading 0/+265 — always store the 9-digit local number
+const normalizePhone = (raw: string) => {
+  let digits = raw.replace(/\D/g, "");
+  if (digits.startsWith("0")) digits = digits.slice(1);
+  if (digits.startsWith("265")) digits = digits.slice(3);
+  return digits.slice(0, 9);
+};
 
 const InviteStaffModal = ({ open, onClose, onInvited, departments }: Props) => {
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+
   const [form, setForm] = useState({
-    fullName: "",
+    title: "",
+    firstName: "",
+    lastName: "",
     email: "",
     phone: "",
-    role: "BURSAR" as StaffRole,
+    roleId: "",
     departmentId: "",
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
 
+  // Fetch roles when modal opens
+  useEffect(() => {
+    if (!open) return;
+    setRolesLoading(true);
+    api
+      .get("/roles")
+      .then((res) => {
+        // Exclude School Admin — only one per school, cannot be invited
+        const list = (res.data.data || []).filter(
+          (r: Role) => r.name !== "School Admin",
+        );
+        setRoles(list);
+        // Default to first non-admin role
+        if (list.length > 0) {
+          setForm((prev) => ({ ...prev, roleId: list[0].id }));
+        }
+      })
+      .catch(() => setRoles([]))
+      .finally(() => setRolesLoading(false));
+  }, [open]);
+
   // Reset when modal closes
   useEffect(() => {
     if (!open) {
       setTimeout(() => {
         setForm({
-          fullName: "",
+          title: "",
+          firstName: "",
+          lastName: "",
           email: "",
           phone: "",
-          role: "BURSAR",
+          roleId: "",
           departmentId: "",
         });
         setError("");
@@ -77,10 +91,12 @@ const InviteStaffModal = ({ open, onClose, onInvited, departments }: Props) => {
 
     try {
       await api.post("/staff/invite", {
-        fullName: form.fullName,
-        email: form.email,
-        phone: form.phone,
-        role: form.role,
+        title: form.title || undefined,
+        firstName: form.firstName.trim(),
+        lastName: form.lastName.trim(),
+        email: form.email.trim(),
+        phone: `+265${form.phone}`,
+        roleId: form.roleId,
         departmentId: form.departmentId || undefined,
       });
       setSuccess(true);
@@ -96,6 +112,8 @@ const InviteStaffModal = ({ open, onClose, onInvited, departments }: Props) => {
   };
 
   if (!open) return null;
+
+  const selectedRole = roles.find((r) => r.id === form.roleId);
 
   return (
     <div
@@ -151,19 +169,65 @@ const InviteStaffModal = ({ open, onClose, onInvited, departments }: Props) => {
               </div>
             )}
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                Full Name *
-              </label>
-              <input
-                value={form.fullName}
-                onChange={(e) => setForm({ ...form, fullName: e.target.value })}
-                placeholder="John Banda"
-                required
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-              />
+            {/* Title + Names */}
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  Title
+                </label>
+                <Select
+                  value={form.title || "none"}
+                  onValueChange={(v) =>
+                    setForm({ ...form, title: v === "none" ? "" : v })
+                  }
+                >
+                  <SelectTrigger className="w-full bg-white border-gray-200 rounded-lg text-sm h-[42px]">
+                    <SelectValue placeholder="No title" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="none">No title</SelectItem>
+                    {TITLES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                    First Name *
+                  </label>
+                  <input
+                    value={form.firstName}
+                    onChange={(e) =>
+                      setForm({ ...form, firstName: e.target.value })
+                    }
+                    placeholder="John"
+                    required
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                    Last Name *
+                  </label>
+                  <input
+                    value={form.lastName}
+                    onChange={(e) =>
+                      setForm({ ...form, lastName: e.target.value })
+                    }
+                    placeholder="Banda"
+                    required
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                  />
+                </div>
+              </div>
             </div>
 
+            {/* Email */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
                 Email *
@@ -178,46 +242,65 @@ const InviteStaffModal = ({ open, onClose, onInvited, departments }: Props) => {
               />
             </div>
 
+            {/* Phone */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
                 Phone *
               </label>
-              <input
-                type="tel"
-                value={form.phone}
-                onChange={(e) => setForm({ ...form, phone: e.target.value })}
-                placeholder="+265 991 234 567"
-                required
-                className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-              />
+              <div className="flex">
+                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-sm text-gray-600 font-medium">
+                  +265
+                </span>
+                <input
+                  type="tel"
+                  inputMode="numeric"
+                  value={form.phone}
+                  onChange={(e) =>
+                    setForm({ ...form, phone: normalizePhone(e.target.value) })
+                  }
+                  placeholder="995049331"
+                  maxLength={9}
+                  required
+                  pattern="[0-9]{9}"
+                  title="Enter 9 digits (e.g. 995049331)"
+                  className="flex-1 min-w-0 px-3 py-2.5 border border-gray-200 rounded-r-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                />
+              </div>
             </div>
 
+            {/* Role */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
                 Role *
               </label>
               <Select
-                value={form.role}
-                onValueChange={(v) =>
-                  setForm({ ...form, role: v as StaffRole })
-                }
+                value={form.roleId}
+                onValueChange={(v) => setForm({ ...form, roleId: v })}
+                disabled={rolesLoading}
               >
                 <SelectTrigger className="w-full bg-white border-gray-200 rounded-lg text-sm h-[42px]">
-                  <SelectValue placeholder="Select role" />
+                  <SelectValue
+                    placeholder={
+                      rolesLoading ? "Loading roles..." : "Select role"
+                    }
+                  />
                 </SelectTrigger>
                 <SelectContent className="bg-white">
-                  {ROLES.map((r) => (
-                    <SelectItem key={r.value} value={r.value}>
-                      {r.label}
+                  {roles.map((r) => (
+                    <SelectItem key={r.id} value={r.id}>
+                      {r.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <p className="text-xs text-gray-400 mt-1.5">
-                {ROLES.find((r) => r.value === form.role)?.hint}
-              </p>
+              {selectedRole?.description && (
+                <p className="text-xs text-gray-400 mt-1.5">
+                  {selectedRole.description}
+                </p>
+              )}
             </div>
 
+            {/* Department */}
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
                 Department
@@ -252,7 +335,7 @@ const InviteStaffModal = ({ open, onClose, onInvited, departments }: Props) => {
               </button>
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || rolesLoading || !form.roleId}
                 className="flex-1 flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-2.5 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
               >
                 {loading && <Loader2 size={14} className="animate-spin" />}

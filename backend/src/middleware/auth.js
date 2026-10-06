@@ -1,7 +1,8 @@
+// backend/src/middleware/auth.js
 const jwt = require("jsonwebtoken");
 const prisma = require("../config/db");
 
-// Verify JWT token for staff
+// ==================== STAFF AUTH ====================
 const verifyStaff = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -16,10 +17,13 @@ const verifyStaff = async (req, res, next) => {
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Get staff from database
+    // Load staff with role + school (role is now a relation)
     const staff = await prisma.staff.findUnique({
       where: { id: decoded.id },
-      include: { school: true },
+      include: {
+        role: { select: { id: true, name: true, permissions: true } },
+        school: true,
+      },
     });
 
     if (!staff || !staff.isActive) {
@@ -40,6 +44,7 @@ const verifyStaff = async (req, res, next) => {
   }
 };
 
+// ==================== GENERIC AUTHENTICATE ====================
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -62,11 +67,11 @@ const authenticate = async (req, res, next) => {
       select: {
         id: true,
         schoolId: true,
-        role: true,
         email: true,
         fullName: true,
         isActive: true,
         mustChangePassword: true,
+        role: { select: { id: true, name: true, permissions: true } },
       },
     });
 
@@ -79,7 +84,6 @@ const authenticate = async (req, res, next) => {
         .status(403)
         .json({ success: false, message: "Account deactivated" });
 
-    // Block everything except change-password if user must change password
     if (staff.mustChangePassword) {
       const allowedPaths = [
         "/api/auth/change-password",
@@ -106,7 +110,8 @@ const authenticate = async (req, res, next) => {
     return res.status(500).json({ success: false, message: "Auth failed" });
   }
 };
-// Verify parent session (simpler - uses studentId stored in token)
+
+// ==================== PARENT AUTH ====================
 const verifyParent = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -128,7 +133,6 @@ const verifyParent = async (req, res, next) => {
       });
     }
 
-    // Get student to confirm still exists
     const student = await prisma.student.findUnique({
       where: { id: decoded.studentId },
       include: { school: true, class: true },
@@ -152,8 +156,7 @@ const verifyParent = async (req, res, next) => {
   }
 };
 
-// Accepts EITHER a staff token OR a parent token.
-// Populates req.schoolId in both cases so school-scoped reads work for both roles.
+// ==================== STAFF OR PARENT ====================
 const verifyStaffOrParent = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -192,7 +195,10 @@ const verifyStaffOrParent = async (req, res, next) => {
     // Staff path
     const staff = await prisma.staff.findUnique({
       where: { id: decoded.id },
-      include: { school: true },
+      include: {
+        role: { select: { id: true, name: true, permissions: true } },
+        school: true,
+      },
     });
 
     if (!staff || !staff.isActive) {

@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { useAuthStore } from "../../store/authStore";
-import type { Department, Staff, StaffRole } from "../../types";
+import type { Department, Role, Staff } from "../../types";
 
 interface Props {
   member: Staff | null;
@@ -26,48 +26,33 @@ interface Props {
   onUpdated: () => void;
 }
 
-const ROLES: { value: StaffRole; label: string; hint: string }[] = [
-  {
-    value: "SCHOOL_ADMIN",
-    label: "School Admin",
-    hint: "Full access to everything",
-  },
-  {
-    value: "BURSAR",
-    label: "Bursar",
-    hint: "Records payments and manages finance",
-  },
-  {
-    value: "FINANCE",
-    label: "Finance",
-    hint: "Views reports and reconciles accounts",
-  },
-  {
-    value: "REGISTRAR",
-    label: "Registrar",
-    hint: "Manages students and enrollment",
-  },
-  {
-    value: "TEACHER",
-    label: "Teacher",
-    hint: "Views results and student records",
-  },
-  { value: "OTHER", label: "Other", hint: "Custom role" },
-];
-
 const EditStaffModal = ({ member, departments, onClose, onUpdated }: Props) => {
   const { staff: currentUser } = useAuthStore();
 
-  const [role, setRole] = useState<StaffRole>("BURSAR");
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [rolesLoading, setRolesLoading] = useState(false);
+
+  const [roleId, setRoleId] = useState<string>("");
   const [departmentId, setDepartmentId] = useState<string>("");
   const [isActive, setIsActive] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
-  // Load current values when modal opens
+  // Load roles when modal opens
+  useEffect(() => {
+    if (!member) return;
+    setRolesLoading(true);
+    api
+      .get("/roles")
+      .then((res) => setRoles(res.data.data || []))
+      .catch(() => setRoles([]))
+      .finally(() => setRolesLoading(false));
+  }, [member]);
+
+  // Populate form from member
   useEffect(() => {
     if (member) {
-      setRole(member.role);
+      setRoleId(member.role?.id || "");
       setDepartmentId(member.department?.id || "");
       setIsActive(member.isActive !== false);
       setError("");
@@ -77,10 +62,13 @@ const EditStaffModal = ({ member, departments, onClose, onUpdated }: Props) => {
   if (!member) return null;
 
   const isSelf = member.id === currentUser?.id;
-  const roleChanged = role !== member.role;
+  const currentRoleId = member.role?.id || "";
+  const roleChanged = roleId !== currentRoleId;
   const deptChanged = (member.department?.id || "") !== departmentId;
   const statusChanged = isActive !== (member.isActive !== false);
   const hasChanges = roleChanged || deptChanged || statusChanged;
+
+  const selectedRole = roles.find((r) => r.id === roleId);
 
   const handleSave = async () => {
     setError("");
@@ -93,7 +81,7 @@ const EditStaffModal = ({ member, departments, onClose, onUpdated }: Props) => {
     setSaving(true);
     try {
       const payload: any = {};
-      if (roleChanged) payload.role = role;
+      if (roleChanged) payload.roleId = roleId;
       if (deptChanged) payload.departmentId = departmentId || null;
       if (statusChanged) payload.isActive = isActive;
 
@@ -145,7 +133,6 @@ const EditStaffModal = ({ member, departments, onClose, onUpdated }: Props) => {
             </div>
           )}
 
-          {/* Self warning */}
           {isSelf && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-2">
               <ShieldAlert
@@ -165,28 +152,34 @@ const EditStaffModal = ({ member, departments, onClose, onUpdated }: Props) => {
               Role
             </label>
             <Select
-              value={role}
-              onValueChange={(v) => setRole(v as StaffRole)}
-              disabled={isSelf}
+              value={roleId}
+              onValueChange={setRoleId}
+              disabled={isSelf || rolesLoading}
             >
               <SelectTrigger
                 className={`w-full bg-white border-gray-200 rounded-lg text-sm h-[42px] ${
                   isSelf ? "opacity-60 cursor-not-allowed" : ""
                 }`}
               >
-                <SelectValue placeholder="Select role" />
+                <SelectValue
+                  placeholder={
+                    rolesLoading ? "Loading roles..." : "Select role"
+                  }
+                />
               </SelectTrigger>
               <SelectContent className="bg-white">
-                {ROLES.map((r) => (
-                  <SelectItem key={r.value} value={r.value}>
-                    {r.label}
+                {roles.map((r) => (
+                  <SelectItem key={r.id} value={r.id}>
+                    {r.name}
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
-            <p className="text-xs text-gray-400 mt-1.5">
-              {ROLES.find((r) => r.value === role)?.hint}
-            </p>
+            {selectedRole?.description && (
+              <p className="text-xs text-gray-400 mt-1.5">
+                {selectedRole.description}
+              </p>
+            )}
           </div>
 
           {/* Department */}

@@ -1,21 +1,9 @@
-
-enum StaffRole {
-  SUPER_ADMIN
-  SCHOOL_ADMIN
-  BURSAR
-  FINANCE
-  TEACHER
-  REGISTRAR
-  OTHER
-}
-
 enum Term {
   TERM_1
   TERM_2
   TERM_3
 }
 
-// ==================== PLATFORM ====================
 model Platform {
   id        String   @id @default(uuid())
   name      String   @default("SchoolPay Malawi")
@@ -65,6 +53,7 @@ model School {
 
   staff           Staff[]
   departments     Department[]
+  roles           Role[]
   classes         Class[]
   students        Student[]
   payments        FeePayment[]
@@ -80,8 +69,7 @@ model School {
   @@map("schools")
 }
 
-// ==================== DEPARTMENT (NEW) ====================
-// Created by admin in Settings, e.g. "Finance", "Bursary", "Academics"
+// ==================== DEPARTMENT ====================
 model Department {
   id       String @id @default(uuid())
   schoolId String
@@ -100,7 +88,30 @@ model Department {
   @@map("departments")
 }
 
-// ==================== STAFF (REWRITTEN) ====================
+// ==================== ROLE ====================
+// Custom roles created by admin in Settings.
+// permissions shape: { "students": ["read","write"], "payments": ["read","verify"] }
+model Role {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  permissions Json
+  isSystem    Boolean @default(false) // protects default roles from deletion
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  staff Staff[]
+
+  @@unique([schoolId, name])
+  @@index([schoolId])
+  @@map("roles")
+}
+
+// ==================== STAFF ====================
 model Staff {
   id       String @id @default(uuid())
   schoolId String
@@ -109,28 +120,29 @@ model Staff {
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
-  fullName String
-  email    String  @unique
-  phone    String
-  role     StaffRole
-  avatar   String?
+  roleId String
+  role   Role   @relation(fields: [roleId], references: [id])
 
-  // Password is nullable because invited staff don't have one until accepted
+  title     String?
+  firstName String
+  lastName  String
+  fullName  String
+
+  email        String  @unique
+  phone        String
   passwordHash String?
+  avatar       String?
 
   isActive  Boolean   @default(true)
   lastLogin DateTime?
 
-  // ---------- Email Verification (admin registration) ----------
   emailVerified            Boolean   @default(false)
   emailVerificationOtp     String?
   emailVerificationExpires DateTime?
 
-  // ---------- Password Management ----------
   mustChangePassword Boolean   @default(false)
   passwordChangedAt  DateTime?
 
-  // ---------- Invitation (staff invited by admin) ----------
   invitedById       String?
   invitedBy         Staff?    @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
   invited           Staff[]   @relation("InvitedBy")
@@ -138,7 +150,6 @@ model Staff {
   invitationToken   String?   @unique
   invitationExpires DateTime?
 
-  // ---------- Password Reset ----------
   passwordResetToken   String?   @unique
   passwordResetExpires DateTime?
 
@@ -154,7 +165,7 @@ model Staff {
   @@map("staff")
 }
 
-// ==================== PARENT OTP (phone login) ====================
+// ==================== PARENT OTP ====================
 model OtpCode {
   id        String   @id @default(uuid())
   phone     String

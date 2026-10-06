@@ -23,23 +23,45 @@ const generateTempPassword = () => {
   return base.join("");
 };
 
+// Merge title + firstName + lastName into one display name
+const buildFullName = (title, firstName, lastName) =>
+  [title, firstName, lastName]
+    .filter((p) => p && String(p).trim())
+    .map((p) => String(p).trim())
+    .join(" ");
+
 // ==================== INVITE STAFF ====================
 // POST /api/staff/invite
 const inviteStaff = async (req, res) => {
   try {
-    const { fullName, email, phone, role, departmentId } = req.body;
+    const { title, firstName, lastName, email, phone, roleId, departmentId } =
+      req.body;
 
-    if (!fullName || !email || !phone || !role) {
+    if (!firstName || !lastName || !email || !phone || !roleId) {
       return res.status(400).json({
         success: false,
-        message: "fullName, email, phone, role required",
+        message: "firstName, lastName, email, phone, roleId required",
       });
     }
 
-    // Restrict roles that can be assigned
-    const allowedRoles = ["BURSAR", "FINANCE", "TEACHER", "REGISTRAR", "OTHER"];
-    if (!allowedRoles.includes(role)) {
-      return res.status(400).json({ success: false, message: "Invalid role" });
+    // Validate role belongs to this school
+    const role = await prisma.role.findFirst({
+      where: { id: roleId, schoolId: req.schoolId },
+    });
+    if (!role) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Role not found" });
+    }
+
+    // Prevent inviting another School Admin through this endpoint
+    // (there is only one admin per school — the founder)
+    if (role.name === "School Admin") {
+      return res.status(400).json({
+        success: false,
+        message:
+          "You cannot invite another School Admin. Choose a different role.",
+      });
     }
 
     const existing = await prisma.staff.findUnique({ where: { email } });
@@ -64,6 +86,7 @@ const inviteStaff = async (req, res) => {
     const tempPassword = generateTempPassword();
     const inviteToken = crypto.randomBytes(32).toString("hex");
     const tempPasswordHash = await bcrypt.hash(tempPassword, 12);
+    const fullName = buildFullName(title, firstName, lastName);
 
     const school = await prisma.school.findUnique({
       where: { id: req.schoolId },
@@ -73,10 +96,13 @@ const inviteStaff = async (req, res) => {
       data: {
         schoolId: req.schoolId,
         departmentId: departmentId || null,
+        roleId,
+        title: title?.trim() || null,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
         fullName,
         email,
         phone,
-        role,
         passwordHash: tempPasswordHash, // temp; will be replaced on accept
         emailVerified: false,
         mustChangePassword: true,
@@ -86,6 +112,7 @@ const inviteStaff = async (req, res) => {
         invitationExpires: new Date(Date.now() + INVITE_TTL_MS),
       },
       include: {
+        role: { select: { id: true, name: true } },
         department: { select: { id: true, name: true } },
       },
     });
@@ -95,7 +122,7 @@ const inviteStaff = async (req, res) => {
       to: email,
       name: fullName,
       schoolName: school.name,
-      role,
+      role: role.name,
       tempPassword,
       inviteToken,
     });
@@ -108,7 +135,7 @@ const inviteStaff = async (req, res) => {
         action: "STAFF_INVITED",
         entity: "Staff",
         entityId: invited.id,
-        changes: { email, role, departmentId },
+        changes: { email, roleId, roleName: role.name, departmentId },
       },
     });
 
@@ -117,6 +144,9 @@ const inviteStaff = async (req, res) => {
       message: `Invitation sent to ${email}`,
       data: {
         id: invited.id,
+        title: invited.title,
+        firstName: invited.firstName,
+        lastName: invited.lastName,
         fullName: invited.fullName,
         email: invited.email,
         role: invited.role,
@@ -139,10 +169,13 @@ const listStaff = async (req, res) => {
       where: { schoolId: req.schoolId },
       select: {
         id: true,
+        title: true,
+        firstName: true,
+        lastName: true,
         fullName: true,
         email: true,
         phone: true,
-        role: true,
+        role: { select: { id: true, name: true } },
         isActive: true,
         emailVerified: true,
         mustChangePassword: true,
@@ -152,7 +185,7 @@ const listStaff = async (req, res) => {
         createdAt: true,
         department: { select: { id: true, name: true } },
       },
-      orderBy: [{ role: "asc" }, { fullName: "asc" }],
+      orderBy: [{ role: { name: "asc" } }, { fullName: "asc" }],
     });
     return res.status(200).json({ success: true, data: staff });
   } catch (err) {
@@ -170,6 +203,7 @@ const resendInvite = async (req, res) => {
     const { id } = req.params;
     const member = await prisma.staff.findFirst({
       where: { id, schoolId: req.schoolId },
+      include: { role: { select: { name: true } } },
     });
     if (!member)
       return res
@@ -196,7 +230,7 @@ const resendInvite = async (req, res) => {
       to: member.email,
       name: member.fullName,
       schoolName: school.name,
-      role: member.role,
+      role: member.role.name,
       tempPassword,
       inviteToken,
     });
@@ -217,7 +251,7 @@ const resendInvite = async (req, res) => {
 const updateStaff = async (req, res) => {
   try {
     const { id } = req.params;
-    const { role, departmentId, isActive } = req.body;
+    const { roleId, departmentId, isActive } = req.body;
 
     const existing = await prisma.staff.findFirst({
       where: { id, schoolId: req.schoolId },
@@ -227,23 +261,62 @@ const updateStaff = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Staff not found" });
 
-    // Prevent admin from demoting themselves (safety)
-    if (existing.id === req.staff.id && role && role !== existing.role) {
+    // Validate role if provided
+    if (roleId) {
+      const role = await prisma.role.findFirst({
+        where: { id: roleId, schoolId: req.schoolId },
+      });
+      if (!role) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Role not found" });
+      }
+    }
+
+    // Prevent admin from changing their own role
+    if (existing.id === req.staff.id && roleId && roleId !== existing.roleId) {
       return res
         .status(400)
         .json({ success: false, message: "You cannot change your own role" });
     }
 
+    // Prevent self-deactivation
+    if (
+      existing.id === req.staff.id &&
+      isActive !== undefined &&
+      isActive === false
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "You cannot deactivate your own account",
+      });
+    }
+
+    // Validate department if provided
+    if (departmentId) {
+      const dept = await prisma.department.findFirst({
+        where: { id: departmentId, schoolId: req.schoolId },
+      });
+      if (!dept) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Department not found" });
+      }
+    }
+
     const updated = await prisma.staff.update({
       where: { id },
       data: {
-        ...(role && { role }),
+        ...(roleId && { roleId }),
         ...(departmentId !== undefined && {
           departmentId: departmentId || null,
         }),
         ...(isActive !== undefined && { isActive }),
       },
-      include: { department: { select: { id: true, name: true } } },
+      include: {
+        role: { select: { id: true, name: true } },
+        department: { select: { id: true, name: true } },
+      },
     });
 
     await prisma.auditLog.create({
@@ -253,7 +326,7 @@ const updateStaff = async (req, res) => {
         action: "STAFF_UPDATED",
         entity: "Staff",
         entityId: id,
-        changes: { role, departmentId, isActive },
+        changes: { roleId, departmentId, isActive },
       },
     });
 

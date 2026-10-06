@@ -2,10 +2,10 @@ const express = require("express");
 const router = express.Router();
 const staff = require("../controllers/staff.controller");
 const { authenticate } = require("../middleware/auth");
-const { requireRole } = require("../middleware/role");
+const { requirePermission } = require("../middleware/role");
 
 router.use(authenticate);
-router.use(requireRole("SCHOOL_ADMIN"));
+router.use(requirePermission("staff", "write"));
 
 router.post("/invite", staff.inviteStaff);
 router.get("/", staff.listStaff);

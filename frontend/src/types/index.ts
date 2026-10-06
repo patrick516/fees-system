@@ -1,4 +1,27 @@
-// ==================== DEPARTMENT (NEW) ====================
+export type Resource =
+  | "dashboard"
+  | "students"
+  | "payments"
+  | "classes"
+  | "reports"
+  | "sms"
+  | "results"
+  | "staff"
+  | "settings";
+
+export type PermissionAction = "read" | "write" | "verify" | "delete";
+
+export type Permissions = Partial<Record<Resource, PermissionAction[]>>;
+
+export interface Role {
+  id: string;
+  name: string;
+  description?: string | null;
+  permissions: Permissions;
+  isSystem: boolean;
+  _count?: { staff: number };
+}
+
 export interface Department {
   id: string;
   name: string;
@@ -7,7 +30,6 @@ export interface Department {
   _count?: { staff: number };
 }
 
-// ==================== SCHOOL ====================
 export interface School {
   id: string;
   name: string;
@@ -21,27 +43,20 @@ export interface School {
   isActive: boolean;
 }
 
-// ==================== STAFF (UPDATED) ====================
-export type StaffRole =
-  | "SUPER_ADMIN"
-  | "SCHOOL_ADMIN"
-  | "BURSAR"
-  | "FINANCE"
-  | "TEACHER"
-  | "REGISTRAR"
-  | "OTHER";
-
 export interface Staff {
   id: string;
+  title?: string | null;
+  firstName: string;
+  lastName: string;
   fullName: string;
   email: string;
   phone: string;
-  role: StaffRole;
+  role: Role;
   avatar: string | null;
   school: School;
-  department?: Department | null; // NEW
-  mustChangePassword?: boolean; // NEW
-  emailVerified?: boolean; // NEW
+  department?: Department | null;
+  mustChangePassword?: boolean;
+  emailVerified?: boolean;
   isActive?: boolean;
   lastLogin?: string | null;
   invitedAt?: string | null;
@@ -49,14 +64,12 @@ export interface Staff {
   createdAt?: string;
 }
 
-// ==================== CLASS ====================
 export interface Class {
   id: string;
   name: string;
   level?: number;
 }
 
-// ==================== STUDENT ====================
 export interface Student {
   id: string;
   studentCode: string;
@@ -79,7 +92,6 @@ export interface Student {
   outstandingBalance?: number;
 }
 
-// ==================== FEE STRUCTURE ====================
 export interface FeeStructure {
   id: string;
   classId: string;
@@ -96,7 +108,6 @@ export interface FeeStructure {
   class?: { name: string };
 }
 
-// ==================== PAYMENT ====================
 export type PaymentMethod =
   | "CASH"
   | "AIRTEL_MONEY"
@@ -136,7 +147,6 @@ export interface Payment {
   verifiedBy?: { fullName: string } | null;
 }
 
-// ==================== PAYMENT SUMMARY ====================
 export interface PaymentSummary {
   totalRequired: number;
   totalCollected: number;
@@ -158,7 +168,6 @@ export interface PaymentSummary {
   term?: string | null;
 }
 
-// ==================== PAGINATION ====================
 export interface Pagination {
   total: number;
   page: number;
@@ -166,7 +175,6 @@ export interface Pagination {
   totalPages: number;
 }
 
-// ==================== API RESPONSE ====================
 export interface ApiResponse<T> {
   success: boolean;
   message?: string;

@@ -17,26 +17,54 @@ import {
   UserCog,
 } from "lucide-react";
 import { useAuthStore } from "../../../store/authStore";
+import type { Resource } from "../../../types";
 
 type NavItem = {
   to: string;
   icon: typeof LayoutDashboard;
   label: string;
   end?: boolean;
-  adminOnly?: boolean; // NEW: hide from non-admins
+  resource: Resource;
 };
 
 const navItems: NavItem[] = [
-  { to: "/dashboard", icon: LayoutDashboard, label: "Dashboard", end: true },
-  { to: "/students", icon: Users, label: "Students" },
-  { to: "/payments", icon: CreditCard, label: "Payments", end: true },
-  { to: "/payments/pending", icon: Clock, label: "Pending" },
-  { to: "/classes", icon: GraduationCap, label: "Classes" },
-  { to: "/reports", icon: BarChart2, label: "Reports" },
-  { to: "/sms", icon: MessageSquare, label: "Send SMS" },
-  { to: "/results", icon: FileText, label: "Exam Results" },
-  { to: "/staff", icon: UserCog, label: "Staff", adminOnly: true }, // NEW
-  { to: "/settings", icon: Settings, label: "Settings" },
+  {
+    to: "/dashboard",
+    icon: LayoutDashboard,
+    label: "Dashboard",
+    end: true,
+    resource: "dashboard",
+  },
+  { to: "/students", icon: Users, label: "Students", resource: "students" },
+  {
+    to: "/payments",
+    icon: CreditCard,
+    label: "Payments",
+    end: true,
+    resource: "payments",
+  },
+  {
+    to: "/payments/pending",
+    icon: Clock,
+    label: "Pending",
+    resource: "payments",
+  },
+  {
+    to: "/classes",
+    icon: GraduationCap,
+    label: "Classes",
+    resource: "classes",
+  },
+  { to: "/reports", icon: BarChart2, label: "Reports", resource: "reports" },
+  { to: "/sms", icon: MessageSquare, label: "Send SMS", resource: "sms" },
+  {
+    to: "/results",
+    icon: FileText,
+    label: "Exam Results",
+    resource: "results",
+  },
+  { to: "/staff", icon: UserCog, label: "Staff", resource: "staff" },
+  { to: "/settings", icon: Settings, label: "Settings", resource: "settings" },
 ];
 
 const Sidebar = () => {
@@ -44,9 +72,16 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
 
-  const visibleNavItems = navItems.filter(
-    (item) => !item.adminOnly || staff?.role === "SCHOOL_ADMIN",
-  );
+  // Check if the logged-in user has "read" permission for a resource.
+  // School Admin always passes (safety fallback).
+  const canRead = (resource: Resource): boolean => {
+    if (!staff?.role) return false;
+    if (staff.role.name === "School Admin") return true;
+    const perms = staff.role.permissions?.[resource];
+    return Array.isArray(perms) && perms.includes("read");
+  };
+
+  const visibleNavItems = navItems.filter((item) => canRead(item.resource));
 
   const handleLogout = () => {
     logout();
@@ -74,10 +109,9 @@ const Sidebar = () => {
           <div className="flex-1 min-w-0">
             <p className="font-bold text-sm">SchoolPay</p>
             <p className="text-white/70 text-xs truncate">
-              {staff?.school.name}
+              {staff?.school?.name}
             </p>
           </div>
-          {/* Close button — mobile only */}
           <button
             onClick={close}
             className="md:hidden ml-auto text-white/70 hover:text-white"
@@ -114,12 +148,12 @@ const Sidebar = () => {
       <div className="p-4 border-t border-white/10">
         <div className="flex items-center gap-3 mb-3 px-2">
           <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold shrink-0">
-            {staff?.fullName.charAt(0)}
+            {staff?.fullName?.charAt(0) || "?"}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-medium truncate">{staff?.fullName}</p>
-            <p className="text-white/70 text-xs">
-              {staff?.role.replace("_", " ")}
+            <p className="text-white/70 text-xs truncate">
+              {staff?.role?.name || "—"}
             </p>
           </div>
         </div>
@@ -161,13 +195,12 @@ const Sidebar = () => {
         </div>
       </div>
 
-      {/* ── Desktop sidebar (always visible) ── */}
+      {/* ── Desktop sidebar ── */}
       <aside className="hidden md:flex md:flex-col md:w-64 md:shrink-0 h-screen sticky top-0">
         {sidebarContent}
       </aside>
 
       {/* ── Mobile drawer ── */}
-      {/* Backdrop */}
       <div
         onClick={close}
         className={`md:hidden fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ${
@@ -177,7 +210,6 @@ const Sidebar = () => {
         }`}
         aria-hidden="true"
       />
-      {/* Drawer panel */}
       <aside
         className={`md:hidden fixed top-0 left-0 z-50 h-full transition-transform duration-300 ${
           open ? "translate-x-0" : "-translate-x-full"

@@ -15,8 +15,17 @@ import {
 import api from "../../lib/axios";
 import PasswordStrengthMeter from "../../components/shared/PasswordStrengthMeter";
 import { validatePassword } from "../../lib/passwordPolicy";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 
 type Step = 1 | 2 | 3;
+
+const TITLES = ["Mr", "Mrs", "Ms", "Miss", "Dr", "Prof"];
 
 // Strips non-digits, removes leading 0 or 265 so we always store the 9-digit local number
 const normalizePhone = (raw: string) => {
@@ -37,9 +46,11 @@ const Signup = () => {
   const [setupComplete, setSetupComplete] = useState(false);
   const [setupSchoolName, setSetupSchoolName] = useState<string | undefined>();
 
-  // Step 1: personal
+  // Step 1: personal — split name
   const [personal, setPersonal] = useState({
-    fullName: "",
+    title: "",
+    firstName: "",
+    lastName: "",
     email: "",
     phone: "",
     password: "",
@@ -67,7 +78,6 @@ const Signup = () => {
         setSetupSchoolName(res.data.data.schoolName);
       })
       .catch(() => {
-        // If the check fails, allow the signup page to load — safer default
         setSetupComplete(false);
       })
       .finally(() => setCheckingSetup(false));
@@ -92,13 +102,21 @@ const Signup = () => {
     setLoading(true);
     try {
       await api.post("/auth/register", {
-        ...personal,
+        // Split name
+        title: personal.title || undefined,
+        firstName: personal.firstName.trim(),
+        lastName: personal.lastName.trim(),
+        email: personal.email.trim(),
         phone: `+265${personal.phone}`,
-        ...school,
+        password: personal.password,
+        // School
+        schoolName: school.schoolName.trim(),
+        address: school.address.trim(),
+        city: school.city.trim(),
         schoolPhone: `+265${school.schoolPhone}`,
       });
       setStep(3);
-      setCountdown(60); // block resend for 60s initially
+      setCountdown(60);
     } catch (err: any) {
       const data = err.response?.data;
       if (data?.errors?.length) setError(data.errors.join(" • "));
@@ -157,8 +175,8 @@ const Signup = () => {
     setTimeout(() => setCountdown((c) => c - 1), 1000);
   }
 
-  // ==================== STEP LABELS ====================
   const stepLabels = ["Your details", "School info", "Verify email"];
+
   // ==================== SETUP CHECK: LOADING ====================
   if (checkingSetup) {
     return (
@@ -207,19 +225,16 @@ const Signup = () => {
   }
 
   return (
-    // fixed + overflow-hidden → page never scrolls
     <div className="fixed inset-0 w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat overflow-hidden">
       <div className="absolute inset-0 bg-black/40" />
 
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-4 py-4">
-        {/* Logo */}
         <div className="mb-4 flex items-center justify-center">
           <div className="w-12 h-12 bg-[var(--color-primary)] rounded-2xl flex items-center justify-center">
             <School size={24} className="text-white" />
           </div>
         </div>
 
-        {/* Heading */}
         <h1 className="text-2xl font-bold text-white text-center tracking-tight">
           Create your school account
         </h1>
@@ -227,7 +242,6 @@ const Signup = () => {
           Step {step} of 3 — {stepLabels[step - 1]}
         </p>
 
-        {/* Card — capped height + internal scroll only if tiny viewport */}
         <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl p-6 max-h-[calc(100vh-9rem)] overflow-y-auto">
           {/* ==================== STEPPER ==================== */}
           <div className="flex items-center justify-center gap-2 mb-5">
@@ -269,22 +283,69 @@ const Signup = () => {
           {/* ==================== STEP 1 — PERSONAL ==================== */}
           {step === 1 && (
             <form onSubmit={goToStep2} className="space-y-3">
+              {/* Title */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Full Name
+                  Title
                 </label>
-                <input
-                  type="text"
-                  value={personal.fullName}
-                  onChange={(e) =>
-                    setPersonal({ ...personal, fullName: e.target.value })
+                <Select
+                  value={personal.title || "none"}
+                  onValueChange={(v) =>
+                    setPersonal({
+                      ...personal,
+                      title: v === "none" ? "" : v,
+                    })
                   }
-                  placeholder="John Banda"
-                  required
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all"
-                />
+                >
+                  <SelectTrigger className="w-full bg-white border-gray-300 rounded-lg text-sm h-[42px]">
+                    <SelectValue placeholder="No title" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="none">No title</SelectItem>
+                    {TITLES.map((t) => (
+                      <SelectItem key={t} value={t}>
+                        {t}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
+              {/* First + Last name */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    First Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={personal.firstName}
+                    onChange={(e) =>
+                      setPersonal({ ...personal, firstName: e.target.value })
+                    }
+                    placeholder="Patrick"
+                    required
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Last Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={personal.lastName}
+                    onChange={(e) =>
+                      setPersonal({ ...personal, lastName: e.target.value })
+                    }
+                    placeholder="Kulini"
+                    required
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all"
+                  />
+                </div>
+              </div>
+
+              {/* Email */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   Email
@@ -301,6 +362,7 @@ const Signup = () => {
                 />
               </div>
 
+              {/* Phone */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   Phone Number
@@ -332,6 +394,7 @@ const Signup = () => {
                 </p>
               </div>
 
+              {/* Password */}
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   Password
@@ -358,7 +421,6 @@ const Signup = () => {
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
                 </div>
-                {/* Compact meter — fits on 2 tight lines */}
                 <PasswordStrengthMeter password={personal.password} compact />
               </div>
 

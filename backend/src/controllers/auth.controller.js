@@ -5,6 +5,7 @@ const prisma = require("../config/db");
 const { sendOtp, verifyOtp } = require("../lib/sms");
 const { sendOtpEmail } = require("../lib/mailer");
 const { validatePassword } = require("../lib/passwordPolicy");
+const { createDefaultRolesForSchool } = require("../lib/defaultRoles");
 
 // ==================== HELPERS ====================
 
@@ -26,6 +27,14 @@ const slugify = (str) =>
     .replace(/\s+/g, "-")
     .replace(/-+/g, "-");
 
+// Merge title + firstName + lastName into a single display name.
+// Returns "" if firstName or lastName is missing.
+const buildFullName = (title, firstName, lastName) =>
+  [title, firstName, lastName]
+    .filter((p) => p && String(p).trim())
+    .map((p) => String(p).trim())
+    .join(" ");
+
 // ==================== STAFF AUTH ====================
 
 // POST /api/auth/staff/login
@@ -43,6 +52,7 @@ const staffLogin = async (req, res) => {
     const staff = await prisma.staff.findUnique({
       where: { email: email.toLowerCase().trim() },
       include: {
+        role: true,
         department: { select: { id: true, name: true } },
         school: {
           select: {
@@ -106,7 +116,6 @@ const staffLogin = async (req, res) => {
     const token = generateToken({
       id: staff.id,
       schoolId: staff.schoolId,
-      role: staff.role,
       type: "STAFF",
     });
 
@@ -115,14 +124,20 @@ const staffLogin = async (req, res) => {
       message: "Login successful",
       data: {
         token,
-        // NEW: flag frontend to force password change
         mustChangePassword: staff.mustChangePassword,
         staff: {
           id: staff.id,
+          title: staff.title,
+          firstName: staff.firstName,
+          lastName: staff.lastName,
           fullName: staff.fullName,
           email: staff.email,
           phone: staff.phone,
-          role: staff.role,
+          role: {
+            id: staff.role.id,
+            name: staff.role.name,
+            permissions: staff.role.permissions,
+          },
           avatar: staff.avatar,
           department: staff.department,
           school: staff.school,
@@ -145,10 +160,15 @@ const getStaffProfile = async (req, res) => {
       where: { id: req.staff.id },
       select: {
         id: true,
+        title: true,
+        firstName: true,
+        lastName: true,
         fullName: true,
         email: true,
         phone: true,
-        role: true,
+        role: {
+          select: { id: true, name: true, permissions: true },
+        },
         avatar: true,
         lastLogin: true,
         mustChangePassword: true,
@@ -252,28 +272,23 @@ const changePassword = async (req, res) => {
 const registerAdmin = async (req, res) => {
   try {
     const {
-      fullName,
+      // Personal — split name
+      title,
+      firstName,
+      lastName,
       email,
       phone,
       password,
+      // School
       schoolName,
       address,
       city,
       schoolPhone,
     } = req.body;
-    // Block registration if a school already exists — setup is one-time only
-    const existingSchoolCount = await prisma.school.count();
-    if (existingSchoolCount > 0) {
-      return res.status(403).json({
-        success: false,
-        message:
-          "Setup is already complete. Please contact your school administrator.",
-        code: "SETUP_ALREADY_COMPLETE",
-      });
-    }
 
     if (
-      !fullName ||
+      !firstName ||
+      !lastName ||
       !email ||
       !phone ||
       !password ||
@@ -284,7 +299,8 @@ const registerAdmin = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required",
+        message:
+          "firstName, lastName, email, phone, password, schoolName, address, city and schoolPhone are required",
       });
     }
 
@@ -320,11 +336,13 @@ const registerAdmin = async (req, res) => {
     const slugExists = await prisma.school.findUnique({ where: { slug } });
     if (slugExists) slug = `${slug}-${Date.now().toString(36)}`;
 
+    const fullName = buildFullName(title, firstName, lastName);
     const passwordHash = await bcrypt.hash(password, 12);
     const otp = generateOtp();
     const otpHash = await bcrypt.hash(otp, 10);
 
     const result = await prisma.$transaction(async (tx) => {
+      // 1. Create school
       const school = await tx.school.create({
         data: {
           platformId: platform.id,
@@ -337,14 +355,21 @@ const registerAdmin = async (req, res) => {
         },
       });
 
+      // 2. Create the 6 default roles for this school
+      const roleMap = await createDefaultRolesForSchool(tx, school.id);
+
+      // 3. Create the admin, linked to the School Admin role
       const admin = await tx.staff.create({
         data: {
           schoolId: school.id,
+          roleId: roleMap["School Admin"],
+          title: title?.trim() || null,
+          firstName: firstName.trim(),
+          lastName: lastName.trim(),
           fullName,
           email,
           phone,
           passwordHash,
-          role: "SCHOOL_ADMIN",
           emailVerified: false,
           emailVerificationOtp: otpHash,
           emailVerificationExpires: new Date(Date.now() + OTP_TTL_MS),
@@ -531,10 +556,15 @@ const getMe = async (req, res) => {
       where: { id: req.staff.id },
       select: {
         id: true,
+        title: true,
+        firstName: true,
+        lastName: true,
         fullName: true,
         email: true,
         phone: true,
-        role: true,
+        role: {
+          select: { id: true, name: true, permissions: true },
+        },
         avatar: true,
         lastLogin: true,
         mustChangePassword: true,
