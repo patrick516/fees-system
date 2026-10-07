@@ -181,3 +181,27 @@ export interface ApiResponse<T> {
   data: T;
   pagination?: Pagination;
 }
+
+export type NotificationChannel = "SMS" | "EMAIL" | "BOTH";
+
+export interface NotificationLog {
+  id: string;
+  channel: "SMS" | "EMAIL";
+  phone?: string | null;
+  email?: string | null;
+  recipientName?: string | null;
+  message: string;
+  subject?: string | null;
+  type: string;
+  template?: string | null;
+  status: "SENT" | "FAILED";
+  messageId?: string | null;
+  cost?: string | null;
+  errorMessage?: string | null;
+  sentBy?: { fullName: string } | null;
+  createdAt: string;
+}
+
+export interface NotificationDefaults {
+  defaultChannel: NotificationChannel;
+}

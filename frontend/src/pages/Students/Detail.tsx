@@ -18,6 +18,7 @@ import {
   Cake,
 } from "lucide-react";
 import api from "../../lib/axios";
+import { usePermission } from "../../hooks/usePermission";
 
 const statusConfig = {
   VERIFIED: {
@@ -43,6 +44,7 @@ const methodLabel = (method: string) => method.replace(/_/g, " ");
 const StudentDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { can } = usePermission();
   const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -215,17 +217,22 @@ const StudentDetail = () => {
             )}
           </div>
 
-          <button
-            onClick={() =>
-              navigate("/payments/record", {
-                state: { studentId: student.id, studentName: student.fullName },
-              })
-            }
-            className="mt-5 w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-2.5 rounded-xl text-sm font-medium hover:bg-[var(--color-primary-dark)] transition-colors"
-          >
-            <CreditCard size={16} />
-            Record Payment
-          </button>
+          {can("payments", "write") && (
+            <button
+              onClick={() =>
+                navigate("/payments/record", {
+                  state: {
+                    studentId: student.id,
+                    studentName: student.fullName,
+                  },
+                })
+              }
+              className="mt-5 w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-2.5 rounded-xl text-sm font-medium hover:bg-[var(--color-primary-dark)] transition-colors"
+            >
+              <CreditCard size={16} />
+              Record Payment
+            </button>
+          )}
         </div>
 
         {/* Right — Stats + Credit + Fee Structures */}

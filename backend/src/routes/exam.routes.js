@@ -6,31 +6,56 @@ const {
   verifyParent,
   verifyStaffOrParent,
 } = require("../middleware/auth");
-const { isAdmin, isBursar } = require("../middleware/role");
+const { requirePermission } = require("../middleware/role");
 const examController = require("../controllers/exam.controller");
 
 const upload = multer({ storage: multer.memoryStorage() });
 
 // ==================== EXAM PERIODS ====================
-router.get("/periods", verifyStaff, examController.listExamPeriods);
-router.post("/periods", verifyStaff, isAdmin, examController.createExamPeriod);
+router.get(
+  "/periods",
+  verifyStaff,
+  requirePermission("results", "read"),
+  examController.listExamPeriods,
+);
+router.post(
+  "/periods",
+  verifyStaff,
+  requirePermission("results", "write"),
+  examController.createExamPeriod,
+);
 router.put(
   "/periods/:id/activate",
   verifyStaff,
-  isAdmin,
+  requirePermission("results", "write"),
   examController.toggleExamPeriodActive,
 );
 
 // ==================== SUBJECTS ====================
-router.get("/subjects", verifyStaff, examController.getSubjects);
-router.post("/subjects", verifyStaff, isAdmin, examController.createSubject);
+router.get(
+  "/subjects",
+  verifyStaff,
+  requirePermission("results", "read"),
+  examController.getSubjects,
+);
+router.post(
+  "/subjects",
+  verifyStaff,
+  requirePermission("results", "write"),
+  examController.createSubject,
+);
 
 // ==================== GRADE BOUNDARIES ====================
-router.get("/grade-boundaries", verifyStaff, examController.getGradeBoundaries);
+router.get(
+  "/grade-boundaries",
+  verifyStaff,
+  requirePermission("results", "read"),
+  examController.getGradeBoundaries,
+);
 router.put(
   "/grade-boundaries",
   verifyStaff,
-  isAdmin,
+  requirePermission("results", "write"),
   examController.setGradeBoundaries,
 );
 
@@ -38,7 +63,7 @@ router.put(
 router.put(
   "/classes/:classId/grading-system",
   verifyStaff,
-  isAdmin,
+  requirePermission("results", "write"),
   examController.updateClassGradingSystem,
 );
 
@@ -46,28 +71,38 @@ router.put(
 router.post(
   "/results/upload",
   verifyStaff,
-  isBursar,
+  requirePermission("results", "write"),
   upload.single("file"),
   examController.uploadResults,
 );
 
 // ==================== PENDING NAME MATCHES ====================
-router.get("/pending-rows", verifyStaff, examController.getPendingRows);
+router.get(
+  "/pending-rows",
+  verifyStaff,
+  requirePermission("results", "read"),
+  examController.getPendingRows,
+);
 router.post(
   "/pending-rows/:id/resolve",
   verifyStaff,
-  isAdmin,
+  requirePermission("results", "write"),
   examController.resolvePendingRow,
 );
 router.delete(
   "/pending-rows/:id",
   verifyStaff,
-  isAdmin,
+  requirePermission("results", "write"),
   examController.discardPendingRow,
 );
 
 // ==================== ADMIN CLASS VIEW ====================
-router.get("/class-results", verifyStaff, examController.getClassResults);
+router.get(
+  "/class-results",
+  verifyStaff,
+  requirePermission("results", "read"),
+  examController.getClassResults,
+);
 
 // ==================== PARENT VIEW ====================
 router.get(
@@ -76,8 +111,6 @@ router.get(
   examController.getStudentResults,
 );
 
-// Active period — read-only status flag telling the parent portal whether to
-// show the Results tab. Accepts both parent and staff tokens.
 router.get(
   "/active-period",
   verifyStaffOrParent,

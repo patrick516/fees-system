@@ -47,7 +47,7 @@ export const useAuthStore = create<AuthState>()(
           token: null,
           staff: null,
           isAuthenticated: false,
-          mustChangePassword: false, // NEW
+          mustChangePassword: false, 
         });
       },
     }),

@@ -6,7 +6,7 @@ const {
   verifyParent,
   verifyStaffOrParent,
 } = require("../middleware/auth");
-const { isAdmin, isBursar } = require("../middleware/role");
+const { requirePermission } = require("../middleware/role");
 const prisma = require("../config/db");
 const schoolController = require("../controllers/school.controller");
 
@@ -15,118 +15,144 @@ const upload = multer({ storage: multer.memoryStorage() });
 // ==================== CLASSES ====================
 
 // GET /api/schools/classes
-router.get("/classes", verifyStaff, isBursar, async (req, res) => {
-  try {
-    const classes = await prisma.class.findMany({
-      where: { schoolId: req.schoolId, isActive: true },
-      include: {
-        _count: { select: { students: true } },
-        feeStructures: {
-          where: { isActive: true },
-          select: {
-            id: true,
-            term: true,
-            academicYear: true,
-            totalAmount: true,
+router.get(
+  "/classes",
+  verifyStaff,
+  requirePermission("classes", "read"),
+  async (req, res) => {
+    try {
+      const classes = await prisma.class.findMany({
+        where: { schoolId: req.schoolId, isActive: true },
+        include: {
+          _count: { select: { students: true } },
+          feeStructures: {
+            where: { isActive: true },
+            select: {
+              id: true,
+              term: true,
+              academicYear: true,
+              totalAmount: true,
+            },
           },
         },
-      },
-      orderBy: { level: "asc" },
-    });
-    res.json({ success: true, data: classes });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ success: false, message: "Failed to get classes" });
-  }
-});
+        orderBy: { level: "asc" },
+      });
+      res.json({ success: true, data: classes });
+    } catch (err) {
+      console.error(err);
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to get classes" });
+    }
+  },
+);
 
 // POST /api/schools/classes
-router.post("/classes", verifyStaff, isAdmin, async (req, res) => {
-  try {
-    const { name, level } = req.body;
-    if (!name || !level) {
-      return res.status(400).json({
-        success: false,
-        message: "Name and level are required",
+router.post(
+  "/classes",
+  verifyStaff,
+  requirePermission("classes", "write"),
+  async (req, res) => {
+    try {
+      const { name, level } = req.body;
+      if (!name || !level) {
+        return res.status(400).json({
+          success: false,
+          message: "Name and level are required",
+        });
+      }
+      const cls = await prisma.class.create({
+        data: { schoolId: req.schoolId, name, level: parseInt(level) },
       });
+      res.status(201).json({ success: true, data: cls });
+    } catch (err) {
+      if (err.code === "P2002") {
+        return res.status(409).json({
+          success: false,
+          message: "Class already exists",
+        });
+      }
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to create class" });
     }
-    const cls = await prisma.class.create({
-      data: { schoolId: req.schoolId, name, level: parseInt(level) },
-    });
-    res.status(201).json({ success: true, data: cls });
-  } catch (err) {
-    if (err.code === "P2002") {
-      return res.status(409).json({
-        success: false,
-        message: "Class already exists",
-      });
-    }
-    res.status(500).json({ success: false, message: "Failed to create class" });
-  }
-});
+  },
+);
 
 // DELETE /api/schools/classes/:id (soft delete)
-router.delete("/classes/:id", verifyStaff, isAdmin, async (req, res) => {
-  try {
-    const cls = await prisma.class.findFirst({
-      where: { id: req.params.id, schoolId: req.schoolId },
-      include: { _count: { select: { students: true } } },
-    });
-    if (!cls) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Class not found" });
-    }
-    if (cls._count.students > 0) {
-      return res.status(400).json({
-        success: false,
-        message: `Cannot delete class with ${cls._count.students} students. Move students first.`,
+router.delete(
+  "/classes/:id",
+  verifyStaff,
+  requirePermission("classes", "delete"),
+  async (req, res) => {
+    try {
+      const cls = await prisma.class.findFirst({
+        where: { id: req.params.id, schoolId: req.schoolId },
+        include: { _count: { select: { students: true } } },
       });
+      if (!cls) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Class not found" });
+      }
+      if (cls._count.students > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Cannot delete class with ${cls._count.students} students. Move students first.`,
+        });
+      }
+      await prisma.class.update({
+        where: { id: req.params.id },
+        data: { isActive: false },
+      });
+      res.json({ success: true, message: "Class deleted successfully" });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to delete class" });
     }
-    await prisma.class.update({
-      where: { id: req.params.id },
-      data: { isActive: false },
-    });
-    res.json({ success: true, message: "Class deleted successfully" });
-  } catch (err) {
-    res.status(500).json({ success: false, message: "Failed to delete class" });
-  }
-});
+  },
+);
 
 // ==================== FEE STRUCTURES ====================
 
 // GET /api/schools/fee-structures
-router.get("/fee-structures", verifyStaff, isBursar, async (req, res) => {
-  try {
-    const { classId, term, academicYear } = req.query;
+router.get(
+  "/fee-structures",
+  verifyStaff,
+  requirePermission("payments", "read"),
+  async (req, res) => {
+    try {
+      const { classId, term, academicYear } = req.query;
 
-    const where = { schoolId: req.schoolId, isActive: true };
-    if (classId) where.classId = classId;
-    if (term) where.term = term;
-    if (academicYear) where.academicYear = academicYear;
+      const where = { schoolId: req.schoolId, isActive: true };
+      if (classId) where.classId = classId;
+      if (term) where.term = term;
+      if (academicYear) where.academicYear = academicYear;
 
-    const feeStructures = await prisma.feeStructure.findMany({
-      where,
-      include: {
-        class: { select: { id: true, name: true, level: true } },
-      },
-      orderBy: [{ class: { level: "asc" } }, { term: "asc" }],
-    });
+      const feeStructures = await prisma.feeStructure.findMany({
+        where,
+        include: {
+          class: { select: { id: true, name: true, level: true } },
+        },
+        orderBy: [{ class: { level: "asc" } }, { term: "asc" }],
+      });
 
-    res.json({ success: true, data: feeStructures });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to get fee structures" });
-  }
-});
+      res.json({ success: true, data: feeStructures });
+    } catch (err) {
+      console.error(err);
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to get fee structures" });
+    }
+  },
+);
 
 // GET /api/schools/fee-structures/lookup
 router.get(
   "/fee-structures/lookup",
   verifyStaff,
-  isBursar,
+  requirePermission("payments", "read"),
   async (req, res) => {
     try {
       const { classId, term, academicYear } = req.query;
@@ -170,178 +196,193 @@ router.get(
 );
 
 // POST /api/schools/fee-structures
-router.post("/fee-structures", verifyStaff, isAdmin, async (req, res) => {
-  try {
-    const {
-      classId,
-      academicYear,
-      term,
-      totalAmount,
-      tuitionFee,
-      examFee,
-      buildingLevy,
-      uniformFee,
-      bookFee,
-      otherFees,
-      otherFeesDescription,
-    } = req.body;
+router.post(
+  "/fee-structures",
+  verifyStaff,
+  requirePermission("payments", "write"),
+  async (req, res) => {
+    try {
+      const {
+        classId,
+        academicYear,
+        term,
+        totalAmount,
+        tuitionFee,
+        examFee,
+        buildingLevy,
+        uniformFee,
+        bookFee,
+        otherFees,
+        otherFeesDescription,
+      } = req.body;
 
-    if (!classId || !academicYear || !term || !totalAmount) {
-      return res.status(400).json({
-        success: false,
-        message: "classId, academicYear, term and totalAmount are required",
+      if (!classId || !academicYear || !term || !totalAmount) {
+        return res.status(400).json({
+          success: false,
+          message: "classId, academicYear, term and totalAmount are required",
+        });
+      }
+
+      const cls = await prisma.class.findFirst({
+        where: { id: classId, schoolId: req.schoolId },
       });
-    }
+      if (!cls) {
+        return res.status(404).json({
+          success: false,
+          message: "Class not found",
+        });
+      }
 
-    const cls = await prisma.class.findFirst({
-      where: { id: classId, schoolId: req.schoolId },
-    });
-    if (!cls) {
-      return res.status(404).json({
-        success: false,
-        message: "Class not found",
-      });
-    }
-
-    const feeStructure = await prisma.feeStructure.upsert({
-      where: {
-        schoolId_classId_academicYear_term: {
+      const feeStructure = await prisma.feeStructure.upsert({
+        where: {
+          schoolId_classId_academicYear_term: {
+            schoolId: req.schoolId,
+            classId,
+            academicYear,
+            term,
+          },
+        },
+        update: {
+          totalAmount: parseFloat(totalAmount),
+          tuitionFee: tuitionFee ? parseFloat(tuitionFee) : null,
+          examFee: examFee ? parseFloat(examFee) : null,
+          buildingLevy: buildingLevy ? parseFloat(buildingLevy) : null,
+          uniformFee: uniformFee ? parseFloat(uniformFee) : null,
+          bookFee: bookFee ? parseFloat(bookFee) : null,
+          otherFees: otherFees ? parseFloat(otherFees) : null,
+          otherFeesDescription: otherFeesDescription || null,
+          isActive: true,
+        },
+        create: {
           schoolId: req.schoolId,
           classId,
           academicYear,
           term,
+          totalAmount: parseFloat(totalAmount),
+          tuitionFee: tuitionFee ? parseFloat(tuitionFee) : null,
+          examFee: examFee ? parseFloat(examFee) : null,
+          buildingLevy: buildingLevy ? parseFloat(buildingLevy) : null,
+          uniformFee: uniformFee ? parseFloat(uniformFee) : null,
+          bookFee: bookFee ? parseFloat(bookFee) : null,
+          otherFees: otherFees ? parseFloat(otherFees) : null,
+          otherFeesDescription: otherFeesDescription || null,
         },
-      },
-      update: {
-        totalAmount: parseFloat(totalAmount),
-        tuitionFee: tuitionFee ? parseFloat(tuitionFee) : null,
-        examFee: examFee ? parseFloat(examFee) : null,
-        buildingLevy: buildingLevy ? parseFloat(buildingLevy) : null,
-        uniformFee: uniformFee ? parseFloat(uniformFee) : null,
-        bookFee: bookFee ? parseFloat(bookFee) : null,
-        otherFees: otherFees ? parseFloat(otherFees) : null,
-        otherFeesDescription: otherFeesDescription || null,
-        isActive: true,
-      },
-      create: {
-        schoolId: req.schoolId,
-        classId,
-        academicYear,
-        term,
-        totalAmount: parseFloat(totalAmount),
-        tuitionFee: tuitionFee ? parseFloat(tuitionFee) : null,
-        examFee: examFee ? parseFloat(examFee) : null,
-        buildingLevy: buildingLevy ? parseFloat(buildingLevy) : null,
-        uniformFee: uniformFee ? parseFloat(uniformFee) : null,
-        bookFee: bookFee ? parseFloat(bookFee) : null,
-        otherFees: otherFees ? parseFloat(otherFees) : null,
-        otherFeesDescription: otherFeesDescription || null,
-      },
-      include: {
-        class: { select: { name: true } },
-      },
-    });
+        include: {
+          class: { select: { name: true } },
+        },
+      });
 
-    await prisma.auditLog.create({
-      data: {
-        schoolId: req.schoolId,
-        staffId: req.staff.id,
-        action: "FEE_STRUCTURE_SET",
-        entity: "FeeStructure",
-        entityId: feeStructure.id,
-        changes: { classId, term, academicYear, totalAmount },
-      },
-    });
+      await prisma.auditLog.create({
+        data: {
+          schoolId: req.schoolId,
+          staffId: req.staff.id,
+          action: "FEE_STRUCTURE_SET",
+          entity: "FeeStructure",
+          entityId: feeStructure.id,
+          changes: { classId, term, academicYear, totalAmount },
+        },
+      });
 
-    res.status(201).json({
-      success: true,
-      message: `Fees set for ${feeStructure.class.name} - ${term.replace("_", " ")} ${academicYear}`,
-      data: feeStructure,
-    });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to set fee structure" });
-  }
-});
+      res.status(201).json({
+        success: true,
+        message: `Fees set for ${feeStructure.class.name} - ${term.replace("_", " ")} ${academicYear}`,
+        data: feeStructure,
+      });
+    } catch (err) {
+      console.error(err);
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to set fee structure" });
+    }
+  },
+);
 
 // PUT /api/schools/fee-structures/:id
-router.put("/fee-structures/:id", verifyStaff, isAdmin, async (req, res) => {
-  try {
-    const existing = await prisma.feeStructure.findFirst({
-      where: { id: req.params.id, schoolId: req.schoolId },
-    });
-    if (!existing) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Fee structure not found" });
+router.put(
+  "/fee-structures/:id",
+  verifyStaff,
+  requirePermission("payments", "write"),
+  async (req, res) => {
+    try {
+      const existing = await prisma.feeStructure.findFirst({
+        where: { id: req.params.id, schoolId: req.schoolId },
+      });
+      if (!existing) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Fee structure not found" });
+      }
+
+      const updated = await prisma.feeStructure.update({
+        where: { id: req.params.id },
+        data: {
+          totalAmount: req.body.totalAmount
+            ? parseFloat(req.body.totalAmount)
+            : existing.totalAmount,
+          tuitionFee: req.body.tuitionFee
+            ? parseFloat(req.body.tuitionFee)
+            : existing.tuitionFee,
+          examFee: req.body.examFee
+            ? parseFloat(req.body.examFee)
+            : existing.examFee,
+          buildingLevy: req.body.buildingLevy
+            ? parseFloat(req.body.buildingLevy)
+            : existing.buildingLevy,
+          uniformFee: req.body.uniformFee
+            ? parseFloat(req.body.uniformFee)
+            : existing.uniformFee,
+          bookFee: req.body.bookFee
+            ? parseFloat(req.body.bookFee)
+            : existing.bookFee,
+          otherFees: req.body.otherFees
+            ? parseFloat(req.body.otherFees)
+            : existing.otherFees,
+          otherFeesDescription:
+            req.body.otherFeesDescription || existing.otherFeesDescription,
+        },
+        include: { class: { select: { name: true } } },
+      });
+
+      res.json({
+        success: true,
+        message: "Fee structure updated",
+        data: updated,
+      });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to update fee structure" });
     }
-
-    const updated = await prisma.feeStructure.update({
-      where: { id: req.params.id },
-      data: {
-        totalAmount: req.body.totalAmount
-          ? parseFloat(req.body.totalAmount)
-          : existing.totalAmount,
-        tuitionFee: req.body.tuitionFee
-          ? parseFloat(req.body.tuitionFee)
-          : existing.tuitionFee,
-        examFee: req.body.examFee
-          ? parseFloat(req.body.examFee)
-          : existing.examFee,
-        buildingLevy: req.body.buildingLevy
-          ? parseFloat(req.body.buildingLevy)
-          : existing.buildingLevy,
-        uniformFee: req.body.uniformFee
-          ? parseFloat(req.body.uniformFee)
-          : existing.uniformFee,
-        bookFee: req.body.bookFee
-          ? parseFloat(req.body.bookFee)
-          : existing.bookFee,
-        otherFees: req.body.otherFees
-          ? parseFloat(req.body.otherFees)
-          : existing.otherFees,
-        otherFeesDescription:
-          req.body.otherFeesDescription || existing.otherFeesDescription,
-      },
-      include: { class: { select: { name: true } } },
-    });
-
-    res.json({
-      success: true,
-      message: "Fee structure updated",
-      data: updated,
-    });
-  } catch (err) {
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to update fee structure" });
-  }
-});
+  },
+);
 
 // DELETE /api/schools/fee-structures/:id
-router.delete("/fee-structures/:id", verifyStaff, isAdmin, async (req, res) => {
-  try {
-    const existing = await prisma.feeStructure.findFirst({
-      where: { id: req.params.id, schoolId: req.schoolId },
-    });
-    if (!existing) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Fee structure not found" });
+router.delete(
+  "/fee-structures/:id",
+  verifyStaff,
+  requirePermission("payments", "delete"),
+  async (req, res) => {
+    try {
+      const existing = await prisma.feeStructure.findFirst({
+        where: { id: req.params.id, schoolId: req.schoolId },
+      });
+      if (!existing) {
+        return res
+          .status(404)
+          .json({ success: false, message: "Fee structure not found" });
+      }
+      await prisma.feeStructure.update({
+        where: { id: req.params.id },
+        data: { isActive: false },
+      });
+      res.json({ success: true, message: "Fee structure removed" });
+    } catch (err) {
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to delete fee structure" });
     }
-    await prisma.feeStructure.update({
-      where: { id: req.params.id },
-      data: { isActive: false },
-    });
-    res.json({ success: true, message: "Fee structure removed" });
-  } catch (err) {
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to delete fee structure" });
-  }
-});
+  },
+);
 
 // ==================== ACTIVE TERM ====================
 
@@ -382,7 +423,6 @@ router.get("/active-term", verifyStaffOrParent, async (req, res) => {
 });
 
 // GET /api/schools/term-history
-// Every term the school has run, with a financial summary per term.
 router.get("/term-history", verifyStaff, async (req, res) => {
   try {
     const activations = await prisma.termActivation.findMany({
@@ -465,215 +505,215 @@ router.get("/term-history", verifyStaff, async (req, res) => {
 });
 
 // POST /api/schools/activate-term
-router.post("/activate-term", verifyStaff, isAdmin, async (req, res) => {
-  try {
-    const { term, academicYear, startDate, endDate } = req.body;
+router.post(
+  "/activate-term",
+  verifyStaff,
+  requirePermission("settings", "write"),
+  async (req, res) => {
+    try {
+      const { term, academicYear, startDate, endDate } = req.body;
 
-    if (!term || !academicYear) {
-      return res.status(400).json({
-        success: false,
-        message: "term and academicYear are required",
+      if (!term || !academicYear) {
+        return res.status(400).json({
+          success: false,
+          message: "term and academicYear are required",
+        });
+      }
+
+      let parsedStart = null;
+      let parsedEnd = null;
+      if (startDate) parsedStart = new Date(startDate);
+      if (endDate) parsedEnd = new Date(endDate);
+
+      if (parsedStart && parsedEnd && parsedEnd < parsedStart) {
+        return res.status(400).json({
+          success: false,
+          message: "End date must be after start date",
+        });
+      }
+
+      const currentSchool = await prisma.school.findUnique({
+        where: { id: req.schoolId },
+        select: {
+          activeTerm: true,
+          activeAcademicYear: true,
+          activeTermStartDate: true,
+          activeTermEndDate: true,
+        },
       });
-    }
 
-    let parsedStart = null;
-    let parsedEnd = null;
-    if (startDate) parsedStart = new Date(startDate);
-    if (endDate) parsedEnd = new Date(endDate);
+      if (currentSchool?.activeTerm && currentSchool.activeAcademicYear) {
+        const isSameTerm =
+          currentSchool.activeTerm === term &&
+          currentSchool.activeAcademicYear === academicYear;
 
-    if (parsedStart && parsedEnd && parsedEnd < parsedStart) {
-      return res.status(400).json({
-        success: false,
-        message: "End date must be after start date",
-      });
-    }
-
-    // Snapshot the previous active term before switching
-    const currentSchool = await prisma.school.findUnique({
-      where: { id: req.schoolId },
-      select: {
-        activeTerm: true,
-        activeAcademicYear: true,
-        activeTermStartDate: true,
-        activeTermEndDate: true,
-      },
-    });
-
-    if (currentSchool?.activeTerm && currentSchool.activeAcademicYear) {
-      const isSameTerm =
-        currentSchool.activeTerm === term &&
-        currentSchool.activeAcademicYear === academicYear;
-
-      if (!isSameTerm) {
-        await prisma.termActivation.upsert({
-          where: {
-            schoolId_term_academicYear: {
+        if (!isSameTerm) {
+          await prisma.termActivation.upsert({
+            where: {
+              schoolId_term_academicYear: {
+                schoolId: req.schoolId,
+                term: currentSchool.activeTerm,
+                academicYear: currentSchool.activeAcademicYear,
+              },
+            },
+            update: {
+              startDate: currentSchool.activeTermStartDate,
+              endDate: currentSchool.activeTermEndDate,
+            },
+            create: {
               schoolId: req.schoolId,
               term: currentSchool.activeTerm,
               academicYear: currentSchool.activeAcademicYear,
+              startDate: currentSchool.activeTermStartDate,
+              endDate: currentSchool.activeTermEndDate,
+              activatedById: req.staff.id,
             },
-          },
-          update: {
-            startDate: currentSchool.activeTermStartDate,
-            endDate: currentSchool.activeTermEndDate,
-          },
-          create: {
-            schoolId: req.schoolId,
-            term: currentSchool.activeTerm,
-            academicYear: currentSchool.activeAcademicYear,
-            startDate: currentSchool.activeTermStartDate,
-            endDate: currentSchool.activeTermEndDate,
-            activatedById: req.staff.id,
-          },
-        });
+          });
+        }
       }
-    }
 
-    // Require at least one fee structure
-    const feeStructuresExist = await prisma.feeStructure.count({
-      where: {
-        schoolId: req.schoolId,
-        term,
-        academicYear,
-        isActive: true,
-      },
-    });
-
-    if (feeStructuresExist === 0) {
-      return res.status(400).json({
-        success: false,
-        message:
-          "Please set fee structures for at least one class before activating this term.",
-      });
-    }
-
-    // Apply credits
-    const studentsWithCredit = await prisma.student.findMany({
-      where: {
-        schoolId: req.schoolId,
-        creditBalance: { gt: 0 },
-        isActive: true,
-      },
-      include: { class: true },
-    });
-
-    let creditsApplied = 0;
-
-    for (const student of studentsWithCredit) {
-      const feeStructure = await prisma.feeStructure.findFirst({
+      const feeStructuresExist = await prisma.feeStructure.count({
         where: {
           schoolId: req.schoolId,
-          classId: student.classId,
           term,
           academicYear,
           isActive: true,
         },
       });
 
-      if (!feeStructure || student.creditBalance <= 0) continue;
+      if (feeStructuresExist === 0) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Please set fee structures for at least one class before activating this term.",
+        });
+      }
 
-      const creditToApply = Math.min(
-        student.creditBalance,
-        feeStructure.totalAmount,
-      );
-
-      const paymentCount = await prisma.feePayment.count({
-        where: { schoolId: req.schoolId },
+      const studentsWithCredit = await prisma.student.findMany({
+        where: {
+          schoolId: req.schoolId,
+          creditBalance: { gt: 0 },
+          isActive: true,
+        },
+        include: { class: true },
       });
 
-      const { generateReceiptNumber } = require("../lib/utils");
-      const receiptNumber = generateReceiptNumber(
-        academicYear,
-        paymentCount + 1,
-      );
+      let creditsApplied = 0;
 
-      await prisma.feePayment.create({
+      for (const student of studentsWithCredit) {
+        const feeStructure = await prisma.feeStructure.findFirst({
+          where: {
+            schoolId: req.schoolId,
+            classId: student.classId,
+            term,
+            academicYear,
+            isActive: true,
+          },
+        });
+
+        if (!feeStructure || student.creditBalance <= 0) continue;
+
+        const creditToApply = Math.min(
+          student.creditBalance,
+          feeStructure.totalAmount,
+        );
+
+        const paymentCount = await prisma.feePayment.count({
+          where: { schoolId: req.schoolId },
+        });
+
+        const { generateReceiptNumber } = require("../lib/utils");
+        const receiptNumber = generateReceiptNumber(
+          academicYear,
+          paymentCount + 1,
+        );
+
+        await prisma.feePayment.create({
+          data: {
+            schoolId: req.schoolId,
+            studentId: student.id,
+            amount: creditToApply,
+            paymentMethod: "CASH",
+            term,
+            academicYear,
+            receiptNumber,
+            submittedBy: "BURSAR",
+            status: "VERIFIED",
+            notes: `Credit carried over from previous term`,
+            requiredAmount: feeStructure.totalAmount,
+            balance: feeStructure.totalAmount - creditToApply,
+            isDebtor: feeStructure.totalAmount - creditToApply > 0,
+            creditApplied: creditToApply,
+            verifiedAt: new Date(),
+          },
+        });
+
+        await prisma.student.update({
+          where: { id: student.id },
+          data: { creditBalance: student.creditBalance - creditToApply },
+        });
+
+        creditsApplied++;
+      }
+
+      await prisma.school.update({
+        where: { id: req.schoolId },
+        data: {
+          activeTerm: term,
+          activeAcademicYear: academicYear,
+          activeTermStartDate: parsedStart,
+          activeTermEndDate: parsedEnd,
+        },
+      });
+
+      await prisma.termActivation.upsert({
+        where: {
+          schoolId_term_academicYear: {
+            schoolId: req.schoolId,
+            term,
+            academicYear,
+          },
+        },
+        update: {
+          startDate: parsedStart,
+          endDate: parsedEnd,
+          activatedAt: new Date(),
+          activatedById: req.staff.id,
+        },
+        create: {
+          schoolId: req.schoolId,
+          term,
+          academicYear,
+          startDate: parsedStart,
+          endDate: parsedEnd,
+          activatedById: req.staff.id,
+        },
+      });
+
+      await prisma.auditLog.create({
         data: {
           schoolId: req.schoolId,
-          studentId: student.id,
-          amount: creditToApply,
-          paymentMethod: "CASH",
-          term,
-          academicYear,
-          receiptNumber,
-          submittedBy: "BURSAR",
-          status: "VERIFIED",
-          notes: `Credit carried over from previous term`,
-          requiredAmount: feeStructure.totalAmount,
-          balance: feeStructure.totalAmount - creditToApply,
-          isDebtor: feeStructure.totalAmount - creditToApply > 0,
-          creditApplied: creditToApply,
-          verifiedAt: new Date(),
+          staffId: req.staff.id,
+          action: "TERM_ACTIVATED",
+          entity: "School",
+          entityId: req.schoolId,
+          changes: { term, academicYear, creditsApplied },
         },
       });
 
-      await prisma.student.update({
-        where: { id: student.id },
-        data: { creditBalance: student.creditBalance - creditToApply },
+      res.json({
+        success: true,
+        message: `${term.replace("_", " ")} ${academicYear} activated successfully. ${creditsApplied} student credit(s) applied automatically.`,
+        data: { term, academicYear, creditsApplied },
       });
-
-      creditsApplied++;
+    } catch (err) {
+      console.error(err);
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to activate term" });
     }
-
-    // Activate the term on the school row
-    await prisma.school.update({
-      where: { id: req.schoolId },
-      data: {
-        activeTerm: term,
-        activeAcademicYear: academicYear,
-        activeTermStartDate: parsedStart,
-        activeTermEndDate: parsedEnd,
-      },
-    });
-
-    // Record the new term in the permanent history table
-    await prisma.termActivation.upsert({
-      where: {
-        schoolId_term_academicYear: {
-          schoolId: req.schoolId,
-          term,
-          academicYear,
-        },
-      },
-      update: {
-        startDate: parsedStart,
-        endDate: parsedEnd,
-        activatedAt: new Date(),
-        activatedById: req.staff.id,
-      },
-      create: {
-        schoolId: req.schoolId,
-        term,
-        academicYear,
-        startDate: parsedStart,
-        endDate: parsedEnd,
-        activatedById: req.staff.id,
-      },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        schoolId: req.schoolId,
-        staffId: req.staff.id,
-        action: "TERM_ACTIVATED",
-        entity: "School",
-        entityId: req.schoolId,
-        changes: { term, academicYear, creditsApplied },
-      },
-    });
-
-    res.json({
-      success: true,
-      message: `${term.replace("_", " ")} ${academicYear} activated successfully. ${creditsApplied} student credit(s) applied automatically.`,
-      data: { term, academicYear, creditsApplied },
-    });
-  } catch (err) {
-    console.error(err);
-    res
-      .status(500)
-      .json({ success: false, message: "Failed to activate term" });
-  }
-});
+  },
+);
 
 // ==================== STUDENT TERM STATUS ====================
 
@@ -770,56 +810,61 @@ router.get(
 
 // ==================== PAYMENT DETAILS ====================
 
-router.put("/payment-details", verifyStaff, isAdmin, async (req, res) => {
-  try {
-    const {
-      bankAccounts,
-      airtelMoneyNumber,
-      mpambaNumber,
-      paymentInstructions,
-    } = req.body;
+router.put(
+  "/payment-details",
+  verifyStaff,
+  requirePermission("settings", "write"),
+  async (req, res) => {
+    try {
+      const {
+        bankAccounts,
+        airtelMoneyNumber,
+        mpambaNumber,
+        paymentInstructions,
+      } = req.body;
 
-    if (bankAccounts && !Array.isArray(bankAccounts)) {
-      return res.status(400).json({
+      if (bankAccounts && !Array.isArray(bankAccounts)) {
+        return res.status(400).json({
+          success: false,
+          message: "bankAccounts must be an array",
+        });
+      }
+
+      const updated = await prisma.school.update({
+        where: { id: req.schoolId },
+        data: {
+          bankAccounts: bankAccounts || [],
+          airtelMoneyNumber: airtelMoneyNumber || null,
+          mpambaNumber: mpambaNumber || null,
+          paymentInstructions: paymentInstructions || null,
+        },
+      });
+
+      await prisma.auditLog.create({
+        data: {
+          schoolId: req.schoolId,
+          staffId: req.staff.id,
+          action: "PAYMENT_DETAILS_UPDATED",
+          entity: "School",
+          entityId: req.schoolId,
+          changes: { bankAccounts, airtelMoneyNumber, mpambaNumber },
+        },
+      });
+
+      res.json({
+        success: true,
+        message: "Payment details updated successfully",
+        data: updated,
+      });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({
         success: false,
-        message: "bankAccounts must be an array",
+        message: "Failed to update payment details",
       });
     }
-
-    const updated = await prisma.school.update({
-      where: { id: req.schoolId },
-      data: {
-        bankAccounts: bankAccounts || [],
-        airtelMoneyNumber: airtelMoneyNumber || null,
-        mpambaNumber: mpambaNumber || null,
-        paymentInstructions: paymentInstructions || null,
-      },
-    });
-
-    await prisma.auditLog.create({
-      data: {
-        schoolId: req.schoolId,
-        staffId: req.staff.id,
-        action: "PAYMENT_DETAILS_UPDATED",
-        entity: "School",
-        entityId: req.schoolId,
-        changes: { bankAccounts, airtelMoneyNumber, mpambaNumber },
-      },
-    });
-
-    res.json({
-      success: true,
-      message: "Payment details updated successfully",
-      data: updated,
-    });
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      success: false,
-      message: "Failed to update payment details",
-    });
-  }
-});
+  },
+);
 
 // GET /api/schools/payment-info/:schoolId — public
 router.get("/payment-info/:schoolId", async (req, res) => {
@@ -879,13 +924,24 @@ router.get("/me", verifyStaff, async (req, res) => {
 // ==================== SETTINGS ====================
 
 router.get("/settings", verifyStaff, schoolController.getSettings);
-router.put("/settings", verifyStaff, isAdmin, schoolController.updateSettings);
+router.put(
+  "/settings",
+  verifyStaff,
+  requirePermission("settings", "write"),
+  schoolController.updateSettings,
+);
 router.post(
   "/settings/logo",
   verifyStaff,
-  isAdmin,
+  requirePermission("settings", "write"),
   upload.single("logo"),
   schoolController.uploadLogo,
+);
+router.put(
+  "/notification-defaults",
+  verifyStaff,
+  requirePermission("settings", "write"),
+  schoolController.updateNotificationDefaults,
 );
 router.get("/public", schoolController.getPublicSchool);
 router.get("/public/:schoolId", schoolController.getPublicInfo);

@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Plus, CheckCircle, Clock, XCircle } from "lucide-react";
 import api from "../../lib/axios";
 import type { Payment, Pagination } from "../../types";
+import { usePermission } from "../../hooks/usePermission";
 
 const statusConfig = {
   VERIFIED: {
@@ -24,6 +25,7 @@ const statusConfig = {
 
 const PaymentsPage = () => {
   const navigate = useNavigate();
+  const { can } = usePermission();
   const [payments, setPayments] = useState<Payment[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,13 +63,15 @@ const PaymentsPage = () => {
             {pagination?.total || 0} total payments
           </p>
         </div>
-        <button
-          onClick={() => navigate("/payments/record")}
-          className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm hover:bg-[var(--color-primary-dark)]"
-        >
-          <Plus size={16} />
-          Record Payment
-        </button>
+        {can("payments", "write") && (
+          <button
+            onClick={() => navigate("/payments/record")}
+            className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm hover:bg-[var(--color-primary-dark)]"
+          >
+            <Plus size={16} />
+            Record Payment
+          </button>
+        )}
       </div>
 
       {/* Filter */}

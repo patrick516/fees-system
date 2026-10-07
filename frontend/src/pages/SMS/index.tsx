@@ -11,6 +11,9 @@ import {
   RefreshCw,
   ChevronLeft,
   ChevronRight,
+  Mail,
+  Layers,
+  Bell,
 } from "lucide-react";
 import api from "../../lib/axios";
 import {
@@ -26,6 +29,7 @@ import {
   PaginationItem,
 } from "../../components/ui/pagination";
 import { useActiveTerm } from "../../hooks/useActiveTerm";
+import type { NotificationChannel } from "../../types";
 
 const smsTypes = [
   {
@@ -54,6 +58,32 @@ const smsTypes = [
   },
 ];
 
+const CHANNEL_OPTIONS: {
+  value: NotificationChannel;
+  label: string;
+  description: string;
+  icon: typeof MessageSquare;
+}[] = [
+  {
+    value: "SMS",
+    label: "SMS",
+    description: "Send to parent phones",
+    icon: MessageSquare,
+  },
+  {
+    value: "EMAIL",
+    label: "Email",
+    description: "Send to parent emails",
+    icon: Mail,
+  },
+  {
+    value: "BOTH",
+    label: "Both",
+    description: "SMS + Email",
+    icon: Layers,
+  },
+];
+
 const termOptions = [
   { value: "TERM_1", label: "Term 1" },
   { value: "TERM_2", label: "Term 2" },
@@ -67,12 +97,19 @@ const typeLabel: Record<string, string> = {
   reminder: "Fee Reminder",
   announcement: "Announcement",
   unpaid: "Unpaid Alert",
+  payment_received: "Payment Received",
+  payment_verified: "Payment Confirmed",
+  payment_rejected: "Payment Rejected",
 };
 
 const typeColor: Record<string, string> = {
   reminder: "bg-yellow-100 text-yellow-700",
-  announcement: "bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]",
+  announcement:
+    "bg-[var(--color-primary-light)] text-[var(--color-primary-dark)]",
   unpaid: "bg-red-100 text-red-700",
+  payment_received: "bg-emerald-100 text-emerald-700",
+  payment_verified: "bg-emerald-100 text-emerald-700",
+  payment_rejected: "bg-red-100 text-red-700",
 };
 
 const PER_PAGE = 10;
@@ -81,6 +118,7 @@ const SMSPage = () => {
   const [selectedType, setSelectedType] = useState("");
   const [message, setMessage] = useState("");
   const [term, setTerm] = useState("TERM_1");
+  const [channel, setChannel] = useState<NotificationChannel>("BOTH");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
@@ -88,6 +126,7 @@ const SMSPage = () => {
   const [logs, setLogs] = useState<any[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
   const [logFilter, setLogFilter] = useState<string>("");
+  const [channelFilter, setChannelFilter] = useState<string>("");
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<any>(null);
 
@@ -97,11 +136,23 @@ const SMSPage = () => {
     if (currentTerm) setTerm(currentTerm);
   }, [currentTerm]);
 
+  // Load school default channel on mount
+  useEffect(() => {
+    api
+      .get("/schools/me")
+      .then((res) => {
+        const defaults = res.data.data?.notificationDefaults;
+        if (defaults?.defaultChannel) setChannel(defaults.defaultChannel);
+      })
+      .catch(() => {});
+  }, []);
+
   const fetchLogs = async (targetPage = page) => {
     setLogsLoading(true);
     try {
       const params = new URLSearchParams();
       if (logFilter) params.set("type", logFilter);
+      if (channelFilter) params.set("channel", channelFilter);
       params.set("page", String(targetPage));
       params.set("limit", String(PER_PAGE));
       const res = await api.get(`/sms/logs?${params}`);
@@ -115,12 +166,12 @@ const SMSPage = () => {
     }
   };
 
-  // Refetch when filter changes — always reset to page 1
+  // Refetch when any filter changes — reset to page 1
   useEffect(() => {
     setPage(1);
     fetchLogs(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [logFilter]);
+  }, [logFilter, channelFilter]);
 
   const goToPage = (p: number) => {
     if (p < 1 || (pagination && p > pagination.totalPages)) return;
@@ -139,13 +190,13 @@ const SMSPage = () => {
         type: selectedType,
         message: message || undefined,
         term,
+        channel,
       });
       setResult(res.data);
-      // Fresh send → jump back to page 1 so user sees newest logs
       setPage(1);
       await fetchLogs(1);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to send SMS");
+      setError(err.response?.data?.message || "Failed to send");
     } finally {
       setLoading(false);
     }
@@ -162,13 +213,12 @@ const SMSPage = () => {
     });
   };
 
-  // Build a small window of page numbers around the current page
   const getPageNumbers = (): number[] => {
     if (!pagination) return [];
     const { totalPages } = pagination;
     const current = page;
     const pages: number[] = [];
-    const window = 1; // show current ± 1
+    const window = 1;
 
     pages.push(1);
     for (
@@ -187,9 +237,9 @@ const SMSPage = () => {
   return (
     <div className="w-full space-y-4">
       <div>
-        <h2 className="text-lg font-semibold text-gray-800">Send SMS</h2>
+        <h2 className="text-lg font-semibold text-gray-800">Send Alerts</h2>
         <p className="text-sm text-gray-500">
-          Send bulk SMS notifications to parents
+          Send SMS, Email, or both to parents in bulk
         </p>
       </div>
 
@@ -231,12 +281,12 @@ const SMSPage = () => {
               <Users size={14} className="text-gray-400 mt-0.5 shrink-0" />
               <div>
                 <p className="text-xs font-medium text-gray-700">
-                  About bulk SMS
+                  About bulk alerts
                 </p>
                 <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
-                  SMS messages are sent via TumaSend. Each message costs a small
-                  amount — check your TumaSend dashboard for current rates.
-                  Messages are sent to all matching parents in your school.
+                  SMS sends via TumaSend (costs per message). Email sends via
+                  Brevo (free). Messages are delivered to every matching parent
+                  in your school.
                 </p>
               </div>
             </div>
@@ -246,6 +296,43 @@ const SMSPage = () => {
         <div className="lg:col-span-1">
           {selectedType ? (
             <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100 space-y-3">
+              {/* Channel selector */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1.5 flex items-center gap-1.5">
+                  <Bell size={13} />
+                  Send via
+                </label>
+                <div className="grid grid-cols-3 gap-1">
+                  {CHANNEL_OPTIONS.map((c) => {
+                    const Icon = c.icon;
+                    const isActive = channel === c.value;
+                    return (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => setChannel(c.value)}
+                        title={c.description}
+                        className={`flex flex-col items-center gap-1 py-2 px-1 rounded-lg text-xs font-medium transition-colors border ${
+                          isActive
+                            ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
+                            : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                        }`}
+                      >
+                        <Icon size={14} />
+                        {c.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {
+                    CHANNEL_OPTIONS.find((c) => c.value === channel)
+                      ?.description
+                  }
+                </p>
+              </div>
+
+              {/* Term */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Term
@@ -295,13 +382,15 @@ const SMSPage = () => {
               {result && (
                 <div
                   className={`px-3 py-2 rounded-lg text-xs border ${
-                    result.data?.sent > 0
+                    result.data?.smsSent + result.data?.emailSent > 0
                       ? "bg-green-50 border-green-200 text-green-700"
                       : "bg-yellow-50 border-yellow-200 text-yellow-800"
                   }`}
                 >
                   <p className="font-medium">
-                    {result.data?.sent > 0 ? "✅ " : "⚠️ "}
+                    {result.data?.smsSent + result.data?.emailSent > 0
+                      ? "✅ "
+                      : "⚠️ "}
                     {result.message}
                   </p>
                   {result.data?.errors?.length > 0 && (
@@ -328,7 +417,7 @@ const SMSPage = () => {
                   </>
                 ) : (
                   <>
-                    <Send size={16} /> Send SMS Now
+                    <Send size={16} /> Send Now
                   </>
                 )}
               </button>
@@ -340,27 +429,30 @@ const SMSPage = () => {
                 No message type selected
               </p>
               <p className="text-[11px] text-gray-400 mt-1">
-                Pick a type on the left to configure and send an SMS
+                Pick a type on the left to configure and send
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* ==================== SMS HISTORY ==================== */}
+      {/* ==================== HISTORY ==================== */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="px-5 py-3 border-b border-gray-100 flex items-center justify-between flex-wrap gap-3">
           <div>
-            <h3 className="font-medium text-gray-800 text-sm">SMS History</h3>
+            <h3 className="font-medium text-gray-800 text-sm">
+              Notification History
+            </h3>
             <p className="text-[11px] text-gray-500 mt-0.5">
               {pagination
                 ? `Showing ${
                     pagination.total === 0 ? 0 : (page - 1) * PER_PAGE + 1
                   }–${Math.min(page * PER_PAGE, pagination.total)} of ${pagination.total} messages`
-                : "A record of every message sent"}
+                : "A record of every notification sent"}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Type filter */}
             <div className="flex bg-gray-100 rounded-lg p-0.5">
               {[
                 { value: "", label: "All" },
@@ -371,7 +463,7 @@ const SMSPage = () => {
                 <button
                   key={f.value}
                   onClick={() => setLogFilter(f.value)}
-                  className={`px-3 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                  className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
                     logFilter === f.value
                       ? "bg-white shadow-sm text-[var(--color-primary)]"
                       : "text-gray-500 hover:text-gray-700"
@@ -381,6 +473,28 @@ const SMSPage = () => {
                 </button>
               ))}
             </div>
+
+            {/* Channel filter */}
+            <div className="flex bg-gray-100 rounded-lg p-0.5">
+              {[
+                { value: "", label: "All" },
+                { value: "SMS", label: "SMS" },
+                { value: "EMAIL", label: "Email" },
+              ].map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => setChannelFilter(f.value)}
+                  className={`px-2.5 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                    channelFilter === f.value
+                      ? "bg-white shadow-sm text-[var(--color-primary)]"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
             <button
               onClick={() => fetchLogs(page)}
               disabled={logsLoading}
@@ -402,10 +516,12 @@ const SMSPage = () => {
         ) : logs.length === 0 ? (
           <div className="px-6 py-12 text-center">
             <MessageSquare size={28} className="mx-auto mb-2 text-gray-200" />
-            <p className="text-sm text-gray-400 font-medium">No SMS found</p>
+            <p className="text-sm text-gray-400 font-medium">
+              No notifications found
+            </p>
             <p className="text-[11px] text-gray-300 mt-1">
-              {logFilter
-                ? "No messages match the selected filter"
+              {logFilter || channelFilter
+                ? "No messages match the selected filters"
                 : "Sent messages will appear here"}
             </p>
           </div>
@@ -416,6 +532,9 @@ const SMSPage = () => {
                 <tr className="text-left text-gray-500">
                   <th className="px-4 py-2.5 text-[11px] font-medium uppercase">
                     Date
+                  </th>
+                  <th className="px-4 py-2.5 text-[11px] font-medium uppercase">
+                    Channel
                   </th>
                   <th className="px-4 py-2.5 text-[11px] font-medium uppercase">
                     Category
@@ -438,6 +557,17 @@ const SMSPage = () => {
                       {formatDateTime(log.createdAt)}
                     </td>
                     <td className="px-4 py-3">
+                      {log.channel === "SMS" ? (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium bg-blue-100 text-blue-700">
+                          <MessageSquare size={9} /> SMS
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium bg-purple-100 text-purple-700">
+                          <Mail size={9} /> Email
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
                       <span
                         className={`inline-block text-[10px] px-2 py-0.5 rounded-full font-medium ${
                           typeColor[log.type] || "bg-gray-100 text-gray-600"
@@ -447,7 +577,7 @@ const SMSPage = () => {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-[11px] font-mono text-gray-700 whitespace-nowrap">
-                      {log.phone}
+                      {log.phone || log.email || "—"}
                     </td>
                     <td className="px-4 py-3 text-[11px] text-gray-600 max-w-md">
                       <p className="line-clamp-2" title={log.message}>
@@ -489,7 +619,6 @@ const SMSPage = () => {
 
               <Pagination className="mx-0 w-auto">
                 <PaginationContent>
-                  {/* Previous */}
                   <PaginationItem>
                     <button
                       onClick={() => goToPage(page - 1)}
@@ -501,7 +630,6 @@ const SMSPage = () => {
                     </button>
                   </PaginationItem>
 
-                  {/* Page numbers */}
                   {pageNumbers.map((p, idx) => {
                     const prev = pageNumbers[idx - 1];
                     const showEllipsis = prev !== undefined && p - prev > 1;
@@ -527,7 +655,6 @@ const SMSPage = () => {
                     );
                   })}
 
-                  {/* Next */}
                   <PaginationItem>
                     <button
                       onClick={() => goToPage(page + 1)}

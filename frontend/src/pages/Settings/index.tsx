@@ -14,6 +14,7 @@ import { useSchoolSettings } from "../../hooks/useSchoolSettings";
 import DepartmentsCard from "../../components/Settings/DepartmentsCard";
 import RolesCard from "../../components/Settings/RolesCard";
 import EditSchoolModal from "../../components/Settings/EditSchoolModal";
+import NotificationPreferencesCard from "../../components/Settings/NotificationPreferencesCard";
 
 const SettingsPage = () => {
   const { settings, loading } = useSchoolSettings();
@@ -144,11 +145,9 @@ const SettingsPage = () => {
         </div>
       </div>
 
-      {/* ==================== DEPARTMENTS ==================== */}
       <DepartmentsCard />
-
-      {/* ==================== ROLES & PERMISSIONS ==================== */}
       <RolesCard />
+      <NotificationPreferencesCard />
 
       {/* Edit modal */}
       <EditSchoolModal

@@ -200,10 +200,6 @@ const lookupByEmail = async (req, res) => {
   }
 };
 
-// GET /api/schools/public
-// Public — no auth. Since each deployment serves exactly one school,
-// this returns that school's branding without needing an ID.
-// Used by the parent website's login page before anyone has logged in.
 const getPublicSchool = async (req, res) => {
   try {
     const school = await prisma.school.findFirst({
@@ -254,6 +250,37 @@ const getPublicInfo = async (req, res) => {
   }
 };
 
+// ==================== UPDATE NOTIFICATION DEFAULTS ====================
+// PUT /api/schools/notification-defaults
+// Body: { defaultChannel: "SMS" | "EMAIL" | "BOTH" }
+const updateNotificationDefaults = async (req, res) => {
+  try {
+    const { defaultChannel } = req.body;
+
+    if (!["SMS", "EMAIL", "BOTH"].includes(defaultChannel)) {
+      return res.status(400).json({
+        success: false,
+        message: "defaultChannel must be SMS, EMAIL, or BOTH",
+      });
+    }
+
+    const updated = await prisma.school.update({
+      where: { id: req.schoolId },
+      data: {
+        notificationDefaults: { defaultChannel },
+      },
+      select: { id: true, notificationDefaults: true },
+    });
+
+    return res.status(200).json({ success: true, data: updated });
+  } catch (err) {
+    console.error("Update notification defaults error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to update preferences" });
+  }
+};
+
 module.exports = {
   getSettings,
   updateSettings,
@@ -262,4 +289,5 @@ module.exports = {
   lookupByEmail,
   getBySlug,
   getPublicSchool,
+  updateNotificationDefaults,
 };

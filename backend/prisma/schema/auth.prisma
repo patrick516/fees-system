@@ -1,9 +1,11 @@
+//  
 enum Term {
   TERM_1
   TERM_2
   TERM_3
 }
 
+//  PLATFORM 
 model Platform {
   id        String   @id @default(uuid())
   name      String   @default("SchoolPay Malawi")
@@ -17,7 +19,7 @@ model Platform {
   @@map("platform")
 }
 
-// ==================== SCHOOL ====================
+//  SCHOOL
 model School {
   id         String   @id @default(uuid())
   platformId String
@@ -48,28 +50,32 @@ model School {
   activeTermStartDate DateTime?
   activeTermEndDate   DateTime?
 
+  // Notification preference: { "defaultChannel": "SMS" | "EMAIL" | "BOTH" }
+  notificationDefaults Json?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  staff           Staff[]
-  departments     Department[]
-  roles           Role[]
-  classes         Class[]
-  students        Student[]
-  payments        FeePayment[]
-  smsLogs         SmsLog[]
-  feeStructures   FeeStructure[]
-  examPeriods     ExamPeriod[]
-  subjects        Subject[]
-  gradeBoundaries GradeBoundary[]
-  examResults     ExamResult[]
-  pendingExamRows PendingExamRow[]
-  termActivations TermActivation[]
+  // Relations
+  staff            Staff[]
+  departments      Department[]
+  roles            Role[]
+  classes          Class[]
+  students         Student[]
+  payments         FeePayment[]
+  notificationLogs NotificationLog[]
+  feeStructures    FeeStructure[]
+  examPeriods      ExamPeriod[]
+  subjects         Subject[]
+  gradeBoundaries  GradeBoundary[]
+  examResults      ExamResult[]
+  pendingExamRows  PendingExamRow[]
+  termActivations  TermActivation[]
 
   @@map("schools")
 }
 
-// ==================== DEPARTMENT ====================
+//  DEPARTMENT 
 model Department {
   id       String @id @default(uuid())
   schoolId String
@@ -88,7 +94,7 @@ model Department {
   @@map("departments")
 }
 
-// ==================== ROLE ====================
+//  ROLE 
 // Custom roles created by admin in Settings.
 // permissions shape: { "students": ["read","write"], "payments": ["read","verify"] }
 model Role {
@@ -111,7 +117,7 @@ model Role {
   @@map("roles")
 }
 
-// ==================== STAFF ====================
+//  STAFF 
 model Staff {
   id       String @id @default(uuid())
   schoolId String
@@ -156,16 +162,17 @@ model Staff {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  paymentsRecorded FeePayment[] @relation("RecordedBy")
-  paymentsVerified FeePayment[] @relation("VerifiedBy")
-  smsSent          SmsLog[]
+  // Relations
+  paymentsRecorded  FeePayment[]      @relation("RecordedBy")
+  paymentsVerified  FeePayment[]      @relation("VerifiedBy")
+  notificationsSent NotificationLog[]
 
   @@index([schoolId])
   @@index([email])
   @@map("staff")
 }
 
-// ==================== PARENT OTP ====================
+//  PARENT OTP 
 model OtpCode {
   id        String   @id @default(uuid())
   phone     String
@@ -178,7 +185,7 @@ model OtpCode {
   @@map("otp_codes")
 }
 
-// ==================== AUDIT LOG ====================
+//  AUDIT LOG 
 model AuditLog {
   id        String   @id @default(uuid())
   schoolId  String?

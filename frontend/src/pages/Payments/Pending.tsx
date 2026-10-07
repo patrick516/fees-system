@@ -2,9 +2,11 @@ import { useEffect, useState } from "react";
 import { CheckCircle, XCircle, Eye, Clock } from "lucide-react";
 import api from "../../lib/axios";
 import type { Payment } from "../../types";
+import { usePermission } from "../../hooks/usePermission";
 
 const PendingPayments = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
+  const { can } = usePermission();
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [rejectId, setRejectId] = useState<string | null>(null);
@@ -138,25 +140,31 @@ const PendingPayments = () => {
                       View Receipt
                     </button>
                   )}
-                  <button
-                    onClick={() => {
-                      setRejectId(payment.id);
-                      setRejectReason("");
-                    }}
-                    disabled={actionLoading === payment.id}
-                    className="flex items-center gap-1 px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 disabled:opacity-40"
-                  >
-                    <XCircle size={14} />
-                    Reject
-                  </button>
-                  <button
-                    onClick={() => handleVerify(payment.id)}
-                    disabled={actionLoading === payment.id}
-                    className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-40"
-                  >
-                    <CheckCircle size={14} />
-                    {actionLoading === payment.id ? "Processing..." : "Verify"}
-                  </button>
+                  {can("payments", "verify") && (
+                    <>
+                      <button
+                        onClick={() => {
+                          setRejectId(payment.id);
+                          setRejectReason("");
+                        }}
+                        disabled={actionLoading === payment.id}
+                        className="flex items-center gap-1 px-4 py-2 border border-red-200 text-red-600 rounded-lg text-sm hover:bg-red-50 disabled:opacity-40"
+                      >
+                        <XCircle size={14} />
+                        Reject
+                      </button>
+                      <button
+                        onClick={() => handleVerify(payment.id)}
+                        disabled={actionLoading === payment.id}
+                        className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 disabled:opacity-40"
+                      >
+                        <CheckCircle size={14} />
+                        {actionLoading === payment.id
+                          ? "Processing..."
+                          : "Verify"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
             </div>

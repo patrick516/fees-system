@@ -1,6 +1,7 @@
 const prisma = require("../config/db");
 const { uploadToCloudinary } = require("../lib/cloudinary");
 const { generateReceiptNumber } = require("../lib/utils");
+const { sendNotifications } = require("../lib/notifier");
 
 // ==================== HELPER — Calculate debtor status ====================
 // Gets total verified payments for a student for a specific term
@@ -134,6 +135,7 @@ const recordCashPayment = async (req, res) => {
             fullName: true,
             studentCode: true,
             parentPhone: true,
+            parentEmail: true,
             parentName: true,
             class: { select: { name: true } },
           },
@@ -163,6 +165,7 @@ const recordCashPayment = async (req, res) => {
     });
 
     // SMS log
+    // ============ SEND PAYMENT RECEIVED NOTIFICATION ============
     const smsMessage =
       overpayment > 0
         ? `Payment of MWK ${parsedAmount.toLocaleString()} received for ${payment.student.fullName}. Receipt: ${receiptNumber}. Fees fully paid! MWK ${overpayment.toLocaleString()} credit saved for next term.`
@@ -170,7 +173,36 @@ const recordCashPayment = async (req, res) => {
           ? `Payment of MWK ${parsedAmount.toLocaleString()} received for ${payment.student.fullName}. Receipt: ${receiptNumber}. Balance remaining: MWK ${balanceAfter.toLocaleString()}`
           : `Payment of MWK ${parsedAmount.toLocaleString()} received for ${payment.student.fullName}. Receipt: ${receiptNumber}. Fees fully paid!`;
 
-    console.log(`📱 SMS to ${payment.student.parentPhone}: ${smsMessage}`);
+    // Fire-and-forget — don't block the response
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: { name: true, notificationDefaults: true },
+    });
+
+    sendNotifications({
+      recipients: [
+        {
+          phone: payment.student.parentPhone,
+          email: payment.student.parentEmail,
+          name: payment.student.parentName || "Parent",
+          message: smsMessage,
+          subject: `Payment Received — ${school.name}`,
+          templateData: {
+            studentName: payment.student.fullName,
+            amount: parsedAmount,
+            receiptNumber,
+            balanceAfter,
+            overpayment,
+          },
+        },
+      ],
+      channel: school?.notificationDefaults?.defaultChannel || "BOTH",
+      type: "payment_received",
+      templateKey: "payment_received",
+      schoolId: req.schoolId,
+      staffId: req.staff.id,
+      schoolName: school.name,
+    }).catch((e) => console.error("Payment notification error:", e));
 
     return res.status(201).json({
       success: true,
@@ -328,6 +360,7 @@ const verifyPayment = async (req, res) => {
           select: {
             fullName: true,
             parentPhone: true,
+            parentEmail: true,
             parentName: true,
             classId: true,
             class: { select: { name: true } },
@@ -461,9 +494,40 @@ const verifyPayment = async (req, res) => {
       },
     });
 
-    console.log(
-      `📱 SMS to ${payment.student.parentPhone}: Payment of MWK ${payment.amount} for ${payment.student.fullName} CONFIRMED. Receipt: ${payment.receiptNumber}${verified.balance && verified.balance > 0 ? `. Balance: MWK ${verified.balance.toLocaleString()}` : ". Fully paid!"}`,
-    );
+    // ============ SEND PAYMENT VERIFIED NOTIFICATION ============
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: { name: true, notificationDefaults: true },
+    });
+
+    sendNotifications({
+      recipients: [
+        {
+          phone: payment.student.parentPhone,
+          email: payment.student.parentEmail,
+          name: payment.student.parentName || "Parent",
+          message:
+            `Payment of MWK ${payment.amount.toLocaleString()} for ${payment.student.fullName} has been confirmed. ` +
+            `Receipt: ${payment.receiptNumber}` +
+            (verified.balance && verified.balance > 0
+              ? `. Balance: MWK ${verified.balance.toLocaleString()}`
+              : ". Fully paid!"),
+          subject: `Payment Confirmed — ${school.name}`,
+          templateData: {
+            studentName: payment.student.fullName,
+            amount: payment.amount,
+            receiptNumber: payment.receiptNumber,
+            balanceAfter: verified.balance,
+          },
+        },
+      ],
+      channel: school?.notificationDefaults?.defaultChannel || "BOTH",
+      type: "payment_verified",
+      templateKey: "payment_verified",
+      schoolId: req.schoolId,
+      staffId: req.staff.id,
+      schoolName: school.name,
+    }).catch((e) => console.error("Verify notification error:", e));
 
     return res.status(200).json({
       success: true,
@@ -478,7 +542,7 @@ const verifyPayment = async (req, res) => {
     });
   }
 };
-// ==================== BURSAR REJECTS PAYMENT ====================
+
 // PATCH /api/payments/:id/reject
 const rejectPayment = async (req, res) => {
   try {
@@ -518,13 +582,44 @@ const rejectPayment = async (req, res) => {
         verifiedAt: new Date(),
       },
       include: {
-        student: { select: { fullName: true, parentPhone: true } },
+        student: {
+          select: {
+            fullName: true,
+            parentPhone: true,
+            parentEmail: true,
+            parentName: true,
+          },
+        },
       },
     });
 
-    console.log(
-      `📱 SMS to ${rejected.student.parentPhone}: Payment for ${rejected.student.fullName} rejected. Reason: ${reason}. Please resubmit.`,
-    );
+    // ============ SEND PAYMENT REJECTED NOTIFICATION ============
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: { name: true, notificationDefaults: true },
+    });
+
+    sendNotifications({
+      recipients: [
+        {
+          phone: rejected.student.parentPhone,
+          email: rejected.student.parentEmail,
+          name: rejected.student.parentName || "Parent",
+          message: `Payment for ${rejected.student.fullName} rejected. Reason: ${reason}. Please resubmit.`,
+          subject: `Payment Rejected — ${school.name}`,
+          templateData: {
+            studentName: rejected.student.fullName,
+            reason,
+          },
+        },
+      ],
+      channel: school?.notificationDefaults?.defaultChannel || "BOTH",
+      type: "payment_rejected",
+      templateKey: "payment_rejected",
+      schoolId: req.schoolId,
+      staffId: req.staff.id,
+      schoolName: school.name,
+    }).catch((e) => console.error("Reject notification error:", e));
 
     return res.status(200).json({
       success: true,

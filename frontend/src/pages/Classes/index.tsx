@@ -25,6 +25,7 @@ import {
 } from "../../components/ui/select";
 import { getCurrentAcademicYear } from "../../lib/utils";
 import { useActiveTerm } from "../../hooks/useActiveTerm";
+import { usePermission } from "../../hooks/usePermission";
 
 const terms = [
   { value: "TERM_1", label: "Term 1" },
@@ -55,6 +56,7 @@ const termOrder: Record<string, number> = {
 
 const ClassesPage = () => {
   const navigate = useNavigate();
+  const { can } = usePermission();
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
@@ -491,7 +493,7 @@ const ClassesPage = () => {
               Sets the default term and academic year across the whole system
             </p>
           </div>
-          {activeTerm && !showActivateForm && (
+          {activeTerm && !showActivateForm && can("settings", "write") && (
             <button
               onClick={() => {
                 setShowActivateForm(true);
@@ -823,45 +825,47 @@ const ClassesPage = () => {
       </div>
 
       {/* Add Class Form */}
-      <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
-        <h3 className="font-medium text-gray-800 mb-4">Add New Class</h3>
-        <form onSubmit={handleAddClass} className="flex gap-3">
-          <input
-            value={classForm.name}
-            onChange={(e) =>
-              setClassForm({ ...classForm, name: e.target.value })
-            }
-            placeholder="Class name (eg. Form 1, Form 3)"
-            required
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-          />
-          <input
-            type="number"
-            value={classForm.level}
-            onChange={(e) =>
-              setClassForm({ ...classForm, level: e.target.value })
-            }
-            placeholder="Level"
-            required
-            className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-          />
-          <button
-            type="submit"
-            disabled={adding}
-            className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
-          >
-            {adding ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Plus size={14} />
-            )}
-            Add
-          </button>
-        </form>
-        {classError && (
-          <p className="text-red-600 text-sm mt-2">{classError}</p>
-        )}
-      </div>
+      {can("classes", "write") && (
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <h3 className="font-medium text-gray-800 mb-4">Add New Class</h3>
+          <form onSubmit={handleAddClass} className="flex gap-3">
+            <input
+              value={classForm.name}
+              onChange={(e) =>
+                setClassForm({ ...classForm, name: e.target.value })
+              }
+              placeholder="Class name (eg. Form 1, Form 3)"
+              required
+              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            />
+            <input
+              type="number"
+              value={classForm.level}
+              onChange={(e) =>
+                setClassForm({ ...classForm, level: e.target.value })
+              }
+              placeholder="Level"
+              required
+              className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+            />
+            <button
+              type="submit"
+              disabled={adding}
+              className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
+            >
+              {adding ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <Plus size={14} />
+              )}
+              Add
+            </button>
+          </form>
+          {classError && (
+            <p className="text-red-600 text-sm mt-2">{classError}</p>
+          )}
+        </div>
+      )}
 
       {/* Classes List with Fee Structures */}
       <div className="space-y-4">
@@ -905,15 +909,17 @@ const ClassesPage = () => {
                     {cls.feeStructures?.length || 0} fee structure
                     {cls.feeStructures?.length !== 1 ? "s" : ""} set
                   </span>
-                  <button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      handleDeleteClass(cls.id);
-                    }}
-                    className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
-                  >
-                    <Trash2 size={14} />
-                  </button>
+                  {can("classes", "delete") && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteClass(cls.id);
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                    >
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                   {expandedClass === cls.id ? (
                     <ChevronUp size={18} className="text-gray-400" />
                   ) : (
@@ -939,12 +945,14 @@ const ClassesPage = () => {
                               <span className="text-xs font-medium text-[var(--color-primary-dark)] bg-[var(--color-primary-light)] px-2 py-0.5 rounded">
                                 {termLabel(fee.term)} {fee.academicYear}
                               </span>
-                              <button
-                                onClick={() => openFeeForm(cls.id, fee)}
-                                className="p-1 text-gray-400 hover:text-[var(--color-primary)]"
-                              >
-                                <Edit2 size={12} />
-                              </button>
+                              {can("payments", "write") && (
+                                <button
+                                  onClick={() => openFeeForm(cls.id, fee)}
+                                  className="p-1 text-gray-400 hover:text-[var(--color-primary)]"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                              )}
                             </div>
                             <p className="text-lg font-bold text-gray-800">
                               MWK {fee.totalAmount.toLocaleString()}
@@ -963,15 +971,17 @@ const ClassesPage = () => {
                   )}
 
                   {showFeeForm !== cls.id ? (
-                    <button
-                      onClick={() => openFeeForm(cls.id)}
-                      className="flex items-center gap-2 text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm font-medium"
-                    >
-                      <Plus size={16} />
-                      {cls.feeStructures?.length > 0
-                        ? "Add Another Term Fee"
-                        : "Set Fee Structure"}
-                    </button>
+                    can("payments", "write") && (
+                      <button
+                        onClick={() => openFeeForm(cls.id)}
+                        className="flex items-center gap-2 text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm font-medium"
+                      >
+                        <Plus size={16} />
+                        {cls.feeStructures?.length > 0
+                          ? "Add Another Term Fee"
+                          : "Set Fee Structure"}
+                      </button>
+                    )
                   ) : (
                     <form
                       onSubmit={handleSaveFee}
@@ -1158,15 +1168,17 @@ const ClassesPage = () => {
                 <CheckCircle size={12} /> Saved
               </span>
             )}
-            {hasSavedPayment && !isEditingPayment && (
-              <button
-                type="button"
-                onClick={() => setIsEditingPayment(true)}
-                className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition-colors"
-              >
-                <Edit2 size={14} /> Edit Details
-              </button>
-            )}
+            {hasSavedPayment &&
+              !isEditingPayment &&
+              can("settings", "write") && (
+                <button
+                  type="button"
+                  onClick={() => setIsEditingPayment(true)}
+                  className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition-colors"
+                >
+                  <Edit2 size={14} /> Edit Details
+                </button>
+              )}
             {hasSavedPayment && isEditingPayment && (
               <button
                 type="button"

@@ -25,11 +25,12 @@ import SettingsPage from "./pages/Settings/index";
 import ResultsPage from "./pages/Results/index";
 import Promote from "./pages/Students/Promote";
 import BulkImport from "./pages/Students/BulkImport";
-import StaffPage from "./pages/Staff/index"; // NEW
+import StaffPage from "./pages/Staff/index";
 import RateLimitModal from "./components/shared/RateLimitModal";
 
-// Layout
+// Layout + Guards
 import MainLayout from "./components/Layout/MainLayout";
+import PermissionGuard from "./components/shared/PermissionGuard";
 
 // ==================== GUARDS ====================
 
@@ -45,7 +46,6 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 };
 
 // Only accessible when logged in AND mustChangePassword is true.
-// Otherwise, send them where they belong.
 const ForcePasswordRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, mustChangePassword } = useAuthStore();
 
@@ -92,21 +92,137 @@ function App() {
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
+
+          {/* Dashboard — any authenticated user */}
           <Route path="dashboard" element={<Dashboard />} />
-          <Route path="students" element={<StudentsPage />} />
-          <Route path="students/add" element={<AddStudent />} />
-          <Route path="students/promote" element={<Promote />} />
-          <Route path="students/bulk-import" element={<BulkImport />} />
-          <Route path="students/:id" element={<StudentDetail />} />
-          <Route path="payments" element={<PaymentsPage />} />
-          <Route path="payments/record" element={<RecordPayment />} />
-          <Route path="payments/pending" element={<PendingPayments />} />
-          <Route path="classes" element={<ClassesPage />} />
-          <Route path="sms" element={<SMSPage />} />
-          <Route path="reports" element={<ReportsPage />} />
-          <Route path="settings" element={<SettingsPage />} />
-          <Route path="results" element={<ResultsPage />} />
-          <Route path="staff" element={<StaffPage />} /> {/* NEW */}
+
+          {/* ==================== STUDENTS ==================== */}
+          <Route
+            path="students"
+            element={
+              <PermissionGuard resource="students">
+                <StudentsPage />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="students/add"
+            element={
+              <PermissionGuard resource="students" action="write">
+                <AddStudent />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="students/promote"
+            element={
+              <PermissionGuard resource="students" action="write">
+                <Promote />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="students/bulk-import"
+            element={
+              <PermissionGuard resource="students" action="write">
+                <BulkImport />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="students/:id"
+            element={
+              <PermissionGuard resource="students">
+                <StudentDetail />
+              </PermissionGuard>
+            }
+          />
+
+          {/* ==================== PAYMENTS ==================== */}
+          <Route
+            path="payments"
+            element={
+              <PermissionGuard resource="payments">
+                <PaymentsPage />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="payments/record"
+            element={
+              <PermissionGuard resource="payments" action="write">
+                <RecordPayment />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="payments/pending"
+            element={
+              <PermissionGuard resource="payments">
+                <PendingPayments />
+              </PermissionGuard>
+            }
+          />
+
+          {/* ==================== CLASSES ==================== */}
+          <Route
+            path="classes"
+            element={
+              <PermissionGuard resource="classes">
+                <ClassesPage />
+              </PermissionGuard>
+            }
+          />
+
+          {/* ==================== SMS / ALERTS ==================== */}
+          <Route
+            path="sms"
+            element={
+              <PermissionGuard resource="sms">
+                <SMSPage />
+              </PermissionGuard>
+            }
+          />
+
+          {/* ==================== REPORTS ==================== */}
+          <Route
+            path="reports"
+            element={
+              <PermissionGuard resource="reports">
+                <ReportsPage />
+              </PermissionGuard>
+            }
+          />
+
+          {/* ==================== SETTINGS ==================== */}
+          <Route
+            path="settings"
+            element={
+              <PermissionGuard resource="settings">
+                <SettingsPage />
+              </PermissionGuard>
+            }
+          />
+
+          {/* ==================== RESULTS ==================== */}
+          <Route
+            path="results"
+            element={
+              <PermissionGuard resource="results">
+                <ResultsPage />
+              </PermissionGuard>
+            }
+          />
+
+          {/* ==================== STAFF ==================== */}
+          <Route
+            path="staff"
+            element={
+              <PermissionGuard resource="staff">
+                <StaffPage />
+              </PermissionGuard>
+            }
+          />
         </Route>
 
         {/* Catch all */}

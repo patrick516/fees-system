@@ -16,42 +16,82 @@ const {
   promoteStudents,
 } = require("../controllers/promotion.controller");
 
-const { verifyStaff, verifyParent } = require("../middleware/auth");
-const { isBursar, isAdmin } = require("../middleware/role");
+const { verifyStaff } = require("../middleware/auth");
+const { requirePermission } = require("../middleware/role");
 
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
 });
 
-// Public — parent login page
+// ==================== PUBLIC ====================
+// Parent login page — no auth
 router.get("/by-code/:code", getStudentByCode);
 
-// Bulk import — must come before /:id
+// ==================== BULK IMPORT ====================
+// Must come before /:id — otherwise "bulk" is treated as an ID
 router.post(
   "/bulk/preview",
   verifyStaff,
-  isBursar,
+  requirePermission("students", "write"),
   upload.single("file"),
   bulkImportPreview,
 );
 router.post(
   "/bulk/import",
   verifyStaff,
-  isBursar,
+  requirePermission("students", "write"),
   upload.single("file"),
   bulkImport,
 );
 
-// Promotion — before /:id
-router.get("/promote/preview", verifyStaff, isAdmin, previewPromotion);
-router.post("/promote", verifyStaff, isAdmin, promoteStudents);
+// ==================== PROMOTION ====================
+// Must come before /:id too
+router.get(
+  "/promote/preview",
+  verifyStaff,
+  requirePermission("students", "write"),
+  previewPromotion,
+);
+router.post(
+  "/promote",
+  verifyStaff,
+  requirePermission("students", "write"),
+  promoteStudents,
+);
 
-// Staff only
-router.get("/search", verifyStaff, isBursar, searchStudents);
-router.get("/", verifyStaff, isBursar, getStudents);
-router.get("/:id", verifyStaff, isBursar, getStudent);
-router.post("/", verifyStaff, isBursar, addStudent);
-router.put("/:id", verifyStaff, isBursar, updateStudent);
+// ==================== SEARCH ====================
+router.get(
+  "/search",
+  verifyStaff,
+  requirePermission("students", "read"),
+  searchStudents,
+);
+
+// ==================== CRUD ====================
+router.get(
+  "/",
+  verifyStaff,
+  requirePermission("students", "read"),
+  getStudents,
+);
+router.get(
+  "/:id",
+  verifyStaff,
+  requirePermission("students", "read"),
+  getStudent,
+);
+router.post(
+  "/",
+  verifyStaff,
+  requirePermission("students", "write"),
+  addStudent,
+);
+router.put(
+  "/:id",
+  verifyStaff,
+  requirePermission("students", "write"),
+  updateStudent,
+);
 
 module.exports = router;

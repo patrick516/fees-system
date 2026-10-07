@@ -1,14 +1,21 @@
+// backend/src/controllers/sms.controller.js
 const prisma = require("../config/db");
-const { sendSMS } = require("../lib/sms");
+const { sendNotifications } = require("../lib/notifier");
 
-// ==================== BULK SMS ====================
+// ==================== HELPER: Resolve the default channel ====================
+const resolveChannel = (requested, school) => {
+  if (requested && ["SMS", "EMAIL", "BOTH"].includes(requested.toUpperCase())) {
+    return requested.toUpperCase();
+  }
+  return school?.notificationDefaults?.defaultChannel || "BOTH";
+};
+
+// ==================== BULK SEND ====================
 // POST /api/sms/bulk
-// Body: { type: "reminder" | "unpaid" | "announcement", message?, term? }
-// Groups recipients by parent phone so a parent with multiple children
-// gets ONE message listing all their children — not one per student.
+// Body: { type, message?, term?, channel? }
 const sendBulkSMS = async (req, res) => {
   try {
-    const { type, message } = req.body;
+    const { type, message, channel: requestedChannel } = req.body;
 
     if (!type || !["reminder", "unpaid", "announcement"].includes(type)) {
       return res.status(400).json({
@@ -24,13 +31,14 @@ const sendBulkSMS = async (req, res) => {
       });
     }
 
-    // Pull the school + active term — single source of truth
+    // Load school + preferences
     const school = await prisma.school.findUnique({
       where: { id: req.schoolId },
       select: {
         name: true,
         activeTerm: true,
         activeAcademicYear: true,
+        notificationDefaults: true,
       },
     });
 
@@ -40,7 +48,9 @@ const sendBulkSMS = async (req, res) => {
         .json({ success: false, message: "School not found" });
     }
 
-    // For reminder/unpaid we NEED an active term
+    const channel = resolveChannel(requestedChannel, school);
+
+    // Reminder / unpaid need an active term
     if (
       type !== "announcement" &&
       (!school.activeTerm || !school.activeAcademicYear)
@@ -56,11 +66,15 @@ const sendBulkSMS = async (req, res) => {
     const termLabel = termToUse ? termToUse.replace("_", " ") : "";
 
     // ==================== ANNOUNCEMENT ====================
-    // Group by phone, no per-student info needed since message is custom
     if (type === "announcement") {
       const students = await prisma.student.findMany({
         where: { schoolId: req.schoolId, isActive: true },
-        select: { parentPhone: true, parentPhone2: true },
+        select: {
+          parentPhone: true,
+          parentPhone2: true,
+          parentEmail: true,
+          parentName: true,
+        },
       });
 
       const body = message.trim();
@@ -69,23 +83,33 @@ const sendBulkSMS = async (req, res) => {
 
       for (const s of students) {
         const phone = s.parentPhone?.trim();
-        if (phone && !seen.has(phone)) {
-          seen.add(phone);
-          recipients.push({ phone, message: body });
-        }
+        const email = s.parentEmail?.trim();
+        const key = `${phone || ""}|${email || ""}`;
+        if ((!phone && !email) || seen.has(key)) continue;
+        seen.add(key);
+        recipients.push({
+          phone,
+          email,
+          name: s.parentName,
+          message: body,
+          subject: `Announcement from ${school.name}`,
+        });
       }
 
-      return sendToRecipients({
+      const result = await sendNotifications({
         recipients,
-        schoolId: req.schoolId,
+        channel,
         type,
+        templateKey: "announcement",
+        schoolId: req.schoolId,
         staffId: req.staff?.id,
-        res,
+        schoolName: school.name,
       });
+
+      return respond(res, result);
     }
 
     // ==================== REMINDER / UNPAID ====================
-    // 1. Load students + their class fee structures
     const students = await prisma.student.findMany({
       where: { schoolId: req.schoolId, isActive: true },
       include: {
@@ -103,7 +127,6 @@ const sendBulkSMS = async (req, res) => {
       },
     });
 
-    // 2. Batch-load all verified payments for this term/year in ONE query
     const paymentGroups = await prisma.feePayment.groupBy({
       by: ["studentId"],
       where: {
@@ -118,32 +141,36 @@ const sendBulkSMS = async (req, res) => {
       paymentGroups.map((p) => [p.studentId, p._sum.amount || 0]),
     );
 
-    // 3. Group qualifying students by parent phone
-    //    phoneMap: phone -> { parentName, children: [{ name, required, paid, balance }] }
-    const phoneMap = new Map();
+    // Group by (phone + email) so siblings share one message
+    const contactMap = new Map();
 
     for (const student of students) {
       const feeStructure = student.class.feeStructures[0];
-      if (!feeStructure) continue; // class has no fee structure this term
+      if (!feeStructure) continue;
+
       const phone = student.parentPhone?.trim();
-      if (!phone) continue;
+      const email = student.parentEmail?.trim();
+      if (!phone && !email) continue;
 
       const paid = paidByStudent[student.id] || 0;
       const required = feeStructure.totalAmount;
       const balance = Math.max(0, required - paid);
 
-      // Filter by type
       if (type === "reminder" && balance === 0) continue;
       if (type === "unpaid" && paid > 0) continue;
 
-      if (!phoneMap.has(phone)) {
-        phoneMap.set(phone, {
+      // Key by email when available (more unique), else phone
+      const key = email || phone;
+
+      if (!contactMap.has(key)) {
+        contactMap.set(key, {
           phone,
-          parentName: student.parentName,
+          email,
+          name: student.parentName,
           children: [],
         });
       }
-      phoneMap.get(phone).children.push({
+      contactMap.get(key).children.push({
         name: student.fullName,
         required,
         paid,
@@ -151,150 +178,97 @@ const sendBulkSMS = async (req, res) => {
       });
     }
 
-    // 4. Build one message per phone
     const recipients = [];
 
-    for (const entry of phoneMap.values()) {
-      const { phone, parentName, children } = entry;
+    for (const entry of contactMap.values()) {
+      const { phone, email, name, children } = entry;
 
+      let msg = "";
       if (type === "reminder") {
         if (children.length === 1) {
           const c = children[0];
-          recipients.push({
-            phone,
-            message:
-              `Dear ${parentName}, ${c.name}'s ${termLabel} ${yearToUse} fees have a balance of MWK ${c.balance.toLocaleString()}. ` +
-              `Please pay at your earliest convenience. — ${school.name}`,
-          });
+          msg =
+            `Dear ${name}, ${c.name}'s ${termLabel} ${yearToUse} fees have a balance of MWK ${c.balance.toLocaleString()}. ` +
+            `Please pay at your earliest convenience. — ${school.name}`;
         } else {
-          const totalBalance = children.reduce((s, c) => s + c.balance, 0);
+          const total = children.reduce((s, c) => s + c.balance, 0);
           const listing = children
             .map((c) => `${c.name} MWK ${c.balance.toLocaleString()}`)
             .join(", ");
-          recipients.push({
-            phone,
-            message:
-              `Dear ${parentName}, ${termLabel} ${yearToUse} fee balances: ${listing}. ` +
-              `Total MWK ${totalBalance.toLocaleString()}. Please pay soon. — ${school.name}`,
-          });
+          msg =
+            `Dear ${name}, ${termLabel} ${yearToUse} fee balances: ${listing}. ` +
+            `Total MWK ${total.toLocaleString()}. Please pay soon. — ${school.name}`;
         }
       } else if (type === "unpaid") {
         if (children.length === 1) {
           const c = children[0];
-          recipients.push({
-            phone,
-            message:
-              `Dear ${parentName}, we have no payment on record for ${c.name}'s ${termLabel} ${yearToUse} fees (MWK ${c.required.toLocaleString()}). ` +
-              `Please pay to avoid disruption. — ${school.name}`,
-          });
+          msg =
+            `Dear ${name}, we have no payment on record for ${c.name}'s ${termLabel} ${yearToUse} fees (MWK ${c.required.toLocaleString()}). ` +
+            `Please pay to avoid disruption. — ${school.name}`;
         } else {
           const names = children.map((c) => c.name).join(", ");
-          const totalRequired = children.reduce((s, c) => s + c.required, 0);
-          recipients.push({
-            phone,
-            message:
-              `Dear ${parentName}, we have no payment on record for ${children.length} of your children: ${names}. ` +
-              `Total due: MWK ${totalRequired.toLocaleString()} for ${termLabel} ${yearToUse}. Please pay soon. — ${school.name}`,
-          });
+          const total = children.reduce((s, c) => s + c.required, 0);
+          msg =
+            `Dear ${name}, we have no payment on record for ${children.length} of your children: ${names}. ` +
+            `Total due: MWK ${total.toLocaleString()} for ${termLabel} ${yearToUse}. Please pay soon. — ${school.name}`;
         }
       }
+
+      recipients.push({
+        phone,
+        email,
+        name,
+        message: msg,
+        subject:
+          type === "reminder"
+            ? `Fee Reminder — ${school.name}`
+            : `Unpaid Fees — ${school.name}`,
+      });
     }
 
-    return sendToRecipients({
+    const result = await sendNotifications({
       recipients,
-      schoolId: req.schoolId,
+      channel,
       type,
+      templateKey: type === "reminder" ? "fee_reminder" : "unpaid",
+      schoolId: req.schoolId,
       staffId: req.staff?.id,
-      res,
+      schoolName: school.name,
     });
+
+    return respond(res, result);
   } catch (err) {
-    console.error("Bulk SMS error:", err);
+    console.error("Bulk send error:", err);
     return res.status(500).json({
       success: false,
-      message: "Failed to send SMS",
+      message: "Failed to send notifications",
     });
   }
 };
 
-// ==================== SHARED SENDER ====================
-// Sends recipients in batches of 10 in parallel, logs each to SmsLog
-async function sendToRecipients({ recipients, schoolId, type, staffId, res }) {
-  if (recipients.length === 0) {
-    return res.json({
-      success: true,
-      message: "No matching recipients found",
-      data: { sent: 0, failed: 0, total: 0 },
-    });
-  }
+const respond = (res, result) => {
+  const parts = [];
+  if (result.smsSent > 0) parts.push(`${result.smsSent} SMS`);
+  if (result.emailSent > 0)
+    parts.push(`${result.emailSent} email${result.emailSent !== 1 ? "s" : ""}`);
 
-  let sent = 0;
-  let failed = 0;
-  const errors = [];
-  const BATCH_SIZE = 10;
-
-  for (let i = 0; i < recipients.length; i += BATCH_SIZE) {
-    const batch = recipients.slice(i, i + BATCH_SIZE);
-
-    await Promise.all(
-      batch.map(async (r) => {
-        try {
-          const result = await sendSMS(r.phone, r.message);
-
-          await prisma.smsLog.create({
-            data: {
-              schoolId,
-              phone: r.phone,
-              message: r.message,
-              type,
-              status: "SENT",
-              messageId: result?.messageId || null,
-              cost: result?.cost != null ? String(result.cost) : null,
-              sentById: staffId || null,
-            },
-          });
-
-          sent++;
-        } catch (err) {
-          failed++;
-          errors.push(`${r.phone}: ${err.message}`);
-
-          try {
-            await prisma.smsLog.create({
-              data: {
-                schoolId,
-                phone: r.phone,
-                message: r.message,
-                type,
-                status: "FAILED",
-                errorMessage: err.message?.slice(0, 500) || "Unknown error",
-                sentById: staffId || null,
-              },
-            });
-          } catch {
-            /* don't let log failure kill the send loop */
-          }
-        }
-      }),
-    );
-  }
+  const msg =
+    result.smsSent + result.emailSent === 0
+      ? "No notifications sent"
+      : `Sent ${parts.join(" + ")}${result.failed ? `, ${result.failed} failed` : ""}`;
 
   return res.json({
     success: true,
-    message: `Sent ${sent} message${sent !== 1 ? "s" : ""}${failed ? `, ${failed} failed` : ""}`,
-    data: {
-      sent,
-      failed,
-      total: recipients.length,
-      errors: errors.slice(0, 5),
-    },
+    message: msg,
+    data: result,
   });
-}
+};
 
 // ==================== LOGS ====================
-// GET /api/sms/logs?type=&status=&page=1&limit=20
+// GET /api/sms/logs?channel=&type=&status=&page=1&limit=20
 const getSmsLogs = async (req, res) => {
   try {
-    const { type, status, page = 1, limit = 20 } = req.query;
+    const { type, status, channel, page = 1, limit = 20 } = req.query;
 
     const pageNum = Math.max(1, parseInt(page) || 1);
     const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
@@ -303,18 +277,17 @@ const getSmsLogs = async (req, res) => {
     const where = { schoolId: req.schoolId };
     if (type) where.type = type;
     if (status) where.status = status;
+    if (channel) where.channel = channel;
 
     const [logs, total] = await Promise.all([
-      prisma.smsLog.findMany({
+      prisma.notificationLog.findMany({
         where,
         orderBy: { createdAt: "desc" },
         skip,
         take: limitNum,
-        include: {
-          sentBy: { select: { fullName: true } },
-        },
+        include: { sentBy: { select: { fullName: true } } },
       }),
-      prisma.smsLog.count({ where }),
+      prisma.notificationLog.count({ where }),
     ]);
 
     res.json({
@@ -329,7 +302,9 @@ const getSmsLogs = async (req, res) => {
     });
   } catch (err) {
     console.error(err);
-    res.status(500).json({ success: false, message: "Failed to get SMS logs" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get notification logs" });
   }
 };
 

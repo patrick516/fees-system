@@ -1,3 +1,4 @@
+// ==================== ENUMS ====================
 enum PaymentMethod {
   CASH
   AIRTEL_MONEY
@@ -20,6 +21,7 @@ enum SubmittedBy {
   PARENT
 }
 
+// ==================== FEE STRUCTURE ====================
 model FeeStructure {
   id       String @id @default(uuid())
   schoolId String
@@ -48,6 +50,7 @@ model FeeStructure {
   @@map("fee_structures")
 }
 
+// ==================== FEE PAYMENT ====================
 model FeePayment {
   id        String  @id @default(uuid())
   schoolId  String
@@ -87,7 +90,7 @@ model FeePayment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  smsLogs SmsLog[]
+  notifications NotificationLog[]
 
   @@index([schoolId])
   @@index([studentId])
@@ -96,25 +99,43 @@ model FeePayment {
   @@map("fee_payments")
 }
 
-model SmsLog {
+// ==================== NOTIFICATION LOG ====================
+// One row per message attempt (SMS OR Email).
+// Physical table stays as "sms_logs" for backwards compatibility.
+model NotificationLog {
   id       String @id @default(uuid())
   schoolId String
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  phone     String
-  message   String
-  type      String
-  status    String
+  // Channel + recipient
+  channel       String // "SMS" | "EMAIL"
+  phone         String?
+  email         String?
+  recipientName String?
+
+  // Content
+  message  String
+  subject  String? // Email only
+  type     String // reminder | unpaid | announcement | payment_received | payment_verified | payment_rejected | welcome
+  template String?
+
+  // Result
+  status       String
+  messageId    String?
+  cost         String?
+  errorMessage String?
+
+  // Relations
   paymentId String?
   payment   FeePayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   sentById  String?
   sentBy    Staff?      @relation(fields: [sentById], references: [id], onDelete: SetNull)
 
-  messageId    String?
-  cost         String?
-  errorMessage String?
-
   createdAt DateTime @default(now())
 
+  @@index([schoolId])
+  @@index([channel])
+  @@index([type])
+  @@index([createdAt])
   @@map("sms_logs")
 }

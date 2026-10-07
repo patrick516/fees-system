@@ -11,9 +11,11 @@ import {
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { Student, Class, Pagination } from "../../types";
+import { usePermission } from "../../hooks/usePermission";
 
 const StudentsPage = () => {
   const navigate = useNavigate();
+  const { can } = usePermission();
   const [students, setStudents] = useState<Student[]>([]);
   const [classes, setClasses] = useState<Class[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
@@ -77,36 +79,38 @@ const StudentsPage = () => {
               : " total"}
           </p>
         </div>
-        <div className="flex items-center gap-2 shrink-0">
-          <button
-            onClick={() => navigate("/students/promote")}
-            className="flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 md:px-4 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-            title="End of year promotion"
-          >
-            <GraduationCap size={16} />
-            <span className="hidden lg:inline">End of Year Promotion</span>
-            <span className="lg:hidden hidden sm:inline">Promote</span>
-          </button>
+        {can("students", "write") && (
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => navigate("/students/bulk-import")}
+              onClick={() => navigate("/students/promote")}
               className="flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 md:px-4 rounded-lg text-sm hover:bg-gray-50 transition-colors"
-              title="Bulk import students"
+              title="End of year promotion"
             >
-              <Upload size={16} />
-              <span className="hidden lg:inline">Bulk Import</span>
-              <span className="lg:hidden hidden sm:inline">Import</span>
+              <GraduationCap size={16} />
+              <span className="hidden lg:inline">End of Year Promotion</span>
+              <span className="lg:hidden hidden sm:inline">Promote</span>
             </button>
-            <button
-              onClick={() => navigate("/students/add")}
-              className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-3 py-2 md:px-4 rounded-lg text-sm hover:bg-[var(--color-primary-dark)] transition-colors"
-            >
-              <Plus size={16} />
-              <span className="hidden sm:inline">Add Student</span>
-              <span className="sm:hidden">Add</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={() => navigate("/students/bulk-import")}
+                className="flex items-center gap-2 border border-gray-300 text-gray-700 px-3 py-2 md:px-4 rounded-lg text-sm hover:bg-gray-50 transition-colors"
+                title="Bulk import students"
+              >
+                <Upload size={16} />
+                <span className="hidden lg:inline">Bulk Import</span>
+                <span className="lg:hidden hidden sm:inline">Import</span>
+              </button>
+              <button
+                onClick={() => navigate("/students/add")}
+                className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-3 py-2 md:px-4 rounded-lg text-sm hover:bg-[var(--color-primary-dark)] transition-colors"
+              >
+                <Plus size={16} />
+                <span className="hidden sm:inline">Add Student</span>
+                <span className="sm:hidden">Add</span>
+              </button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       {/* Class Filter — horizontally scrollable on mobile */}
