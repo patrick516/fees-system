@@ -7,7 +7,14 @@ const { sendOtpEmail } = require("../lib/mailer");
 const { validatePassword } = require("../lib/passwordPolicy");
 const { createDefaultRolesForSchool } = require("../lib/defaultRoles");
 
-// ==================== HELPERS ====================
+const {
+  signAccessToken,
+  signRefreshToken,
+  verifyRefreshToken,
+  hashToken,
+  compareToken,
+  getRefreshExpiryDate,
+} = require("../lib/tokens");
 
 const generateToken = (payload) => {
   return jwt.sign(payload, process.env.JWT_SECRET, {
@@ -108,22 +115,30 @@ const staffLogin = async (req, res) => {
       });
     }
 
-    await prisma.staff.update({
-      where: { id: staff.id },
-      data: { lastLogin: new Date() },
-    });
-
-    const token = generateToken({
+    // Issue tokens
+    const accessToken = signAccessToken({
       id: staff.id,
       schoolId: staff.schoolId,
       type: "STAFF",
+    });
+    const refreshToken = signRefreshToken(staff.id);
+    const refreshTokenHash = await hashToken(refreshToken);
+
+    await prisma.staff.update({
+      where: { id: staff.id },
+      data: {
+        lastLogin: new Date(),
+        refreshTokenHash,
+        refreshTokenExpires: getRefreshExpiryDate(),
+      },
     });
 
     return res.status(200).json({
       success: true,
       message: "Login successful",
       data: {
-        token,
+        token: accessToken,
+        refreshToken,
         mustChangePassword: staff.mustChangePassword,
         staff: {
           id: staff.id,
@@ -893,6 +908,120 @@ const verifyOTP = async (req, res) => {
   }
 };
 
+// ==================== REFRESH ACCESS TOKEN ====================
+// POST /api/auth/refresh
+// Body: { refreshToken }
+const refreshAccessToken = async (req, res) => {
+  try {
+    const { refreshToken } = req.body;
+    if (!refreshToken) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Refresh token required" });
+    }
+
+    let decoded;
+    try {
+      decoded = verifyRefreshToken(refreshToken);
+    } catch {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid or expired refresh token",
+        code: "REFRESH_EXPIRED",
+      });
+    }
+
+    const staff = await prisma.staff.findUnique({
+      where: { id: decoded.id },
+    });
+
+    if (!staff || !staff.isActive) {
+      return res.status(401).json({
+        success: false,
+        message: "Account not found or deactivated",
+        code: "REFRESH_EXPIRED",
+      });
+    }
+
+    // Verify the stored hash matches the provided refresh token
+    if (!staff.refreshTokenHash || !staff.refreshTokenExpires) {
+      return res.status(401).json({
+        success: false,
+        message: "No active session",
+        code: "REFRESH_EXPIRED",
+      });
+    }
+
+    if (staff.refreshTokenExpires < new Date()) {
+      return res.status(401).json({
+        success: false,
+        message: "Session expired, please log in again",
+        code: "REFRESH_EXPIRED",
+      });
+    }
+
+    const matches = await compareToken(refreshToken, staff.refreshTokenHash);
+    if (!matches) {
+      return res.status(401).json({
+        success: false,
+        message: "Session is no longer valid",
+        code: "REFRESH_EXPIRED",
+      });
+    }
+
+    // Rotate: issue new access + new refresh, store new hash
+    const newAccessToken = signAccessToken({
+      id: staff.id,
+      schoolId: staff.schoolId,
+      type: "STAFF",
+    });
+    const newRefreshToken = signRefreshToken(staff.id);
+    const newHash = await hashToken(newRefreshToken);
+
+    await prisma.staff.update({
+      where: { id: staff.id },
+      data: {
+        refreshTokenHash: newHash,
+        refreshTokenExpires: getRefreshExpiryDate(),
+      },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        token: newAccessToken,
+        refreshToken: newRefreshToken,
+      },
+    });
+  } catch (err) {
+    console.error("Refresh token error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to refresh session" });
+  }
+};
+
+// ==================== STAFF LOGOUT ====================
+
+const staffLogout = async (req, res) => {
+  try {
+    if (req.staff?.id) {
+      await prisma.staff.update({
+        where: { id: req.staff.id },
+        data: {
+          refreshTokenHash: null,
+          refreshTokenExpires: null,
+        },
+      });
+    }
+    return res.status(200).json({ success: true, message: "Logged out" });
+  } catch (err) {
+    console.error("Logout error:", err);
+    // Even on error, tell the client it's logged out — they should clear storage anyway
+    return res.status(200).json({ success: true, message: "Logged out" });
+  }
+};
+
 module.exports = {
   staffLogin,
   getStaffProfile,
@@ -903,6 +1032,8 @@ module.exports = {
   acceptInvitation,
   getMe,
   getSetupStatus,
+  refreshAccessToken,
+  staffLogout,
   parentLoginWithStudentId,
   requestOTP,
   verifyOTP,

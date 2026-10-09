@@ -44,10 +44,10 @@ const Login = () => {
 
     try {
       const res = await api.post("/auth/staff/login", form);
-      const { token, staff, mustChangePassword } = res.data.data;
+      const { token, refreshToken, staff, mustChangePassword } = res.data.data;
 
-      // NEW: persist token + staff + forced-change flag
-      login(token, staff, !!mustChangePassword);
+      // Persist access token + refresh token + staff + forced-change flag
+      login(token, refreshToken, staff, !!mustChangePassword);
 
       if (staff.school) {
         localStorage.setItem(

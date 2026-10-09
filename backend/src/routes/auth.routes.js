@@ -11,6 +11,8 @@ const {
   acceptInvitation,
   getMe,
   getSetupStatus,
+  refreshAccessToken,
+  staffLogout,
   parentLoginWithStudentId,
   requestOTP,
   verifyOTP,
@@ -32,6 +34,9 @@ router.get("/setup-status", getSetupStatus);
 router.post("/register", registerAdmin);
 router.post("/verify-email", verifyEmail);
 router.post("/resend-otp", resendOtp);
+router.post("/refresh", refreshAccessToken);
+
+router.post("/staff/logout", verifyStaff, staffLogout);
 
 router.post(
   "/staff/login",

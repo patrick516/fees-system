@@ -158,6 +158,8 @@ model Staff {
 
   passwordResetToken   String?   @unique
   passwordResetExpires DateTime?
+  refreshTokenHash    String?
+  refreshTokenExpires DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
