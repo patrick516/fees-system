@@ -19,6 +19,20 @@ router.get(
   requirePermission("audit", "read"),
   auditController.exportCsv,
 );
+// Grouped view (one row per user)
+router.get(
+  "/grouped",
+  requirePermission("audit", "read"),
+  auditController.getGroupedByUser,
+);
+
+// User timeline (all actions for one user)
+router.get(
+  "/user/:staffId",
+  requirePermission("audit", "read"),
+  auditController.getUserTimeline,
+);
+
 router.get("/:id", requirePermission("audit", "read"), auditController.getLog);
 
 module.exports = router;
