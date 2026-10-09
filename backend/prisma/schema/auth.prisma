@@ -188,18 +188,37 @@ model OtpCode {
 }
 
 //  AUDIT LOG 
+// Every action taken by a staff member. Actor snapshot is denormalized
+// so the log survives staff deletion or role changes.
 model AuditLog {
-  id        String   @id @default(uuid())
-  schoolId  String?
-  staffId   String?
-  action    String
-  entity    String
-  entityId  String?
-  changes   Json?
+  id       String  @id @default(uuid())
+  schoolId String?
+  staffId  String?
+
+  // Actor snapshot (denormalized at write time)
+  actorName  String?
+  actorRole  String?
+  actorEmail String?
+
+  // What happened
+  action     String // e.g. "STUDENT_ADDED", "LOGIN_SUCCESS", "PAYMENT_VERIFIED"
+  entity     String // "Student", "Payment", "Staff", "Session", ...
+  entityId   String?
+  targetName String? // human-readable target, e.g. student's full name
+  changes    Json? // { before: {...}, after: {...} } OR full payload
+
+  // Result
+  status String @default("SUCCESS") // "SUCCESS" | "FAILED"
+
+  // Request metadata
   ipAddress String?
+  userAgent String?
+
   createdAt DateTime @default(now())
 
   @@index([schoolId])
+  @@index([staffId])
+  @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
 }

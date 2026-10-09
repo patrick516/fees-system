@@ -15,6 +15,7 @@ const {
   compareToken,
   getRefreshExpiryDate,
 } = require("../lib/tokens");
+const { logAudit } = require("../lib/audit");
 
 const generateToken = (payload) => {
   return jwt.sign(payload, process.env.JWT_SECRET, {
@@ -77,6 +78,14 @@ const staffLogin = async (req, res) => {
     });
 
     if (!staff || !staff.passwordHash) {
+      await logAudit(req, {
+        action: "LOGIN_FAILED",
+        entity: "Session",
+        targetName: email,
+        status: "FAILED",
+        changes: { reason: "Unknown email or no password set" },
+        actor: { email },
+      });
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
@@ -109,6 +118,14 @@ const staffLogin = async (req, res) => {
 
     const isPasswordValid = await bcrypt.compare(password, staff.passwordHash);
     if (!isPasswordValid) {
+      await logAudit(req, {
+        action: "LOGIN_FAILED",
+        entity: "Session",
+        targetName: staff.fullName,
+        status: "FAILED",
+        changes: { reason: "Wrong password" },
+        actor: staff,
+      });
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
@@ -131,6 +148,13 @@ const staffLogin = async (req, res) => {
         refreshTokenHash,
         refreshTokenExpires: getRefreshExpiryDate(),
       },
+    });
+
+    await logAudit(req, {
+      action: "LOGIN_SUCCESS",
+      entity: "Session",
+      targetName: staff.fullName,
+      actor: staff,
     });
 
     return res.status(200).json({
@@ -268,6 +292,13 @@ const changePassword = async (req, res) => {
         mustChangePassword: false,
         passwordChangedAt: new Date(),
       },
+    });
+
+    await logAudit(req, {
+      action: "PASSWORD_CHANGED",
+      entity: "Staff",
+      entityId: req.staff.id,
+      targetName: req.staff.fullName,
     });
 
     return res.status(200).json({
@@ -1001,7 +1032,7 @@ const refreshAccessToken = async (req, res) => {
   }
 };
 
-// ==================== STAFF LOGOUT ====================
+//  STAFF LOGOUT
 
 const staffLogout = async (req, res) => {
   try {
@@ -1012,6 +1043,11 @@ const staffLogout = async (req, res) => {
           refreshTokenHash: null,
           refreshTokenExpires: null,
         },
+      });
+      await logAudit(req, {
+        action: "LOGOUT",
+        entity: "Session",
+        targetName: req.staff.fullName,
       });
     }
     return res.status(200).json({ success: true, message: "Logged out" });

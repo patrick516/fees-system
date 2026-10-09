@@ -9,7 +9,10 @@ dotenv.config();
 
 const app = express();
 
-// ============ MIDDLEWARE ============
+// Trust Render's proxy so req.ip reflects the real client IP
+app.set("trust proxy", 1);
+
+//  MIDDLEWARE
 app.use(helmet());
 app.use(morgan("dev"));
 app.use(express.json({ limit: "10mb" }));
@@ -126,6 +129,7 @@ const examRoutes = require("./src/routes/exam.routes");
 const staffRoutes = require("./src/routes/staff.routes");
 const departmentRoutes = require("./src/routes/department.routes");
 const roleRoutes = require("./src/routes/role.routes");
+const auditRoutes = require("./src/routes/audit.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/students", studentRoutes);
@@ -137,6 +141,7 @@ app.use("/api/exams", examRoutes);
 app.use("/api/staff", staffRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/roles", roleRoutes);
+app.use("/api/audit", auditRoutes);
 
 // ============ 404 ============
 app.use((req, res) => {

@@ -1,8 +1,8 @@
-// backend/src/middleware/auth.js
 const jwt = require("jsonwebtoken");
 const prisma = require("../config/db");
+const { logAudit } = require("../lib/audit");
 
-// ==================== STAFF AUTH ====================
+// STAFF AUTH
 const verifyStaff = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -35,6 +35,8 @@ const verifyStaff = async (req, res, next) => {
 
     req.staff = staff;
     req.schoolId = staff.schoolId;
+    // Make sure IP + UA are always available for downstream audit calls
+    if (!req.ip) req.ip = req.socket?.remoteAddress;
     next();
   } catch (error) {
     return res.status(401).json({

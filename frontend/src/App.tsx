@@ -26,13 +26,14 @@ import ResultsPage from "./pages/Results/index";
 import Promote from "./pages/Students/Promote";
 import BulkImport from "./pages/Students/BulkImport";
 import StaffPage from "./pages/Staff/index";
+import AuditPage from "./pages/Audit/index";
 import RateLimitModal from "./components/shared/RateLimitModal";
 
 // Layout + Guards
 import MainLayout from "./components/Layout/MainLayout";
 import PermissionGuard from "./components/shared/PermissionGuard";
 
-// ==================== GUARDS ====================
+//  GUARDS
 
 // Standard protected route — redirects to /login or /force-change-password
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -65,14 +66,14 @@ function App() {
   return (
     <BrowserRouter>
       <Routes>
-        {/* ==================== PUBLIC ==================== */}
+        {/*  PUBLIC  */}
         <Route path="/login" element={<Login />} />
         <Route path="/login/:slug" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/accept-invitation" element={<AcceptInvitation />} />
 
-        {/* ==================== FORCE PASSWORD CHANGE ==================== */}
+        {/*  FORCE PASSWORD CHANGE  */}
         <Route
           path="/force-change-password"
           element={
@@ -82,7 +83,7 @@ function App() {
           }
         />
 
-        {/* ==================== PROTECTED (MainLayout) ==================== */}
+        {/*  PROTECTED (MainLayout)  */}
         <Route
           path="/"
           element={
@@ -96,7 +97,7 @@ function App() {
           {/* Dashboard — any authenticated user */}
           <Route path="dashboard" element={<Dashboard />} />
 
-          {/* ==================== STUDENTS ==================== */}
+          {/*  STUDENTS  */}
           <Route
             path="students"
             element={
@@ -138,7 +139,7 @@ function App() {
             }
           />
 
-          {/* ==================== PAYMENTS ==================== */}
+          {/*  PAYMENTS  */}
           <Route
             path="payments"
             element={
@@ -164,7 +165,7 @@ function App() {
             }
           />
 
-          {/* ==================== CLASSES ==================== */}
+          {/*  CLASSES  */}
           <Route
             path="classes"
             element={
@@ -174,7 +175,7 @@ function App() {
             }
           />
 
-          {/* ==================== SMS / ALERTS ==================== */}
+          {/*  SMS / ALERTS  */}
           <Route
             path="sms"
             element={
@@ -184,7 +185,7 @@ function App() {
             }
           />
 
-          {/* ==================== REPORTS ==================== */}
+          {/*  REPORTS  */}
           <Route
             path="reports"
             element={
@@ -194,7 +195,7 @@ function App() {
             }
           />
 
-          {/* ==================== SETTINGS ==================== */}
+          {/*  SETTINGS  */}
           <Route
             path="settings"
             element={
@@ -204,7 +205,7 @@ function App() {
             }
           />
 
-          {/* ==================== RESULTS ==================== */}
+          {/*  RESULTS  */}
           <Route
             path="results"
             element={
@@ -214,12 +215,21 @@ function App() {
             }
           />
 
-          {/* ==================== STAFF ==================== */}
+          {/*  STAFF  */}
           <Route
             path="staff"
             element={
               <PermissionGuard resource="staff">
                 <StaffPage />
+              </PermissionGuard>
+            }
+          />
+          {/*  AUDIT TRAIL  */}
+          <Route
+            path="audit"
+            element={
+              <PermissionGuard resource="audit">
+                <AuditPage />
               </PermissionGuard>
             }
           />

@@ -7,7 +7,8 @@ export type Resource =
   | "sms"
   | "results"
   | "staff"
-  | "settings";
+  | "settings"
+  | "audit";
 
 export type PermissionAction = "read" | "write" | "verify" | "delete";
 
@@ -204,4 +205,23 @@ export interface NotificationLog {
 
 export interface NotificationDefaults {
   defaultChannel: NotificationChannel;
+}
+
+//  AUDIT
+export interface AuditLog {
+  id: string;
+  schoolId?: string | null;
+  staffId?: string | null;
+  actorName?: string | null;
+  actorRole?: string | null;
+  actorEmail?: string | null;
+  action: string;
+  entity: string;
+  entityId?: string | null;
+  targetName?: string | null;
+  changes?: Record<string, any> | null;
+  status: "SUCCESS" | "FAILED";
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  createdAt: string;
 }

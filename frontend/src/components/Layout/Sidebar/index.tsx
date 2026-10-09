@@ -15,6 +15,7 @@ import {
   X,
   Menu,
   UserCog,
+  History,
 } from "lucide-react";
 import { useAuthStore } from "../../../store/authStore";
 import type { Resource } from "../../../types";
@@ -64,6 +65,7 @@ const navItems: NavItem[] = [
     resource: "results",
   },
   { to: "/staff", icon: UserCog, label: "Staff", resource: "staff" },
+  { to: "/audit", icon: History, label: "Audit Trail", resource: "audit" },
   { to: "/settings", icon: Settings, label: "Settings", resource: "settings" },
 ];
 

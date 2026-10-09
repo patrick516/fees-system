@@ -6,7 +6,7 @@
  * permissions shape:
  *   { [resource]: Array<"read"|"write"|"verify"|"delete"> }
  *
- * Resources: dashboard, students, payments, classes, reports, sms, results, staff, settings
+ * Resources: dashboard, students, payments, classes, reports, sms, results, staff, settings, audit
  */
 const DEFAULT_ROLES = [
   {
@@ -23,6 +23,7 @@ const DEFAULT_ROLES = [
       results: ["read", "write"],
       staff: ["read", "write", "delete"],
       settings: ["read", "write"],
+      audit: ["read"],
     },
   },
   {
@@ -39,6 +40,7 @@ const DEFAULT_ROLES = [
       results: [],
       staff: [],
       settings: [],
+      audit: [],
     },
   },
   {
@@ -55,6 +57,7 @@ const DEFAULT_ROLES = [
       results: [],
       staff: [],
       settings: [],
+      audit: [],
     },
   },
   {
@@ -71,6 +74,7 @@ const DEFAULT_ROLES = [
       results: [],
       staff: [],
       settings: [],
+      audit: [],
     },
   },
   {
@@ -87,6 +91,7 @@ const DEFAULT_ROLES = [
       results: ["read", "write"],
       staff: [],
       settings: [],
+      audit: [],
     },
   },
   {
@@ -103,6 +108,7 @@ const DEFAULT_ROLES = [
       results: [],
       staff: [],
       settings: [],
+      audit: [],
     },
   },
 ];
