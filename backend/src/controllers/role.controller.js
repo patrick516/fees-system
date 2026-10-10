@@ -197,14 +197,44 @@ const updateRole = async (req, res) => {
       },
     });
 
+    // Build a human-readable summary of what changed
+    const summaryParts = [];
+    if (name && name !== existing.name) {
+      summaryParts.push(`renamed to "${name}"`);
+    }
+    if (permissions !== undefined) {
+      const changedResources = Object.keys(permissions).filter((r) => {
+        const before = JSON.stringify(existing.permissions?.[r] || []);
+        const after = JSON.stringify(permissions[r] || []);
+        return before !== after;
+      });
+      if (changedResources.length > 0) {
+        summaryParts.push(
+          `updated permissions for ${changedResources.join(", ")}`,
+        );
+      }
+    }
+
     await prisma.auditLog.create({
       data: {
         schoolId: req.schoolId,
         staffId: req.staff.id,
+        actorName: req.staff.fullName,
+        actorRole: req.staff.role?.name || null,
+        actorEmail: req.staff.email,
+        ipAddress: extractIp(req),
         action: "ROLE_UPDATED",
         entity: "Role",
         entityId: id,
-        changes: { name, description, permissions },
+        targetName: existing.name,
+        status: "SUCCESS",
+        changes: {
+          summary:
+            summaryParts.length > 0
+              ? `${existing.name}: ${summaryParts.join(", ")}`
+              : `${existing.name}: no changes`,
+          permissions,
+        },
       },
     });
 
