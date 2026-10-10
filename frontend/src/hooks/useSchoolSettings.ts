@@ -48,10 +48,9 @@ export const useSchoolSettings = () => {
       const res = await api.post("/schools/settings/logo", formData, {
         headers: { "Content-Type": "multipart/form-data" },
       });
-      setSettings((prev) =>
-        prev ? { ...prev, logo: res.data.data.logo } : prev,
-      );
-      return { success: true };
+      const newLogo = res.data.data.logo; // ← fresh Cloudinary URL
+      setSettings((prev) => (prev ? { ...prev, logo: newLogo } : prev));
+      return { success: true, logo: newLogo }; // ← return it
     } catch (err: any) {
       return {
         success: false,

@@ -58,17 +58,20 @@ const EditSchoolModal = ({ open, onClose, onSaved }: Props) => {
     if (!file) return;
 
     setLogoPreview(URL.createObjectURL(file));
-    const result = await uploadLogo(file);
+    const result: any = await uploadLogo(file);
+
     if (!result.success) {
       setError(result.message || "Failed to upload logo");
       setLogoPreview(settings?.logo || null);
       return;
     }
-    // Refresh settings so modal reflects the new logo URL
-    if (staff && result.success) {
+
+    // Use the fresh URL that came back from the API — not the stale
+    // `settings` state (which hasn't re-rendered yet).
+    if (staff && result.logo) {
       setStaff({
         ...staff,
-        school: { ...staff.school, logo: settings?.logo || staff.school.logo },
+        school: { ...staff.school, logo: result.logo },
       });
     }
   };

@@ -2,7 +2,15 @@ import { useState, useEffect } from "react";
 import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import api from "../../lib/axios";
+import { applyTheme } from "../../lib/theme";
 import { School, Eye, EyeOff, Loader2 } from "lucide-react";
+
+interface Branding {
+  name: string;
+  logo: string | null;
+  motto: string | null;
+  primaryColor?: string | null;
+}
 
 const Login = () => {
   const navigate = useNavigate();
@@ -13,30 +21,63 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [schoolBranding, setSchoolBranding] = useState<{
-    name: string;
-    logo: string | null;
-    motto: string | null;
-  } | null>(null);
+  const [schoolBranding, setSchoolBranding] = useState<Branding | null>(null);
 
+  // ==================== LOAD BRANDING ====================
+  // Priority:
+  //   1. If URL has /login/:slug → fetch by slug
+  //   2. Otherwise → instant cache from localStorage, then refresh from API
   useEffect(() => {
-    if (slug) {
-      api
-        .get(`/schools/by-slug/${slug}`)
-        .then((res) => setSchoolBranding(res.data.data))
-        .catch(() => setSchoolBranding(null));
-      return;
-    }
-    const stored = localStorage.getItem("lastSchoolBranding");
-    if (stored) {
-      try {
-        setSchoolBranding(JSON.parse(stored));
-      } catch {
-        setSchoolBranding(null);
+    const loadBranding = async () => {
+      // --- Slug-based branding ---
+      if (slug) {
+        try {
+          const res = await api.get(`/schools/by-slug/${slug}`);
+          const data = res.data.data;
+          setSchoolBranding(data);
+          if (data.primaryColor) applyTheme(data.primaryColor);
+        } catch {
+          setSchoolBranding(null);
+        }
+        return;
       }
-    }
+
+      // --- Instant cache (no flash) ---
+      const stored = localStorage.getItem("lastSchoolBranding");
+      if (stored) {
+        try {
+          const cached: Branding = JSON.parse(stored);
+          setSchoolBranding(cached);
+          if (cached.primaryColor) applyTheme(cached.primaryColor);
+        } catch {
+          /* ignore corrupt cache */
+        }
+      }
+
+      // --- Always refresh from API — overrides cache ---
+      try {
+        const res = await api.get("/schools/public");
+        const data = res.data.data;
+        if (data?.name) {
+          const branding: Branding = {
+            name: data.name,
+            logo: data.logo,
+            motto: data.motto,
+            primaryColor: data.primaryColor,
+          };
+          setSchoolBranding(branding);
+          localStorage.setItem("lastSchoolBranding", JSON.stringify(branding));
+          if (data.primaryColor) applyTheme(data.primaryColor);
+        }
+      } catch {
+        // API unreachable — keep whatever we showed from cache
+      }
+    };
+
+    loadBranding();
   }, [slug]);
 
+  // ==================== LOGIN ====================
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -46,9 +87,9 @@ const Login = () => {
       const res = await api.post("/auth/staff/login", form);
       const { token, refreshToken, staff, mustChangePassword } = res.data.data;
 
-      // Persist access token + refresh token + staff + forced-change flag
       login(token, refreshToken, staff, !!mustChangePassword);
 
+      // Cache branding so the next visit renders instantly
       if (staff.school) {
         localStorage.setItem(
           "lastSchoolBranding",
@@ -56,11 +97,11 @@ const Login = () => {
             name: staff.school.name,
             logo: staff.school.logo,
             motto: staff.school.motto,
+            primaryColor: staff.school.primaryColor,
           }),
         );
       }
 
-      // NEW: route based on mustChangePassword
       if (mustChangePassword) {
         navigate("/force-change-password");
       } else {
@@ -68,13 +109,10 @@ const Login = () => {
       }
     } catch (err: any) {
       const data = err.response?.data;
-
-      // NEW: unverified email → send them to the OTP page
       if (data?.code === "EMAIL_NOT_VERIFIED") {
         navigate(`/verify-email?email=${encodeURIComponent(form.email)}`);
         return;
       }
-
       setError(data?.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
@@ -83,10 +121,8 @@ const Login = () => {
 
   return (
     <div className="relative min-h-screen w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat">
-      {/* Dark overlay for contrast */}
       <div className="absolute inset-0 bg-black/40" />
 
-      {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-10">
         {/* Logo */}
         <div className="mb-6 flex items-center justify-center">
@@ -108,7 +144,9 @@ const Login = () => {
           Welcome back
         </h1>
         <p className="text-sm text-white/80 mt-2 mb-8 text-center">
-          Welcome back. Let&apos;s get your work done.
+          {schoolBranding?.motto
+            ? `"${schoolBranding.motto}"`
+            : "Let's get your work done."}
         </p>
 
         {/* Card */}
@@ -170,7 +208,6 @@ const Login = () => {
             </button>
           </form>
 
-          {/* NEW: Signup link */}
           <p className="text-xs text-gray-500 text-center mt-6">
             Don&apos;t have an account?{" "}
             <Link
@@ -200,8 +237,7 @@ const Login = () => {
 
         {/* Footer */}
         <p className="text-xs text-white/70 mt-8 text-center">
-          © {new Date().getFullYear()}{" "}
-          {schoolBranding?.name || "St. Andrew's International High School"}.
+          © {new Date().getFullYear()} {schoolBranding?.name || "Your School"}.
           All rights reserved.
         </p>
       </div>
