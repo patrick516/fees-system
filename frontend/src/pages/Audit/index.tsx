@@ -682,7 +682,7 @@ const AuditPage = () => {
         </div>
       )}
 
-      {/* ==================== TIMELINE VIEW ==================== */}
+      {/*  TIMELINE VIEW  */}
       {view === "timeline" && (
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
           {loading ? (
@@ -852,7 +852,7 @@ const AuditPage = () => {
   );
 };
 
-// ==================== AUDIT DETAIL MODAL ====================
+//  AUDIT DETAIL MODAL
 const AuditDetailModal = ({
   log,
   onClose,
@@ -990,7 +990,7 @@ const AuditDetailModal = ({
   );
 };
 
-// ==================== USER TIMELINE DRAWER ====================
+//  USER TIMELINE DRAWER
 const UserTimelineDrawer = ({
   user,
   dateRange,

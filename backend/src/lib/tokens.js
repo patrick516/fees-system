@@ -6,8 +6,6 @@ const bcrypt = require("bcryptjs");
 // Access token: short-lived, sent with every request
 const ACCESS_TTL = process.env.JWT_ACCESS_EXPIRES_IN || "30m";
 
-// Refresh token: long-lived, used only to mint new access tokens
-// After this window of inactivity, the user is logged out.
 const REFRESH_TTL_HOURS = parseInt(
   process.env.JWT_REFRESH_EXPIRES_HOURS || "8",
   10,

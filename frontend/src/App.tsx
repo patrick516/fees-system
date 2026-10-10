@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import axios from "axios";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
 import { applyTheme } from "./lib/theme";
@@ -58,10 +59,57 @@ const ForcePasswordRoute = ({ children }: { children: React.ReactNode }) => {
 
 function App() {
   const { staff } = useAuthStore();
+  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
     applyTheme(staff?.school?.primaryColor);
   }, [staff?.school?.primaryColor]);
+
+  // Validate session once on app boot.
+  // If the refresh token is expired or missing, force logout before
+  // rendering any protected route — prevents the "flash of dashboard".
+  useEffect(() => {
+    const validate = async () => {
+      const { isAuthenticated, refreshToken, logout, setTokens } =
+        useAuthStore.getState();
+
+      // Not logged in → nothing to validate
+      if (!isAuthenticated || !refreshToken) {
+        if (isAuthenticated) logout();
+        setSessionChecked(true);
+        return;
+      }
+
+      try {
+        const baseURL = import.meta.env.VITE_API_URL || "";
+        const res = await axios.post(`${baseURL}/auth/refresh`, {
+          refreshToken,
+        });
+        // Rotated tokens — store the fresh pair
+        setTokens(res.data.data.token, res.data.data.refreshToken);
+      } catch {
+        // Refresh failed — session is dead
+        logout();
+      } finally {
+        setSessionChecked(true);
+      }
+    };
+
+    validate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Splash screen while we validate
+  if (!sessionChecked) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-gray-200 border-t-[var(--color-primary)] animate-spin" />
+          <p className="text-xs text-gray-400">Restoring session...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <BrowserRouter>
