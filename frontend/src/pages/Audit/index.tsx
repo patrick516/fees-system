@@ -160,6 +160,44 @@ const ACTION_LABELS: Record<string, string> = {
 
 const friendlyAction = (action: string) =>
   ACTION_LABELS[action] || action.replace(/_/g, " ").toLowerCase();
+// Turn any changes value into a human-readable string.
+// Handles strings, numbers, arrays, and nested objects.
+const formatChangeValue = (value: any): string => {
+  if (value === null || value === undefined) return "—";
+
+  if (typeof value === "string") return value;
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
+
+  if (Array.isArray(value)) {
+    return value.length === 0
+      ? "none"
+      : value.map((v) => formatChangeValue(v)).join(", ");
+  }
+
+  if (typeof value === "object") {
+    // Special case: permissions objects read better as "students(read,write)"
+    const entries = Object.entries(value);
+    if (entries.length === 0) return "none";
+
+    // Heuristic: if values are arrays, format like "key(a, b)"
+    const allArrays = entries.every(([, v]) => Array.isArray(v));
+    if (allArrays) {
+      const nonEmpty = entries.filter(
+        ([, v]) => Array.isArray(v) && (v as any[]).length > 0,
+      );
+      if (nonEmpty.length === 0) return "no permissions";
+      return nonEmpty
+        .map(([k, v]) => `${k}(${(v as any[]).join(",")})`)
+        .join(", ");
+    }
+
+    // General object → "key: value, key: value"
+    return entries.map(([k, v]) => `${k}: ${formatChangeValue(v)}`).join(", ");
+  }
+
+  return String(value);
+};
 
 const relativeTime = (date: Date) => {
   const diff = Date.now() - date.getTime();
@@ -959,9 +997,18 @@ const AuditDetailModal = ({
               <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
                 Details
               </p>
-              <pre className="bg-gray-50 rounded-xl p-3 text-[11px] text-gray-700 overflow-x-auto whitespace-pre-wrap break-words">
-                {JSON.stringify(log.changes, null, 2)}
-              </pre>
+              <div className="bg-gray-50 rounded-xl overflow-hidden divide-y divide-gray-100">
+                {Object.entries(log.changes).map(([key, value]) => (
+                  <div key={key} className="flex items-start gap-3 px-3 py-2">
+                    <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wide shrink-0 w-24 pt-0.5">
+                      {key.replace(/([A-Z])/g, " $1").trim()}
+                    </p>
+                    <p className="text-xs text-gray-800 break-words flex-1">
+                      {formatChangeValue(value)}
+                    </p>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -1205,22 +1252,36 @@ const UserTimelineDrawer = ({
                       </div>
 
                       {/* Changes preview */}
-                      {log.changes &&
-                        Object.keys(log.changes).length > 0 &&
-                        Object.keys(log.changes).length <= 3 && (
-                          <div className="mt-2 flex flex-wrap gap-1">
-                            {Object.entries(log.changes)
-                              .slice(0, 3)
-                              .map(([k, v]) => (
+                      {log.changes && Object.keys(log.changes).length > 0 && (
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {Object.entries(log.changes)
+                            .slice(0, 4)
+                            .map(([k, v]) => {
+                              const formatted = formatChangeValue(v);
+                              const display =
+                                formatted.length > 60
+                                  ? formatted.slice(0, 57) + "..."
+                                  : formatted;
+                              return (
                                 <span
                                   key={k}
                                   className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded"
+                                  title={formatted}
                                 >
-                                  {k}: {String(v).slice(0, 30)}
+                                  <span className="font-medium text-gray-500">
+                                    {k}:
+                                  </span>{" "}
+                                  {display}
                                 </span>
-                              ))}
-                          </div>
-                        )}
+                              );
+                            })}
+                          {Object.keys(log.changes).length > 4 && (
+                            <span className="text-[10px] text-gray-400 self-center">
+                              +{Object.keys(log.changes).length - 4} more
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
