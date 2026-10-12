@@ -104,7 +104,7 @@ const inviteStaff = async (req, res) => {
         email,
         phone,
         passwordHash: tempPasswordHash, // temp; will be replaced on accept
-        emailVerified: false,
+        emailVerified: true,
         mustChangePassword: true,
         invitedById: req.staff.id,
         invitedAt: new Date(),
@@ -220,6 +220,7 @@ const resendInvite = async (req, res) => {
         invitationToken: inviteToken,
         invitationExpires: new Date(Date.now() + INVITE_TTL_MS),
         mustChangePassword: true,
+        emailVerified: true, // resending also re-confirms
       },
     });
 
