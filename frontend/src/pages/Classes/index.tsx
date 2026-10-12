@@ -26,6 +26,7 @@ import {
 import { getCurrentAcademicYear } from "../../lib/utils";
 import { useActiveTerm } from "../../hooks/useActiveTerm";
 import { usePermission } from "../../hooks/usePermission";
+import { DatePicker } from "../../components/ui/date-picker";
 
 const terms = [
   { value: "TERM_1", label: "Term 1" },
@@ -621,16 +622,14 @@ const ClassesPage = () => {
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Start Date
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={activateForm.startDate}
-                  onChange={(e) =>
-                    setActivateForm({
-                      ...activateForm,
-                      startDate: e.target.value,
-                    })
+                  onChange={(v) =>
+                    setActivateForm({ ...activateForm, startDate: v })
                   }
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] bg-white"
+                  placeholder="Pick start date"
+                  clearable={false}
+                  className="w-[160px]"
                 />
               </div>
 
@@ -638,16 +637,15 @@ const ClassesPage = () => {
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   End Date
                 </label>
-                <input
-                  type="date"
+                <DatePicker
                   value={activateForm.endDate}
-                  onChange={(e) =>
-                    setActivateForm({
-                      ...activateForm,
-                      endDate: e.target.value,
-                    })
+                  onChange={(v) =>
+                    setActivateForm({ ...activateForm, endDate: v })
                   }
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] bg-white"
+                  placeholder="Pick end date"
+                  clearable={false}
+                  min={activateForm.startDate || undefined}
+                  className="w-[160px]"
                 />
               </div>
 
