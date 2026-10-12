@@ -88,6 +88,14 @@ const Login = () => {
       const { token, refreshToken, staff, mustChangePassword } = res.data.data;
 
       login(token, refreshToken, staff, !!mustChangePassword);
+      // If the user must change their password, stash the current one in
+      // sessionStorage so ForceChangePassword can pre-fill the field and
+      // the user only needs to type the new one.
+      if (mustChangePassword) {
+        sessionStorage.setItem("pendingCurrentPassword", form.password);
+      } else {
+        sessionStorage.removeItem("pendingCurrentPassword");
+      }
 
       // Cache branding so the next visit renders instantly
       if (staff.school) {

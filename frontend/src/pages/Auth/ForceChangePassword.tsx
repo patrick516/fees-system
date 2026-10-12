@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff, Loader2, AlertTriangle, ShieldCheck } from "lucide-react";
 import api from "../../lib/axios";
@@ -18,6 +18,19 @@ const ForceChangePassword = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Pre-fill the current password from sessionStorage — the user just
+  // typed it on the login page, no reason to ask twice.
+  useEffect(() => {
+    const stored = sessionStorage.getItem("pendingCurrentPassword");
+    if (stored) {
+      setForm((prev) => ({ ...prev, currentPassword: stored }));
+    } else {
+      // No stash → user must have refreshed or opened the URL directly
+      // Send them back to login
+      navigate("/login", { replace: true });
+    }
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +56,10 @@ const ForceChangePassword = () => {
         currentPassword: form.currentPassword,
         newPassword: form.newPassword,
       });
+
+      // Clean up the temporary stash
+      sessionStorage.removeItem("pendingCurrentPassword");
+
       clearMustChangePassword();
       navigate("/dashboard");
     } catch (err: any) {
@@ -55,25 +72,27 @@ const ForceChangePassword = () => {
   };
 
   const handleLogout = () => {
+    sessionStorage.removeItem("pendingCurrentPassword");
     logout();
     navigate("/login");
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat">
+    // Fixed overlay → page never scrolls
+    <div className="fixed inset-0 w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat overflow-hidden">
       <div className="absolute inset-0 bg-black/40" />
 
-      <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-10">
-        <div className="mb-6 flex items-center justify-center">
-          <div className="w-16 h-16 bg-amber-400/90 backdrop-blur rounded-2xl flex items-center justify-center">
-            <AlertTriangle size={32} className="text-white" />
+      <div className="relative z-10 h-full flex flex-col items-center justify-center px-4 py-4">
+        <div className="mb-4 flex items-center justify-center">
+          <div className="w-14 h-14 bg-amber-400/90 backdrop-blur rounded-2xl flex items-center justify-center">
+            <AlertTriangle size={28} className="text-white" />
           </div>
         </div>
 
-        <h1 className="text-3xl font-bold text-white text-center tracking-tight">
+        <h1 className="text-2xl font-bold text-white text-center tracking-tight">
           Change your password
         </h1>
-        <p className="text-sm text-white/80 mt-2 mb-8 text-center max-w-sm">
+        <p className="text-xs text-white/80 mt-1 mb-4 text-center max-w-sm">
           For security, you must set a new password before continuing
           {staff?.fullName && (
             <>
@@ -85,35 +104,16 @@ const ForceChangePassword = () => {
           )}
         </p>
 
-        <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl p-8">
+        <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl p-6 max-h-[calc(100vh-9rem)] overflow-y-auto">
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-5">
+            <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2.5 rounded-lg text-xs mb-4">
               {error}
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Current Password
-              </label>
-              <input
-                type={showPassword ? "text" : "password"}
-                value={form.currentPassword}
-                onChange={(e) =>
-                  setForm({ ...form, currentPassword: e.target.value })
-                }
-                placeholder="Enter your current password"
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all"
-              />
-              <p className="text-xs text-gray-400 mt-1.5">
-                This is the password from your invitation email
-              </p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
                 New Password
               </label>
               <div className="relative">
@@ -125,22 +125,23 @@ const ForceChangePassword = () => {
                   }
                   placeholder="Create a strong password"
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all pr-12"
+                  autoFocus
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all pr-10"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                 </button>
               </div>
-              <PasswordStrengthMeter password={form.newPassword} />
+              <PasswordStrengthMeter password={form.newPassword} compact />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
+              <label className="block text-xs font-medium text-gray-700 mb-1">
                 Confirm New Password
               </label>
               <input
@@ -149,10 +150,10 @@ const ForceChangePassword = () => {
                 onChange={(e) => setForm({ ...form, confirm: e.target.value })}
                 placeholder="Re-enter new password"
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm text-gray-900 placeholder-gray-400 outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent transition-all"
               />
               {form.confirm && form.newPassword !== form.confirm && (
-                <p className="text-xs text-red-500 mt-1">
+                <p className="text-[11px] text-red-500 mt-1">
                   Passwords do not match
                 </p>
               )}
@@ -161,10 +162,10 @@ const ForceChangePassword = () => {
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-all flex items-center justify-center gap-2"
+              className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] disabled:opacity-50 text-white font-medium py-2.5 rounded-lg transition-all flex items-center justify-center gap-2"
             >
               {loading ? (
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
               ) : (
                 <ShieldCheck size={16} />
               )}
