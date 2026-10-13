@@ -256,15 +256,14 @@ const Login = () => {
             </button>
           </form>
 
-          <p className="text-xs text-gray-500 text-center mt-6">
-            Don&apos;t have an account?{" "}
+          <div className="text-center mt-6 pt-5 border-t border-gray-100">
             <Link
-              to="/signup"
-              className="text-[var(--color-primary)] font-medium hover:underline"
+              to="/forgot-password"
+              className="text-xs font-medium text-[var(--color-primary)] hover:underline"
             >
-              Create one
+              Forgot your password?
             </Link>
-          </p>
+          </div>
         </div>
 
         {/* Divider */}
