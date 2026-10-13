@@ -86,6 +86,12 @@ model FeePayment {
   isDebtor       Boolean @default(false)
   creditApplied  Float   @default(0)
   overpayment    Float   @default(0)
+  malipoTransactionId  String?  
+  malipoStatus         String?  
+  malipoCustomerRef    String?  
+  malipoFailureReason  String?  
+  malipoRawResponse    Json?   
+  paymentChannel       String?   
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -115,8 +121,8 @@ model NotificationLog {
 
   // Content
   message  String
-  subject  String? // Email only
-  type     String // reminder | unpaid | announcement | payment_received | payment_verified | payment_rejected | welcome
+  subject  String? 
+  type     String 
   template String?
 
   // Result

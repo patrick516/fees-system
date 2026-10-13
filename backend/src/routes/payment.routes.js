@@ -3,6 +3,7 @@ const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 
+const malipoController = require("../controllers/malipo.controller");
 const {
   recordCashPayment,
   submitPayment,
@@ -12,9 +13,14 @@ const {
   getPendingPayments,
   getMyChildPayments,
   getPaymentSummary,
+  getPaymentInsights,
 } = require("../controllers/payment.controller");
 
-const { verifyStaff, verifyParent } = require("../middleware/auth");
+const {
+  verifyStaff,
+  verifyParent,
+  verifyStaffOrParent,
+} = require("../middleware/auth");
 const { requirePermission } = require("../middleware/role");
 
 // Multer — memory storage so we can upload to Cloudinary
@@ -29,9 +35,31 @@ const upload = multer({
   },
 });
 
-// ==================== STAFF ROUTES ====================
+//  MALIPO ONLINE PAYMENTS
+// Parent initiates a mobile money payment
+router.post("/malipo/initiate", verifyParent, malipoController.initiatePayment);
 
-// Dashboard summary — powers the Dashboard page (revenue stats, debtor counts, etc.)
+// Public — Malipo calls this to confirm
+router.post("/malipo/webhook", malipoController.webhook);
+
+// Parent or staff polls for status
+router.get(
+  "/malipo/:id/status",
+  verifyStaffOrParent,
+  malipoController.getStatus,
+);
+
+//  STAFF ROUTES
+
+// Payment channel insights — for the admin dashboard
+router.get(
+  "/insights",
+  verifyStaff,
+  requirePermission("payments", "read"),
+  getPaymentInsights,
+);
+
+// Dashboard summary — powers the Dashboard page (revenue stats, debtor counts)
 router.get(
   "/summary",
   verifyStaff,
@@ -39,7 +67,7 @@ router.get(
   getPaymentSummary,
 );
 
-// List pending payments — viewing payments
+// List pending payments
 router.get(
   "/pending",
   verifyStaff,
@@ -79,7 +107,7 @@ router.patch(
   rejectPayment,
 );
 
-// ==================== PARENT ROUTES ====================
+//  PARENT ROUTES
 router.get("/my-child", verifyParent, getMyChildPayments);
 router.post("/submit", verifyParent, upload.single("receipt"), submitPayment);
 

@@ -7,65 +7,69 @@ import {
   CheckCircle,
   Loader2,
   X,
-  FileText,
+  Zap,
+  FileImage,
+  Smartphone,
+  AlertCircle,
 } from "lucide-react";
 import api from "../../lib/axios";
 import { useAuthStore } from "../../store/authStore";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
 import { getCurrentAcademicYear } from "../../lib/utils";
 import { useActiveTerm } from "../../hooks/useActiveTerm";
+import PayOnlineModal from "../../components/PayOnlineModal";
+
+type PayMode = "online" | "receipt";
 
 const paymentMethods = [
-  { value: "AIRTEL_MONEY", label: "Airtel Money" },
-  { value: "TNM_MPAMBA", label: "TNM Mpamba" },
-  { value: "NATIONAL_BANK", label: "National Bank" },
-  { value: "STANDARD_BANK", label: "Standard Bank" },
-  { value: "FDH_BANK", label: "FDH Bank" },
-  { value: "NBS_BANK", label: "NBS Bank" },
-  { value: "OTHER_BANK", label: "Other Bank" },
-];
-
-const terms = [
-  { value: "TERM_1", label: "Term 1" },
-  { value: "TERM_2", label: "Term 2" },
-  { value: "TERM_3", label: "Term 3" },
+  { value: "AIRTEL_MONEY", label: "Airtel Money", emoji: "🔴" },
+  { value: "TNM_MPAMBA", label: "TNM Mpamba", emoji: "🟡" },
+  { value: "NATIONAL_BANK", label: "National Bank", emoji: "🏦" },
+  { value: "STANDARD_BANK", label: "Standard Bank", emoji: "🏦" },
+  { value: "FDH_BANK", label: "FDH Bank", emoji: "🏦" },
+  { value: "NBS_BANK", label: "NBS Bank", emoji: "🏦" },
+  { value: "OTHER_BANK", label: "Other Bank", emoji: "🏦" },
 ];
 
 export default function PayPage() {
   const router = useRouter();
-  const { isAuthenticated, student, token, _hasHydrated } = useAuthStore();
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [error, setError] = useState("");
-  const [receiptFile, setReceiptFile] = useState<File | null>(null);
-  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const { isAuthenticated, student, _hasHydrated } = useAuthStore();
+
+  // Mode selector
+  const [mode, setMode] = useState<PayMode>("online");
+
+  // Shared state
+  const [form, setForm] = useState({
+    amount: "",
+    term: "TERM_1",
+    academicYear: getCurrentAcademicYear(),
+  });
+
+  // Term status
   const [termStatus, setTermStatus] = useState<any>(null);
   const [termStatusLoading, setTermStatusLoading] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState<any>(null);
 
-  // Active term — single source of truth for term + academic year
+  // Receipt-specific state
+  const [receiptFile, setReceiptFile] = useState<File | null>(null);
+  const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
+  const [receiptMethod, setReceiptMethod] = useState("AIRTEL_MONEY");
+  const [bankReference, setBankReference] = useState("");
+
+  // Modal + submit states
+  const [showOnlineModal, setShowOnlineModal] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState("");
+
+  // Active term
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
 
-  const [form, setForm] = useState({
-    amount: "",
-    paymentMethod: "AIRTEL_MONEY",
-    term: "TERM_1",
-    academicYear: getCurrentAcademicYear(),
-    bankReference: "",
-  });
-
+  // ---------- Effects ----------
   useEffect(() => {
     if (!_hasHydrated) return;
     if (!isAuthenticated) router.push("/");
   }, [_hasHydrated, isAuthenticated]);
 
-  // Sync the form's term + academic year once the activated values load
   useEffect(() => {
     setForm((prev) => ({
       ...prev,
@@ -74,7 +78,6 @@ export default function PayPage() {
     }));
   }, [activeYear, currentTerm]);
 
-  // Fetch term status when term or year changes
   useEffect(() => {
     if (!student?.id || !form.term) return;
     setTermStatusLoading(true);
@@ -95,33 +98,48 @@ export default function PayPage() {
       .catch(() => {});
   }, [student]);
 
+  // ---------- Handlers ----------
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setError("File too large — max 5MB");
+      return;
+    }
     setReceiptFile(file);
     const reader = new FileReader();
     reader.onload = () => setReceiptPreview(reader.result as string);
     reader.readAsDataURL(file);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const clearReceipt = () => {
+    setReceiptFile(null);
+    setReceiptPreview(null);
+  };
+
+  const handleReceiptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+
+    const amount = parseFloat(form.amount);
+    if (!amount || amount <= 0) {
+      setError("Please enter a valid amount");
+      return;
+    }
     if (!receiptFile) {
       setError("Please upload your payment receipt");
       return;
     }
-    setError("");
-    setLoading(true);
 
+    setLoading(true);
     try {
       const formData = new FormData();
       formData.append("studentId", student?.id || "");
       formData.append("amount", form.amount);
-      formData.append("paymentMethod", form.paymentMethod);
+      formData.append("paymentMethod", receiptMethod);
       formData.append("term", form.term);
       formData.append("academicYear", form.academicYear);
-      if (form.bankReference)
-        formData.append("bankReference", form.bankReference);
+      if (bankReference) formData.append("bankReference", bankReference);
       formData.append("receipt", receiptFile);
 
       await api.post("/payments/submit", formData, {
@@ -138,14 +156,31 @@ export default function PayPage() {
     }
   };
 
-  if (!_hasHydrated)
+  const openOnlineModal = () => {
+    setError("");
+    const amount = parseFloat(form.amount);
+    if (!amount || amount <= 0) {
+      setError("Enter an amount first");
+      return;
+    }
+    setShowOnlineModal(true);
+  };
+
+  // ---------- Derived ----------
+  const amountNum = parseFloat(form.amount) || 0;
+  const canPayOnline = amountNum > 0;
+  const canSubmitReceipt = amountNum > 0 && !!receiptFile;
+
+  // ---------- Guards ----------
+  if (!_hasHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-900" />
       </div>
     );
+  }
 
-  if (success)
+  if (success) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="bg-white rounded-2xl p-8 max-w-sm w-full text-center shadow-sm border border-gray-100">
@@ -153,22 +188,23 @@ export default function PayPage() {
             <CheckCircle size={32} className="text-green-600" />
           </div>
           <h2 className="text-xl font-bold text-gray-800 mb-2">
-            Payment Submitted!
+            Payment Submitted
           </h2>
-          <p className="text-sm text-gray-500 mb-6">
-            Your payment has been submitted successfully. The school will verify
-            it and you'll receive confirmation.
+          <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+            {mode === "online"
+              ? "Your payment has been confirmed automatically."
+              : "Your payment has been submitted. The school will verify it shortly."}
           </p>
           <div className="space-y-3">
             <button
               onClick={() => router.push("/history")}
-              className="w-full bg-blue-900 text-white py-3 rounded-xl text-sm font-medium hover:bg-blue-800"
+              className="w-full bg-[var(--color-primary)] text-white py-3 rounded-xl text-sm font-medium hover:bg-[var(--color-primary-dark)] transition-colors"
             >
               View Payment History
             </button>
             <button
               onClick={() => router.push("/dashboard")}
-              className="w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm hover:bg-gray-50"
+              className="w-full border border-gray-200 text-gray-600 py-3 rounded-xl text-sm hover:bg-gray-50 transition-colors"
             >
               Back to Dashboard
             </button>
@@ -176,360 +212,482 @@ export default function PayPage() {
         </div>
       </div>
     );
+  }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+    <div className="min-h-screen bg-gray-50 pb-32">
+      {/* ============ HEADER ============ */}
       <div className="bg-[var(--color-primary)] text-white sticky top-0 z-20 shadow-md">
         <div className="max-w-lg mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
             <button
               onClick={() => router.push("/dashboard")}
               className="p-2 hover:bg-white/10 rounded-xl transition-colors"
+              aria-label="Back"
             >
               <ArrowLeft size={18} />
             </button>
-            <h1 className="text-lg font-semibold">Submit Payment</h1>
+            <h1 className="text-lg font-semibold">Pay Fees</h1>
           </div>
         </div>
       </div>
 
-      <div className="max-w-lg mx-auto px-4 py-3 space-y-3 pb-24">
-        {/* Student Info */}
+      <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
+        {/* ============ STUDENT INFO ============ */}
         <div className="bg-white rounded-2xl p-3.5 shadow-sm border border-gray-100">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-[var(--color-primary-light)] rounded-xl flex items-center justify-center text-[var(--color-primary)] font-bold">
+            <div className="w-11 h-11 bg-[var(--color-primary-light)] rounded-xl flex items-center justify-center text-[var(--color-primary)] font-bold text-lg">
               {student?.fullName?.charAt(0)}
             </div>
-            <div>
-              <h1 className="text-base font-bold truncate leading-tight">
+            <div className="min-w-0">
+              <p className="text-base font-bold text-gray-800 truncate leading-tight">
                 {student?.fullName}
-              </h1>
-              <p className="text-xs text-gray-500">
+              </p>
+              <p className="text-xs text-gray-500 mt-0.5">
                 {student?.class} • {student?.studentCode}
               </p>
             </div>
           </div>
         </div>
 
-        <form id="payment-form" onSubmit={handleSubmit} className="space-y-3">
-          {/* Term Selection */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
-            <h2 className="font-medium text-gray-800 text-sm">
-              Payment Details
-            </h2>
+        {/* ============ FEE SUMMARY ============ */}
+        {termStatusLoading && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-center">
+            <Loader2
+              size={16}
+              className="animate-spin text-gray-400 mx-auto mb-1"
+            />
+            <p className="text-xs text-gray-400">Loading fee details...</p>
+          </div>
+        )}
 
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                  Term
-                </label>
-                <div className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 font-medium">
-                  {currentTerm?.replace("_", " ") || "—"}
-                </div>
+        {termStatus &&
+          !termStatusLoading &&
+          termStatus.termStatus.hasFeeStructure && (
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  {currentTerm?.replace("_", " ") || "—"} • {activeYear}
+                </p>
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                  Academic Year
-                </label>
-                <div className="w-full px-3 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm text-gray-700 font-medium">
-                  {activeYear || "—"}
-                </div>
-              </div>
-            </div>
-
-            <p className="text-[11px] text-gray-400 -mt-1">
-              Fees are only collected for the currently activated term. Contact
-              the school office if you need to pay for a different term.
-            </p>
-
-            {/* Fee Info */}
-            {termStatusLoading && (
-              <div className="bg-gray-50 rounded-xl p-3 text-sm text-gray-400 text-center">
-                Loading fee information...
-              </div>
-            )}
-            {termStatus &&
-              !termStatusLoading &&
-              termStatus.termStatus.hasFeeStructure && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <p className="text-sm font-semibold text-blue-900 mb-2">
-                    Required: MWK{" "}
-                    {termStatus.termStatus.requiredAmount?.toLocaleString()}
+              <div className="grid grid-cols-3 gap-2">
+                <div className="bg-blue-50 rounded-xl p-3 text-center border border-blue-100">
+                  <p className="text-[10px] text-blue-700 font-medium uppercase tracking-wide">
+                    Required
                   </p>
-                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
-                    <div>
-                      <p className="text-gray-400">Paid</p>
-                      <p className="font-medium text-green-600">
-                        MWK{" "}
-                        {termStatus.termStatus.totalPaidThisTerm.toLocaleString()}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400">Balance</p>
-                      <p
-                        className={`font-medium ${termStatus.termStatus.balanceRemaining === 0 ? "text-green-600" : "text-red-600"}`}
-                      >
-                        {termStatus.termStatus.balanceRemaining === 0
-                          ? "✓ Paid"
-                          : `MWK ${termStatus.termStatus.balanceRemaining?.toLocaleString()}`}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400">Credit</p>
-                      <p
-                        className={`font-medium ${termStatus.termStatus.creditBalance > 0 ? "text-purple-600" : "text-gray-400"}`}
-                      >
-                        {termStatus.termStatus.creditBalance > 0
-                          ? `MWK ${termStatus.termStatus.creditBalance.toLocaleString()}`
-                          : "None"}
-                      </p>
-                    </div>
-                  </div>
+                  <p className="text-sm font-bold text-blue-900 mt-1">
+                    MWK {termStatus.termStatus.requiredAmount?.toLocaleString()}
+                  </p>
+                </div>
+                <div className="bg-emerald-50 rounded-xl p-3 text-center border border-emerald-100">
+                  <p className="text-[10px] text-emerald-700 font-medium uppercase tracking-wide">
+                    Paid
+                  </p>
+                  <p className="text-sm font-bold text-emerald-700 mt-1">
+                    MWK{" "}
+                    {termStatus.termStatus.totalPaidThisTerm.toLocaleString()}
+                  </p>
+                </div>
+                <div
+                  className={`rounded-xl p-3 text-center border ${
+                    termStatus.termStatus.balanceRemaining === 0
+                      ? "bg-emerald-50 border-emerald-100"
+                      : "bg-red-50 border-red-100"
+                  }`}
+                >
+                  <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">
+                    Balance
+                  </p>
+                  <p
+                    className={`text-sm font-bold mt-1 ${
+                      termStatus.termStatus.balanceRemaining === 0
+                        ? "text-emerald-700"
+                        : "text-red-600"
+                    }`}
+                  >
+                    {termStatus.termStatus.balanceRemaining === 0
+                      ? "✓ Clear"
+                      : `MWK ${termStatus.termStatus.balanceRemaining?.toLocaleString()}`}
+                  </p>
+                </div>
+              </div>
+              {termStatus.termStatus.creditBalance > 0 && (
+                <div className="mt-2 bg-purple-50 border border-purple-100 rounded-lg p-2 text-center">
+                  <p className="text-[11px] text-purple-700">
+                    Credit balance: MWK{" "}
+                    {termStatus.termStatus.creditBalance.toLocaleString()} —
+                    applies to next term
+                  </p>
                 </div>
               )}
+            </div>
+          )}
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                Amount Paid (MWK) *
-              </label>
-              <input
-                type="number"
-                value={form.amount}
-                onChange={(e) => setForm({ ...form, amount: e.target.value })}
-                required
-                min="1"
-                placeholder="eg. 150000"
-                className="w-full px-4 py-3 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 text-lg font-medium"
-              />
+        {/* ============ AMOUNT INPUT ============ */}
+        <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+          <label className="block text-xs font-medium text-gray-600 mb-2">
+            How much are you paying?
+          </label>
+          <div className="relative">
+            <span className="absolute left-4 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-400">
+              MWK
+            </span>
+            <input
+              type="number"
+              value={form.amount}
+              onChange={(e) => setForm({ ...form, amount: e.target.value })}
+              placeholder="0"
+              min="1"
+              inputMode="numeric"
+              className="w-full pl-14 pr-4 py-3.5 border-2 border-gray-200 rounded-xl text-lg font-bold focus:outline-none focus:border-[var(--color-primary)] text-gray-900"
+            />
+          </div>
+          {form.amount && amountNum > 0 && (
+            <p className="text-[11px] text-gray-400 mt-1.5 text-center">
+              {amountNum.toLocaleString()} Kwacha
+            </p>
+          )}
+        </div>
+
+        {/* ============ PAYMENT MODE SWITCHER ============ */}
+        <div className="bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100 flex gap-1.5">
+          <button
+            type="button"
+            onClick={() => setMode("online")}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
+              mode === "online"
+                ? "bg-gradient-to-br from-emerald-600 to-emerald-500 text-white shadow-sm"
+                : "text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            <Zap size={15} />
+            Pay Online
+          </button>
+          <button
+            type="button"
+            onClick={() => setMode("receipt")}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
+              mode === "receipt"
+                ? "bg-[var(--color-primary)] text-white shadow-sm"
+                : "text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            <FileImage size={15} />
+            Upload Receipt
+          </button>
+        </div>
+
+        {/* ============ ERROR ============ */}
+        {error && (
+          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-2">
+            <AlertCircle size={16} className="shrink-0 mt-0.5" />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* ============ ONLINE MODE ============ */}
+        {mode === "online" && (
+          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                <Smartphone size={18} className="text-emerald-600" />
+              </div>
+              <div>
+                <h2 className="text-sm font-bold text-gray-800">
+                  Instant Payment
+                </h2>
+                <p className="text-[11px] text-gray-500 mt-0.5 leading-relaxed">
+                  Pay with Airtel Money or TNM Mpamba. You'll receive a prompt
+                  on your phone — no receipt upload needed.
+                </p>
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                Payment Method *
-              </label>
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 space-y-2">
+              <div className="flex items-center gap-2 text-xs text-emerald-800">
+                <CheckCircle size={12} className="shrink-0" />
+                <span>Payment confirms automatically in seconds</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-emerald-800">
+                <CheckCircle size={12} className="shrink-0" />
+                <span>Balance updates instantly on your account</span>
+              </div>
+              <div className="flex items-center gap-2 text-xs text-emerald-800">
+                <CheckCircle size={12} className="shrink-0" />
+                <span>Receipt sent via SMS & email</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ============ RECEIPT MODE ============ */}
+        {mode === "receipt" && (
+          <div className="space-y-3">
+            {/* Payment Method */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
+              <h2 className="text-sm font-bold text-gray-800">
+                How did you pay?
+              </h2>
               <div className="grid grid-cols-2 gap-2">
                 {paymentMethods.map((m) => (
                   <button
                     key={m.value}
                     type="button"
-                    onClick={() => setForm({ ...form, paymentMethod: m.value })}
-                    className={`py-2.5 px-3 rounded-xl text-sm font-medium border transition-all ${
-                      form.paymentMethod === m.value
-                        ? "bg-[var(--color-primary)] text-white border-[var(--color-primary)]"
-                        : "bg-white text-gray-600 border-gray-200 hover:border-[var(--color-primary)]"
+                    onClick={() => setReceiptMethod(m.value)}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-medium border-2 transition-all flex items-center gap-2 justify-center ${
+                      receiptMethod === m.value
+                        ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]"
+                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
                     }`}
                   >
-                    {m.label}
+                    <span>{m.emoji}</span>
+                    <span className="truncate">{m.label}</span>
                   </button>
                 ))}
               </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                  Transaction Reference{" "}
+                  <span className="text-gray-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  value={bankReference}
+                  onChange={(e) => setBankReference(e.target.value)}
+                  placeholder="eg. TXN12345678"
+                  className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                Transaction Reference{" "}
-                <span className="text-gray-400">(optional)</span>
-              </label>
-              <input
-                value={form.bankReference}
-                onChange={(e) =>
-                  setForm({ ...form, bankReference: e.target.value })
-                }
-                placeholder="eg. TXN12345678"
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Payment Account Details */}
-          {paymentInfo &&
-            (paymentInfo.airtelMoneyNumber ||
-              paymentInfo.mpambaNumber ||
-              (paymentInfo.bankAccounts &&
-                paymentInfo.bankAccounts.length > 0)) && (
-              <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-                <h2 className="font-medium text-gray-800 text-sm mb-2.5">
-                  Pay To These Accounts
-                </h2>
-                <div className="space-y-2">
-                  {paymentInfo.airtelMoneyNumber && (
-                    <div className="flex items-center justify-between p-3 bg-red-50 rounded-xl">
-                      <div>
-                        <p className="text-xs text-gray-500">Airtel Money</p>
-                        <p className="text-sm font-bold text-gray-800">
-                          {paymentInfo.airtelMoneyNumber}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigator.clipboard?.writeText(
-                            paymentInfo.airtelMoneyNumber,
-                          )
-                        }
-                        className="text-xs text-red-600 font-medium px-3 py-1 bg-red-100 rounded-lg"
-                      >
-                        Copy
-                      </button>
-                    </div>
-                  )}
-                  {paymentInfo.mpambaNumber && (
-                    <div className="flex items-center justify-between p-3 bg-yellow-50 rounded-xl">
-                      <div>
-                        <p className="text-xs text-gray-500">TNM Mpamba</p>
-                        <p className="text-sm font-bold text-gray-800">
-                          {paymentInfo.mpambaNumber}
-                        </p>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          navigator.clipboard?.writeText(
-                            paymentInfo.mpambaNumber,
-                          )
-                        }
-                        className="text-xs text-yellow-600 font-medium px-3 py-1 bg-yellow-100 rounded-lg"
-                      >
-                        Copy
-                      </button>
-                    </div>
-                  )}
-                  {paymentInfo.bankAccounts &&
-                    paymentInfo.bankAccounts.map((bank: any, index: number) => (
-                      <div
-                        key={index}
-                        className="flex items-center justify-between p-3 bg-blue-50 rounded-xl"
-                      >
-                        <div className="min-w-0">
-                          <p className="text-xs text-gray-500 truncate">
-                            {bank.bankName}
-                            {bank.branch ? ` • ${bank.branch}` : ""}
-                          </p>
-                          <p className="text-sm font-bold text-gray-800 font-mono">
-                            {bank.accountNumber}
-                          </p>
-                          {bank.accountName && (
-                            <p className="text-[10px] text-gray-400 truncate">
-                              {bank.accountName}
-                            </p>
-                          )}
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() =>
-                            navigator.clipboard?.writeText(bank.accountNumber)
+            {/* Accounts to pay to */}
+            {paymentInfo &&
+              (paymentInfo.airtelMoneyNumber ||
+                paymentInfo.mpambaNumber ||
+                (paymentInfo.bankAccounts &&
+                  paymentInfo.bankAccounts.length > 0)) && (
+                <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+                  <div className="flex items-center justify-between mb-3">
+                    <h2 className="text-sm font-bold text-gray-800">
+                      Where to pay
+                    </h2>
+                    <span className="text-[10px] font-mono text-gray-400">
+                      Ref: {student?.studentCode}
+                    </span>
+                  </div>
+                  <div className="space-y-2">
+                    {paymentInfo.airtelMoneyNumber && (
+                      <PaymentAccountRow
+                        label="Airtel Money"
+                        value={paymentInfo.airtelMoneyNumber}
+                        color="red"
+                      />
+                    )}
+                    {paymentInfo.mpambaNumber && (
+                      <PaymentAccountRow
+                        label="TNM Mpamba"
+                        value={paymentInfo.mpambaNumber}
+                        color="amber"
+                      />
+                    )}
+                    {paymentInfo.bankAccounts?.map(
+                      (bank: any, index: number) => (
+                        <PaymentAccountRow
+                          key={index}
+                          label={bank.bankName}
+                          sub={
+                            bank.accountName
+                              ? `${bank.accountName}${bank.branch ? ` • ${bank.branch}` : ""}`
+                              : bank.branch
                           }
-                          className="text-xs text-blue-600 font-medium px-3 py-1 bg-blue-100 rounded-lg shrink-0 ml-2"
-                        >
-                          Copy
-                        </button>
-                      </div>
-                    ))}
-                  <div className="bg-gray-50 rounded-xl p-3 mt-1">
-                    <p className="text-xs text-gray-500">
-                      Reference:{" "}
-                      <span className="font-bold text-gray-700 font-mono">
-                        {student?.studentCode}
-                      </span>
-                    </p>
+                          value={bank.accountNumber}
+                          color="blue"
+                        />
+                      ),
+                    )}
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-          {/* Receipt Upload */}
-          <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
-            <h2 className="font-medium text-gray-800 text-sm mb-1">
-              Upload Receipt *
-            </h2>
-            <p className="text-xs text-gray-400 mb-3">
-              Take a photo of your Airtel Money/Mpamba/bank receipt and upload
-              it here.
-            </p>
+            {/* Receipt upload */}
+            <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
+              <h2 className="text-sm font-bold text-gray-800 mb-1">
+                Upload your receipt
+              </h2>
+              <p className="text-[11px] text-gray-400 mb-3">
+                Photo or screenshot of your payment confirmation
+              </p>
 
-            {!receiptPreview ? (
-              <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition-all">
-                <Upload size={24} className="text-gray-400 mb-2" />
-                <p className="text-sm font-medium text-gray-600">
-                  Tap to upload receipt
-                </p>
-                <p className="text-xs text-gray-400 mt-1">
-                  JPG, PNG or PDF up to 5MB
-                </p>
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  capture="environment"
-                />
-              </label>
-            ) : (
-              <div className="relative">
-                {receiptFile?.type === "application/pdf" ? (
-                  <div className="w-full h-64 rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
-                    <embed
-                      src={receiptPreview || undefined}
-                      type="application/pdf"
-                      className="w-full h-full"
-                    />
-                  </div>
-                ) : (
-                  <img
-                    src={receiptPreview}
-                    alt="Receipt preview"
-                    className="w-full h-48 object-cover rounded-xl border border-gray-200"
+              {!receiptPreview ? (
+                <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-200 rounded-xl cursor-pointer hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]/30 transition-all">
+                  <Upload size={24} className="text-gray-400 mb-2" />
+                  <p className="text-sm font-medium text-gray-600">
+                    Tap to upload
+                  </p>
+                  <p className="text-[11px] text-gray-400 mt-1">
+                    JPG, PNG or PDF • max 5MB
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    capture="environment"
                   />
-                )}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setReceiptFile(null);
-                    setReceiptPreview(null);
-                  }}
-                  className="absolute top-2 right-2 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700"
-                >
-                  <X size={14} />
-                </button>
-                <p className="text-xs text-gray-500 mt-2 text-center truncate px-6">
-                  {receiptFile?.name}
-                </p>
-              </div>
-            )}
-          </div>
-
-          {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-              {error}
+                </label>
+              ) : (
+                <div className="relative">
+                  {receiptFile?.type === "application/pdf" ? (
+                    <div className="w-full h-64 rounded-xl border border-gray-200 overflow-hidden bg-gray-50">
+                      <embed
+                        src={receiptPreview || undefined}
+                        type="application/pdf"
+                        className="w-full h-full"
+                      />
+                    </div>
+                  ) : (
+                    <img
+                      src={receiptPreview}
+                      alt="Receipt preview"
+                      className="w-full h-48 object-cover rounded-xl border border-gray-200"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={clearReceipt}
+                    className="absolute top-2 right-2 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 shadow-md"
+                    aria-label="Remove receipt"
+                  >
+                    <X size={14} />
+                  </button>
+                  <p className="text-[11px] text-gray-500 mt-2 text-center truncate px-8">
+                    {receiptFile?.name}
+                  </p>
+                </div>
+              )}
             </div>
-          )}
-
-          <p className="text-center text-xs text-gray-400">
-            After submitting, the school will verify your receipt and confirm
-            your payment.
-          </p>
-        </form>
+          </div>
+        )}
       </div>
 
-      {/* Sticky submit bar */}
-      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 max-w-lg mx-auto shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
-        <button
-          type="submit"
-          form="payment-form"
-          disabled={loading || !receiptFile}
-          onClick={handleSubmit}
-          className="w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-3.5 rounded-xl font-medium text-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-40 transition-colors"
-        >
-          {loading ? (
-            <>
-              <Loader2 size={16} className="animate-spin" /> Submitting...
-            </>
+      {/* ============ STICKY SUBMIT BAR ============ */}
+      <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
+        <div className="max-w-lg mx-auto">
+          {mode === "online" ? (
+            <button
+              type="button"
+              onClick={openOnlineModal}
+              disabled={!canPayOnline}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white py-3.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Zap size={16} />
+              {canPayOnline
+                ? `Pay MWK ${amountNum.toLocaleString()} Online`
+                : "Enter an amount to continue"}
+            </button>
           ) : (
-            `Submit Payment — MWK ${form.amount ? parseFloat(form.amount).toLocaleString() : "0"}`
+            <button
+              type="button"
+              onClick={handleReceiptSubmit}
+              disabled={loading || !canSubmitReceipt}
+              className="w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white py-3.5 rounded-xl font-semibold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Submitting...
+                </>
+              ) : (
+                <>
+                  <CheckCircle size={16} />
+                  {canSubmitReceipt
+                    ? `Submit Payment — MWK ${amountNum.toLocaleString()}`
+                    : !receiptFile
+                      ? "Upload a receipt to continue"
+                      : "Enter an amount to continue"}
+                </>
+              )}
+            </button>
           )}
-        </button>
+        </div>
       </div>
+
+      {/* ============ PAY ONLINE MODAL ============ */}
+      <PayOnlineModal
+        open={showOnlineModal}
+        onClose={() => setShowOnlineModal(false)}
+        amount={amountNum}
+        term={form.term}
+        academicYear={form.academicYear}
+        onSuccess={() => {
+          if (student?.id && form.term) {
+            api
+              .get(
+                `/schools/student-term-status/${student.id}?term=${form.term}&academicYear=${form.academicYear}`,
+              )
+              .then((res) => setTermStatus(res.data.data))
+              .catch(() => {});
+          }
+          setShowOnlineModal(false);
+          setSuccess(true);
+        }}
+      />
     </div>
   );
 }
+
+// ==================== SUB-COMPONENT ====================
+const PaymentAccountRow = ({
+  label,
+  value,
+  sub,
+  color,
+}: {
+  label: string;
+  value: string;
+  sub?: string;
+  color: "red" | "amber" | "blue";
+}) => {
+  const colorMap = {
+    red: {
+      bg: "bg-red-50",
+      text: "text-red-700",
+      btn: "bg-red-100 text-red-600",
+    },
+    amber: {
+      bg: "bg-amber-50",
+      text: "text-amber-700",
+      btn: "bg-amber-100 text-amber-600",
+    },
+    blue: {
+      bg: "bg-blue-50",
+      text: "text-blue-700",
+      btn: "bg-blue-100 text-blue-600",
+    },
+  };
+  const c = colorMap[color];
+
+  const handleCopy = () => {
+    navigator.clipboard?.writeText(value);
+  };
+
+  return (
+    <div className={`flex items-center justify-between p-3 rounded-xl ${c.bg}`}>
+      <div className="min-w-0">
+        <p className={`text-[11px] font-medium ${c.text}`}>{label}</p>
+        <p className="text-sm font-bold text-gray-800 font-mono truncate">
+          {value}
+        </p>
+        {sub && (
+          <p className="text-[10px] text-gray-500 truncate mt-0.5">{sub}</p>
+        )}
+      </div>
+      <button
+        type="button"
+        onClick={handleCopy}
+        className={`text-[11px] font-semibold px-3 py-1 rounded-lg ${c.btn} shrink-0 ml-2`}
+      >
+        Copy
+      </button>
+    </div>
+  );
+};

@@ -4,6 +4,10 @@ const helmet = require("helmet");
 const morgan = require("morgan");
 const dotenv = require("dotenv");
 const rateLimit = require("express-rate-limit");
+const cron = require("node-cron");
+const {
+  reconcileStalePending,
+} = require("./src/controllers/malipo.controller");
 
 dotenv.config();
 
@@ -115,6 +119,16 @@ app.use("/api/auth/accept-invitation", authLimiter);
 app.use("/api/auth", authLimiter);
 app.use("/api/", readLimiter);
 
+// Malipo reconciliation — every 5 minutes, catch stuck payments
+cron.schedule("*/5 * * * *", () => {
+  reconcileStalePending().catch((err) =>
+    console.error("[malipo-cron] Sweep failed:", err.message),
+  );
+});
+
+if (isProd) {
+  console.log("✓ Malipo reconciliation cron scheduled (every 5 min)");
+}
 // Health monitors ping "/" — return 200 so logs don't fill with 404s
 app.get("/", (req, res) => {
   res.json({

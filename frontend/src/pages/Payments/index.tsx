@@ -4,6 +4,7 @@ import { Plus, CheckCircle, Clock, XCircle } from "lucide-react";
 import api from "../../lib/axios";
 import type { Payment, Pagination } from "../../types";
 import { usePermission } from "../../hooks/usePermission";
+import PaymentInsights from "../../components/Payments/PaymentInsights";
 
 const statusConfig = {
   VERIFIED: {
@@ -73,6 +74,9 @@ const PaymentsPage = () => {
           </button>
         )}
       </div>
+
+      {/* Payment Channel Insights */}
+      <PaymentInsights />
 
       {/* Filter */}
       <div className="flex gap-2">

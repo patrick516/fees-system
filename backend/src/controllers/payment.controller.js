@@ -923,6 +923,163 @@ const getPaymentSummary = async (req, res) => {
   }
 };
 
+// ==================== PAYMENT INSIGHTS ====================
+// GET /api/payments/insights
+// Breakdown of payments by channel — for the admin dashboard
+const getPaymentInsights = async (req, res) => {
+  try {
+    const { term, academicYear } = req.query;
+
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: { activeTerm: true, activeAcademicYear: true },
+    });
+
+    const year = academicYear || school?.activeAcademicYear;
+    const resolvedTerm = term || school?.activeTerm;
+
+    const baseWhere = { schoolId: req.schoolId };
+    if (year) baseWhere.academicYear = year;
+    if (resolvedTerm) baseWhere.term = resolvedTerm;
+
+    // All verified payments for this term
+    const payments = await prisma.feePayment.findMany({
+      where: { ...baseWhere, status: "VERIFIED" },
+      select: {
+        id: true,
+        amount: true,
+        paymentMethod: true,
+        paymentChannel: true,
+        createdAt: true,
+      },
+    });
+
+    // ============ Categorize by channel ============
+    const BANK_METHODS = [
+      "NATIONAL_BANK",
+      "STANDARD_BANK",
+      "FDH_BANK",
+      "NBS_BANK",
+      "OTHER_BANK",
+    ];
+    const MOBILE_METHODS = ["AIRTEL_MONEY", "TNM_MPAMBA"];
+
+    const channels = {
+      malipo_online: {
+        count: 0,
+        amount: 0,
+        label: "Malipo Online",
+        description: "Auto-verified via mobile money",
+        color: "emerald",
+      },
+      mobile_manual: {
+        count: 0,
+        amount: 0,
+        label: "Mobile Money",
+        description: "Airtel/Mpamba with receipt",
+        color: "amber",
+      },
+      bank_manual: {
+        count: 0,
+        amount: 0,
+        label: "Bank Transfer",
+        description: "Bank deposit with receipt",
+        color: "blue",
+      },
+      cash: {
+        count: 0,
+        amount: 0,
+        label: "Cash",
+        description: "Recorded by bursar at office",
+        color: "slate",
+      },
+    };
+
+    for (const p of payments) {
+      if (p.paymentChannel === "MALIPO") {
+        channels.malipo_online.count++;
+        channels.malipo_online.amount += p.amount;
+      } else if (p.paymentMethod === "CASH") {
+        channels.cash.count++;
+        channels.cash.amount += p.amount;
+      } else if (BANK_METHODS.includes(p.paymentMethod)) {
+        channels.bank_manual.count++;
+        channels.bank_manual.amount += p.amount;
+      } else if (MOBILE_METHODS.includes(p.paymentMethod)) {
+        channels.mobile_manual.count++;
+        channels.mobile_manual.amount += p.amount;
+      }
+    }
+
+    const totalAmount = Object.values(channels).reduce(
+      (s, c) => s + c.amount,
+      0,
+    );
+    const totalCount = Object.values(channels).reduce((s, c) => s + c.count, 0);
+
+    const breakdown = Object.entries(channels).map(([key, c]) => ({
+      key,
+      ...c,
+      percent: totalAmount > 0 ? Math.round((c.amount / totalAmount) * 100) : 0,
+    }));
+
+    // Sort by amount descending — highest-performing channel first
+    breakdown.sort((a, b) => b.amount - a.amount);
+
+    // ============ Today's online payments ============
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayOnlinePayments = payments.filter(
+      (p) =>
+        p.paymentChannel === "MALIPO" && new Date(p.createdAt) >= todayStart,
+    );
+    const todayOnlineAmount = todayOnlinePayments.reduce(
+      (s, p) => s + p.amount,
+      0,
+    );
+
+    // ============ Pending / failed online payments ============
+    const [malipoPending, malipoFailed] = await Promise.all([
+      prisma.feePayment.count({
+        where: {
+          ...baseWhere,
+          paymentChannel: "MALIPO",
+          status: "PENDING",
+        },
+      }),
+      prisma.feePayment.count({
+        where: {
+          ...baseWhere,
+          paymentChannel: "MALIPO",
+          status: "REJECTED",
+        },
+      }),
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalAmount,
+        totalCount,
+        todayOnline: {
+          amount: todayOnlineAmount,
+          count: todayOnlinePayments.length,
+        },
+        malipoPending,
+        malipoFailed,
+        channels: breakdown,
+        academicYear: year,
+        term: resolvedTerm,
+      },
+    });
+  } catch (error) {
+    console.error("Get payment insights error:", error);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load insights" });
+  }
+};
 module.exports = {
   recordCashPayment,
   submitPayment,
@@ -932,4 +1089,5 @@ module.exports = {
   getPendingPayments,
   getMyChildPayments,
   getPaymentSummary,
+  getPaymentInsights,
 };
