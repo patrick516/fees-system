@@ -12,15 +12,15 @@ interface Branding {
   primaryColor?: string | null;
 }
 
-const [lockedInfo, setLockedInfo] = useState<{
-  message: string;
-  minutesRemaining: number;
-} | null>(null);
-
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuthStore();
   const { slug } = useParams();
+
+  const [lockedInfo, setLockedInfo] = useState<{
+    message: string;
+    minutesRemaining: number;
+  } | null>(null);
 
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
