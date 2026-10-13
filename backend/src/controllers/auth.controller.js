@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const crypto = require("crypto");
 const prisma = require("../config/db");
 const { sendOtp, verifyOtp } = require("../lib/sms");
-const { sendOtpEmail } = require("../lib/mailer");
+const { sendOtpEmail, sendPasswordResetEmail } = require("../lib/mailer");
 const { validatePassword } = require("../lib/passwordPolicy");
 const { createDefaultRolesForSchool } = require("../lib/defaultRoles");
 
@@ -1058,6 +1058,187 @@ const staffLogout = async (req, res) => {
   }
 };
 
+// ==================== FORGOT PASSWORD ====================
+// POST /api/auth/forgot-password
+// Body: { email }
+// Always returns success to prevent email enumeration.
+const forgotPassword = async (req, res) => {
+  const GENERIC_MESSAGE =
+    "If an account exists with that email, you'll receive a password reset link shortly.";
+
+  try {
+    const { email } = req.body;
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Email is required" });
+    }
+
+    const staff = await prisma.staff.findUnique({
+      where: { email: email.toLowerCase().trim() },
+    });
+
+    // Silent success — don't reveal whether the account exists
+    if (!staff || !staff.isActive) {
+      return res.status(200).json({ success: true, message: GENERIC_MESSAGE });
+    }
+
+    // Generate token (raw, not hashed — expires in 30 min and single-use)
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
+
+    await prisma.staff.update({
+      where: { id: staff.id },
+      data: {
+        passwordResetToken: resetToken,
+        passwordResetExpires: expiresAt,
+      },
+    });
+
+    // Send email — log if it fails, but don't reveal to the caller
+    const sendResult = await sendPasswordResetEmail({
+      to: staff.email,
+      name: staff.fullName,
+      resetToken,
+      expiresInMinutes: 30,
+    });
+
+    if (sendResult?.success === false) {
+      console.error("Password reset email failed for", staff.email, sendResult);
+    }
+
+    await logAudit(req, {
+      action: "PASSWORD_RESET_REQUESTED",
+      entity: "Staff",
+      entityId: staff.id,
+      targetName: staff.fullName,
+      actor: staff,
+    });
+
+    return res.status(200).json({ success: true, message: GENERIC_MESSAGE });
+  } catch (err) {
+    console.error("Forgot password error:", err);
+    // Still return the generic message to avoid leaks
+    return res.status(200).json({ success: true, message: GENERIC_MESSAGE });
+  }
+};
+
+// ==================== VALIDATE RESET TOKEN ====================
+// GET /api/auth/reset-password/:token
+// Used by the frontend to decide if the token is still valid before
+// rendering the "set new password" form.
+const validateResetToken = async (req, res) => {
+  try {
+    const { token } = req.params;
+    if (!token) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Token is required" });
+    }
+
+    const staff = await prisma.staff.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpires: { gt: new Date() },
+        isActive: true,
+      },
+      select: { id: true, email: true, fullName: true },
+    });
+
+    if (!staff) {
+      return res.status(400).json({
+        success: false,
+        message: "This reset link is invalid or has expired.",
+        code: "INVALID_RESET_TOKEN",
+      });
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: { email: staff.email, fullName: staff.fullName },
+    });
+  } catch (err) {
+    console.error("Validate reset token error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to validate token" });
+  }
+};
+
+// POST /api/auth/reset-password
+// Body: { token, newPassword }
+const resetPassword = async (req, res) => {
+  try {
+    const { token, newPassword } = req.body;
+
+    if (!token || !newPassword) {
+      return res.status(400).json({
+        success: false,
+        message: "Token and new password are required",
+      });
+    }
+
+    const pwCheck = validatePassword(newPassword);
+    if (!pwCheck.valid) {
+      return res.status(400).json({
+        success: false,
+        message: "Password does not meet policy",
+        errors: pwCheck.errors,
+      });
+    }
+
+    const staff = await prisma.staff.findFirst({
+      where: {
+        passwordResetToken: token,
+        passwordResetExpires: { gt: new Date() },
+        isActive: true,
+      },
+    });
+
+    if (!staff) {
+      return res.status(400).json({
+        success: false,
+        message: "This reset link is invalid or has expired.",
+        code: "INVALID_RESET_TOKEN",
+      });
+    }
+
+    const passwordHash = await bcrypt.hash(newPassword, 12);
+
+    await prisma.staff.update({
+      where: { id: staff.id },
+      data: {
+        passwordHash,
+        passwordResetToken: null,
+        passwordResetExpires: null,
+        mustChangePassword: false,
+        passwordChangedAt: new Date(),
+        // Invalidate all sessions — user must log in fresh with the new password
+        refreshTokenHash: null,
+        refreshTokenExpires: null,
+      },
+    });
+
+    await logAudit(req, {
+      action: "PASSWORD_RESET_COMPLETED",
+      entity: "Staff",
+      entityId: staff.id,
+      targetName: staff.fullName,
+      actor: staff,
+    });
+
+    return res.status(200).json({
+      success: true,
+      message: "Password updated. You can now log in with your new password.",
+    });
+  } catch (err) {
+    console.error("Reset password error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to reset password" });
+  }
+};
+
 module.exports = {
   staffLogin,
   getStaffProfile,
@@ -1070,6 +1251,9 @@ module.exports = {
   getSetupStatus,
   refreshAccessToken,
   staffLogout,
+  forgotPassword,
+  validateResetToken,
+  resetPassword,
   parentLoginWithStudentId,
   requestOTP,
   verifyOTP,

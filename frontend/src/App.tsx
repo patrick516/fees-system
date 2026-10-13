@@ -10,6 +10,8 @@ import Signup from "./pages/Auth/Signup";
 import VerifyEmail from "./pages/Auth/VerifyEmail";
 import AcceptInvitation from "./pages/Auth/AcceptInvitation";
 import ForceChangePassword from "./pages/Auth/ForceChangePassword";
+import ForgotPassword from "./pages/Auth/ForgotPassword";
+import ResetPassword from "./pages/Auth/ResetPassword";
 
 // Pages — App
 import Dashboard from "./pages/Dashboard/index";
@@ -120,6 +122,8 @@ function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
         <Route path="/accept-invitation" element={<AcceptInvitation />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
 
         {/*  FORCE PASSWORD CHANGE  */}
         <Route

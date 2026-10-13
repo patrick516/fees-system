@@ -73,7 +73,7 @@ const sendOtpEmail = async ({
   });
 };
 
-// ==================== INVITATION EMAIL ====================
+//  INVITATION EMAIL
 const sendInvitationEmail = async ({
   to,
   name,
@@ -125,5 +125,54 @@ const sendInvitationEmail = async ({
     htmlContent: html,
   });
 };
+//  PASSWORD RESET
+const sendPasswordResetEmail = async ({
+  to,
+  name,
+  resetToken,
+  expiresInMinutes = 30,
+}) => {
+  const resetUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/reset-password?token=${resetToken}`;
 
-module.exports = { sendEmail, sendOtpEmail, sendInvitationEmail };
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #f8fafc;">
+      <div style="background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+        <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">Reset your password</h2>
+        <p style="margin: 0 0 24px; color: #64748b; font-size: 14px; line-height: 1.6;">
+          Hi ${name || "there"}, we received a request to reset your SchoolPay password.
+          Click the button below to choose a new one. This link expires in ${expiresInMinutes} minutes.
+        </p>
+
+        <a href="${resetUrl}" style="display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-size: 14px; font-weight: 600;">
+          Reset Password →
+        </a>
+
+        <p style="margin: 24px 0 0; color: #94a3b8; font-size: 12px; line-height: 1.6;">
+          If you didn't request this, you can safely ignore this email — your password won't change.
+        </p>
+
+        <p style="margin: 16px 0 0; color: #94a3b8; font-size: 11px; line-height: 1.5;">
+          Button not working? Paste this into your browser:<br>
+          <span style="color: #64748b; word-break: break-all;">${resetUrl}</span>
+        </p>
+      </div>
+      <p style="text-align: center; color: #94a3b8; font-size: 11px; margin-top: 16px;">
+        ${SENDER_NAME} • Automated message, please do not reply
+      </p>
+    </div>
+  `;
+
+  return sendEmail({
+    to,
+    toName: name,
+    subject: "Reset your SchoolPay password",
+    htmlContent: html,
+  });
+};
+
+module.exports = {
+  sendEmail,
+  sendOtpEmail,
+  sendInvitationEmail,
+  sendPasswordResetEmail,
+};

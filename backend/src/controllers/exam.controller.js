@@ -13,8 +13,6 @@ const resolveGrade = (mark, boundaries) => {
   };
 };
 
-// ==================== EXAM PERIODS ====================
-
 // POST /api/exams/periods
 const createExamPeriod = async (req, res) => {
   try {

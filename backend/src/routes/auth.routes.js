@@ -13,6 +13,9 @@ const {
   getSetupStatus,
   refreshAccessToken,
   staffLogout,
+  forgotPassword,
+  validateResetToken,
+  resetPassword,
   parentLoginWithStudentId,
   requestOTP,
   verifyOTP,
@@ -34,6 +37,9 @@ router.get("/setup-status", getSetupStatus);
 router.post("/register", registerAdmin);
 router.post("/verify-email", verifyEmail);
 router.post("/resend-otp", resendOtp);
+router.post("/forgot-password", forgotPassword);
+router.get("/reset-password/:token", validateResetToken);
+router.post("/reset-password", resetPassword);
 router.post("/refresh", refreshAccessToken);
 
 router.post("/staff/logout", verifyStaff, staffLogout);
