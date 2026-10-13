@@ -63,6 +63,8 @@ export interface Staff {
   invitedAt?: string | null;
   invitationExpires?: string | null;
   createdAt?: string;
+  failedLoginAttempts?: number;
+  lockedUntil?: string | null;
 }
 
 export interface Class {

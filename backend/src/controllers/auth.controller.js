@@ -43,7 +43,24 @@ const buildFullName = (title, firstName, lastName) =>
     .map((p) => String(p).trim())
     .join(" ");
 
-// ==================== STAFF AUTH ====================
+// Login lockout config
+const MAX_ATTEMPTS = parseInt(process.env.LOGIN_MAX_ATTEMPTS || "3", 10);
+const LOCKOUT_HOURS = parseInt(process.env.LOGIN_LOCKOUT_HOURS || "2", 10);
+
+// Returns { locked: boolean, minutesRemaining: number, lockedUntil: Date|null }
+const checkLockStatus = (staff) => {
+  if (!staff?.lockedUntil) {
+    return { locked: false, minutesRemaining: 0, lockedUntil: null };
+  }
+  const now = Date.now();
+  const until = new Date(staff.lockedUntil).getTime();
+  if (until <= now) {
+    return { locked: false, minutesRemaining: 0, lockedUntil: null };
+  }
+  const minutesRemaining = Math.ceil((until - now) / 60000);
+  return { locked: true, minutesRemaining, lockedUntil: staff.lockedUntil };
+};
+//  STAFF AUTH
 
 // POST /api/auth/staff/login
 const staffLogin = async (req, res) => {
@@ -77,21 +94,27 @@ const staffLogin = async (req, res) => {
       },
     });
 
+    // If no account or no password, treat as invalid (don't reveal which)
     if (!staff || !staff.passwordHash) {
-      await logAudit(req, {
-        action: "LOGIN_FAILED",
-        entity: "Session",
-        targetName: email,
-        status: "FAILED",
-        changes: { reason: "Unknown email or no password set" },
-        actor: { email },
-      });
       return res.status(401).json({
         success: false,
         message: "Invalid email or password",
       });
     }
 
+    // ============ LOCKOUT CHECK ============
+    const lock = checkLockStatus(staff);
+    if (lock.locked) {
+      return res.status(423).json({
+        success: false,
+        code: "ACCOUNT_LOCKED",
+        message: `Account locked due to too many failed login attempts. Try again in ${lock.minutesRemaining} minute${lock.minutesRemaining === 1 ? "" : "s"}.`,
+        lockedUntil: lock.lockedUntil,
+        minutesRemaining: lock.minutesRemaining,
+      });
+    }
+
+    // ============ OTHER BLOCKING CHECKS ============
     if (!staff.isActive) {
       return res.status(401).json({
         success: false,
@@ -107,7 +130,6 @@ const staffLogin = async (req, res) => {
       });
     }
 
-    // NEW: block login until email is verified
     if (!staff.emailVerified) {
       return res.status(403).json({
         success: false,
@@ -116,23 +138,57 @@ const staffLogin = async (req, res) => {
       });
     }
 
+    // ============ PASSWORD CHECK ============
     const isPasswordValid = await bcrypt.compare(password, staff.passwordHash);
+
     if (!isPasswordValid) {
+      // Increment failed attempts
+      const newAttempts = (staff.failedLoginAttempts || 0) + 1;
+      const shouldLock = newAttempts >= MAX_ATTEMPTS;
+      const lockedUntil = shouldLock
+        ? new Date(Date.now() + LOCKOUT_HOURS * 60 * 60 * 1000)
+        : null;
+
+      await prisma.staff.update({
+        where: { id: staff.id },
+        data: {
+          failedLoginAttempts: newAttempts,
+          lockedUntil,
+        },
+      });
+
       await logAudit(req, {
-        action: "LOGIN_FAILED",
+        action: shouldLock ? "ACCOUNT_LOCKED" : "LOGIN_FAILED",
         entity: "Session",
         targetName: staff.fullName,
         status: "FAILED",
-        changes: { reason: "Wrong password" },
+        changes: {
+          reason: "Wrong password",
+          attempt: newAttempts,
+          lockedUntil: lockedUntil?.toISOString() || null,
+        },
         actor: staff,
       });
+
+      if (shouldLock) {
+        return res.status(423).json({
+          success: false,
+          code: "ACCOUNT_LOCKED",
+          message: `Too many failed attempts. Account locked for ${LOCKOUT_HOURS} hour${LOCKOUT_HOURS === 1 ? "" : "s"}.`,
+          lockedUntil,
+          minutesRemaining: LOCKOUT_HOURS * 60,
+        });
+      }
+
+      const attemptsLeft = MAX_ATTEMPTS - newAttempts;
       return res.status(401).json({
         success: false,
-        message: "Invalid email or password",
+        message: `Invalid email or password. ${attemptsLeft} attempt${attemptsLeft === 1 ? "" : "s"} remaining before lockout.`,
+        attemptsLeft,
       });
     }
 
-    // Issue tokens
+    // ============ SUCCESS — reset lockout ============
     const accessToken = signAccessToken({
       id: staff.id,
       schoolId: staff.schoolId,
@@ -147,6 +203,9 @@ const staffLogin = async (req, res) => {
         lastLogin: new Date(),
         refreshTokenHash,
         refreshTokenExpires: getRefreshExpiryDate(),
+        // Reset lockout counters on successful login
+        failedLoginAttempts: 0,
+        lockedUntil: null,
       },
     });
 

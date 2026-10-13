@@ -158,6 +158,8 @@ model Staff {
 
   passwordResetToken   String?   @unique
   passwordResetExpires DateTime?
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
   refreshTokenHash    String?
   refreshTokenExpires DateTime?
 

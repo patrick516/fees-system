@@ -183,6 +183,8 @@ const listStaff = async (req, res) => {
         invitedAt: true,
         invitationExpires: true,
         createdAt: true,
+        failedLoginAttempts: true,
+        lockedUntil: true,
         department: { select: { id: true, name: true } },
       },
       orderBy: [{ role: { name: "asc" } }, { fullName: "asc" }],
@@ -383,10 +385,62 @@ const removeStaff = async (req, res) => {
   }
 };
 
+// ==================== UNLOCK STAFF ====================
+// POST /api/staff/:id/unlock
+// Admin manually clears the lockout (e.g. user says they got locked by mistake)
+const unlockStaff = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const existing = await prisma.staff.findFirst({
+      where: { id, schoolId: req.schoolId },
+    });
+    if (!existing)
+      return res
+        .status(404)
+        .json({ success: false, message: "Staff not found" });
+
+    if (!existing.lockedUntil && existing.failedLoginAttempts === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "This account is not locked",
+      });
+    }
+
+    await prisma.staff.update({
+      where: { id },
+      data: {
+        failedLoginAttempts: 0,
+        lockedUntil: null,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        schoolId: req.schoolId,
+        staffId: req.staff.id,
+        action: "STAFF_UNLOCKED",
+        entity: "Staff",
+        entityId: id,
+        targetName: existing.fullName,
+        actorName: req.staff.fullName,
+        actorRole: req.staff.role?.name,
+        actorEmail: req.staff.email,
+      },
+    });
+
+    return res.status(200).json({ success: true, message: "Account unlocked" });
+  } catch (err) {
+    console.error("Unlock staff error:", err);
+    return res.status(500).json({ success: false, message: "Unlock failed" });
+  }
+};
+
 module.exports = {
   inviteStaff,
   listStaff,
   resendInvite,
   updateStaff,
   removeStaff,
+  unlockStaff,
 };

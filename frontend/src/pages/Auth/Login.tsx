@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import api from "../../lib/axios";
 import { applyTheme } from "../../lib/theme";
-import { School, Eye, EyeOff, Loader2 } from "lucide-react";
+import { School, Eye, EyeOff, Loader2, ShieldAlert } from "lucide-react";
 
 interface Branding {
   name: string;
@@ -11,6 +11,11 @@ interface Branding {
   motto: string | null;
   primaryColor?: string | null;
 }
+
+const [lockedInfo, setLockedInfo] = useState<{
+  message: string;
+  minutesRemaining: number;
+} | null>(null);
 
 const Login = () => {
   const navigate = useNavigate();
@@ -117,10 +122,24 @@ const Login = () => {
       }
     } catch (err: any) {
       const data = err.response?.data;
+      const status = err.response?.status;
+
+      // Unverified email → send them to the OTP page
       if (data?.code === "EMAIL_NOT_VERIFIED") {
         navigate(`/verify-email?email=${encodeURIComponent(form.email)}`);
         return;
       }
+
+      // Account locked → show the lockout message with countdown
+      if (status === 423 && data?.code === "ACCOUNT_LOCKED") {
+        setLockedInfo({
+          message: data?.message || "Account is temporarily locked.",
+          minutesRemaining: data?.minutesRemaining || 0,
+        });
+        setError("");
+        return;
+      }
+
       setError(data?.message || "Login failed. Please try again.");
     } finally {
       setLoading(false);
@@ -159,11 +178,32 @@ const Login = () => {
 
         {/* Card */}
         <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl p-8">
-          {error && (
+          {lockedInfo ? (
+            <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4 mb-6">
+              <div className="flex items-start gap-3">
+                <ShieldAlert
+                  size={20}
+                  className="text-red-600 shrink-0 mt-0.5"
+                />
+                <div>
+                  <p className="text-sm font-semibold text-red-800">
+                    Account temporarily locked
+                  </p>
+                  <p className="text-xs text-red-700 mt-1 leading-relaxed">
+                    {lockedInfo.message}
+                  </p>
+                  <p className="text-[11px] text-red-500 mt-2">
+                    If this is a mistake, contact your school administrator to
+                    unlock your account.
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : error ? (
             <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm mb-6">
               {error}
             </div>
-          )}
+          ) : null}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
@@ -216,7 +256,7 @@ const Login = () => {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !!lockedInfo}
               className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] disabled:opacity-50 text-white font-medium py-3 rounded-lg transition-all duration-300 flex items-center justify-center gap-2"
             >
               {loading && <Loader2 size={18} className="animate-spin" />}

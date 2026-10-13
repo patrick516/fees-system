@@ -65,7 +65,7 @@ const otpLimiter = rateLimit({
   legacyHeaders: false,
 });
 
-// Auth limiter (login attempts, password changes)
+// Auth limiter (general — for password changes etc.)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: isProd ? 20 : 2000,
@@ -76,6 +76,22 @@ const authLimiter = rateLimit({
   skip: (req) => req.method === "OPTIONS",
   standardHeaders: true,
   legacyHeaders: false,
+});
+
+const loginLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minute
+  max: isProd
+    ? parseInt(process.env.LOGIN_RATE_LIMIT_PER_MIN || "10", 10)
+    : 1000,
+  message: {
+    success: false,
+    message: "Too many login attempts. Please wait a minute.",
+  },
+  skip: (req) => req.method === "OPTIONS",
+  standardHeaders: true,
+  legacyHeaders: false,
+  // Key by IP
+  keyGenerator: (req) => req.ip,
 });
 
 // Generous limiter for everything else
@@ -90,8 +106,7 @@ const readLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
-
-// Apply the strictest first (Express matches in order)
+app.use("/api/auth/staff/login", loginLimiter);
 app.use("/api/auth/parent/request-otp", otpLimiter);
 app.use("/api/auth/register", authLimiter);
 app.use("/api/auth/verify-email", otpLimiter);

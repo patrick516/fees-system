@@ -12,6 +12,7 @@ import {
   Edit2,
   X,
   ShieldAlert,
+  Lock,
 } from "lucide-react";
 import api from "../../lib/axios";
 import InviteStaffModal from "../../components/Staff/InviteStaffModal";
@@ -84,7 +85,31 @@ const StaffPage = () => {
     }
   };
 
+  const handleUnlock = async (id: string) => {
+    setBusyId(id);
+    try {
+      await api.post(`/staff/${id}/unlock`);
+      await fetchAll();
+      setSelectedMember(null);
+      setEditMember(null);
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to unlock");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const getStatusBadge = (member: Staff) => {
+    if (member.lockedUntil && new Date(member.lockedUntil) > new Date()) {
+      const minutesRemaining = Math.ceil(
+        (new Date(member.lockedUntil).getTime() - Date.now()) / 60000,
+      );
+      return (
+        <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-red-100 text-red-700 font-medium">
+          <Lock size={10} /> Locked ({minutesRemaining}m)
+        </span>
+      );
+    }
     if (!member.isActive) {
       return (
         <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-full bg-gray-100 text-gray-600">
@@ -332,6 +357,26 @@ const StaffPage = () => {
                   </p>
                 </div>
               </button>
+              {selectedMember.lockedUntil &&
+                new Date(selectedMember.lockedUntil) > new Date() && (
+                  <button
+                    onClick={() => handleUnlock(selectedMember.id)}
+                    disabled={busyId === selectedMember.id}
+                    className="w-full text-left px-3 py-3 text-sm text-red-700 hover:bg-red-50 rounded-lg flex items-center gap-3 disabled:opacity-50"
+                  >
+                    {busyId === selectedMember.id ? (
+                      <Loader2 size={16} className="animate-spin" />
+                    ) : (
+                      <Lock size={16} />
+                    )}
+                    <div>
+                      <p className="font-medium">Unlock Account</p>
+                      <p className="text-xs text-red-400">
+                        Clear lockout and reset failed attempts
+                      </p>
+                    </div>
+                  </button>
+                )}
 
               {isSelf(selectedMember) ? (
                 // Self — cannot deactivate

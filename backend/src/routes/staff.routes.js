@@ -12,5 +12,10 @@ router.get("/", staff.listStaff);
 router.post("/:id/resend-invite", staff.resendInvite);
 router.put("/:id", staff.updateStaff);
 router.delete("/:id", staff.removeStaff);
+router.post(
+  "/:id/unlock",
+  requirePermission("staff", "write"),
+  staff.unlockStaff,
+);
 
 module.exports = router;
