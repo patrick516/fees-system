@@ -3,11 +3,13 @@ import { useState, useEffect, useRef } from "react";
 import {
   X,
   Loader2,
-  Smartphone,
   CheckCircle,
   XCircle,
   Clock,
-  Phone,
+  Copy,
+  Smartphone,
+  Hash,
+  Info,
 } from "lucide-react";
 import api from "../lib/axios";
 import { useAuthStore } from "../store/authStore";
@@ -23,12 +25,7 @@ interface Props {
 
 type Step = "form" | "processing" | "success" | "failed";
 
-const MOBILE_METHODS = [
-  { value: "AIRTEL", label: "Airtel Money", color: "red", emoji: "🔴" },
-  { value: "MPAMBA", label: "TNM Mpamba", color: "amber", emoji: "🟡" },
-];
-
-const MIN_AMOUNT = 50;
+const MIN_AMOUNT = 100;
 
 export default function PayOnlineModal({
   open,
@@ -41,31 +38,33 @@ export default function PayOnlineModal({
   const { student } = useAuthStore();
 
   const [step, setStep] = useState<Step>("form");
-  const [method, setMethod] = useState<"AIRTEL" | "MPAMBA">("AIRTEL");
-  const [phone, setPhone] = useState("");
   const [paymentId, setPaymentId] = useState<string | null>(null);
   const [receiptNumber, setReceiptNumber] = useState<string | null>(null);
+  const [timedAccountNumber, setTimedAccountNumber] = useState<string | null>(
+    null,
+  );
+  const [expiryDate, setExpiryDate] = useState<string | null>(null);
   const [failureReason, setFailureReason] = useState<string | null>(null);
   const [error, setError] = useState("");
   const [elapsed, setElapsed] = useState(0);
+  const [copied, setCopied] = useState(false);
 
   const pollRef = useRef<any>(null);
   const tickRef = useRef<any>(null);
 
-  // Reset on open
   useEffect(() => {
     if (open) {
       setStep("form");
-      setPhone(student?.parentPhone || "");
       setError("");
       setPaymentId(null);
       setReceiptNumber(null);
+      setTimedAccountNumber(null);
+      setExpiryDate(null);
       setFailureReason(null);
       setElapsed(0);
     }
-  }, [open, student?.parentPhone]);
+  }, [open]);
 
-  // Cleanup on unmount / close
   useEffect(() => {
     return () => {
       if (pollRef.current) clearInterval(pollRef.current);
@@ -88,53 +87,44 @@ export default function PayOnlineModal({
     e.preventDefault();
     setError("");
 
-    const cleanPhone = phone.replace(/\D/g, "");
-    if (cleanPhone.length < 9) {
-      setError("Enter a valid phone number");
-      return;
-    }
-
     if (amount < MIN_AMOUNT) {
       setError(`Minimum amount is MWK ${MIN_AMOUNT}`);
       return;
     }
 
     try {
-      const res = await api.post("/payments/malipo/initiate", {
+      const res = await api.post("/payments/onekhusa/initiate", {
         studentId: student?.id,
         amount,
-        method,
-        phone: `+265${cleanPhone.slice(-9)}`,
         term,
         academicYear,
       });
 
-      setPaymentId(res.data.data.paymentId);
-      setReceiptNumber(res.data.data.receiptNumber);
+      const data = res.data.data;
+      setPaymentId(data.paymentId);
+      setReceiptNumber(data.receiptNumber);
+      setTimedAccountNumber(data.timedAccountNumber);
+      setExpiryDate(data.expiryDate);
       setStep("processing");
 
-      // Start polling
+      // Start polling for status
       let tries = 0;
-      const MAX_TRIES = 60; // ~3 min at 3s interval
+      const MAX_TRIES = 200; // 200 * 5s = ~16 minutes (TAN expires in 15)
 
       pollRef.current = setInterval(async () => {
         tries++;
         if (tries > MAX_TRIES) {
           stopPolling();
           setStep("failed");
-          setFailureReason("Payment timed out. Please try again.");
+          setFailureReason("Payment request expired. Please try again.");
           return;
         }
 
         try {
           const statusRes = await api.get(
-            `/payments/malipo/${res.data.data.paymentId}/status`,
+            `/payments/onekhusa/${data.paymentId}/status`,
           );
-          const {
-            status,
-            malipoStatus,
-            failureReason: reason,
-          } = statusRes.data.data;
+          const { status, failureReason: reason } = statusRes.data.data;
 
           if (status === "VERIFIED") {
             stopPolling();
@@ -145,13 +135,11 @@ export default function PayOnlineModal({
             setStep("failed");
             setFailureReason(reason || "Payment was declined.");
           }
-          // else: still PENDING or Processing → keep polling
-        } catch (err) {
+        } catch {
           // Network blip — keep polling
         }
-      }, 3000);
+      }, 5000);
 
-      // Elapsed counter (updates the "waiting" text)
       tickRef.current = setInterval(() => setElapsed((s) => s + 1), 1000);
     } catch (err: any) {
       setError(
@@ -161,19 +149,27 @@ export default function PayOnlineModal({
     }
   };
 
+  const handleCopy = () => {
+    if (timedAccountNumber) {
+      navigator.clipboard?.writeText(timedAccountNumber);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+
   const handleClose = () => {
     stopPolling();
     onClose();
   };
 
-  const handleRetry = () => {
-    setStep("form");
-    setError("");
-    setFailureReason(null);
-    setElapsed(0);
-  };
-
   if (!open) return null;
+
+  const minutesLeft = expiryDate
+    ? Math.max(
+        0,
+        Math.ceil((new Date(expiryDate).getTime() - Date.now()) / 60000),
+      )
+    : 0;
 
   return (
     <div
@@ -193,13 +189,14 @@ export default function PayOnlineModal({
             <div>
               <h3 className="text-sm font-semibold text-gray-800">
                 {step === "form" && "Pay Online"}
-                {step === "processing" && "Waiting for confirmation"}
+                {step === "processing" && "Send your payment"}
                 {step === "success" && "Payment confirmed"}
                 {step === "failed" && "Payment failed"}
               </h3>
               <p className="text-[11px] text-gray-500">
-                {step === "form" && "Pay instantly with mobile money"}
-                {step === "processing" && "Check your phone"}
+                {step === "form" && "Instant confirmation via OneKhusa"}
+                {step === "processing" &&
+                  "Transfer to the account number below"}
                 {step === "success" && "Receipt saved to your history"}
                 {step === "failed" && "You can try again"}
               </p>
@@ -222,7 +219,6 @@ export default function PayOnlineModal({
               </div>
             )}
 
-            {/* Amount display */}
             <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4 text-center">
               <p className="text-[11px] text-emerald-700 uppercase tracking-wide font-medium">
                 Amount to pay
@@ -235,103 +231,121 @@ export default function PayOnlineModal({
               </p>
             </div>
 
-            {/* Method picker */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                Mobile Money Provider
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                {MOBILE_METHODS.map((m) => (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => setMethod(m.value as "AIRTEL" | "MPAMBA")}
-                    className={`py-3 px-3 rounded-xl text-sm font-medium border-2 transition-all flex items-center gap-2 justify-center ${
-                      method === m.value
-                        ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-                    }`}
-                  >
-                    <span>{m.emoji}</span>
-                    {m.label}
-                  </button>
-                ))}
+            <div className="bg-blue-50 border border-blue-100 rounded-xl p-3.5 flex items-start gap-2.5">
+              <Info size={14} className="text-blue-600 shrink-0 mt-0.5" />
+              <div>
+                <p className="text-xs font-medium text-blue-800">
+                  How it works
+                </p>
+                <ol className="text-[11px] text-blue-700 mt-1 space-y-0.5 list-decimal list-inside">
+                  <li>Click "Get Account Number" below</li>
+                  <li>We'll give you a temporary account number</li>
+                  <li>Open your bank or mobile money app</li>
+                  <li>Send MWK {amount.toLocaleString()} to that number</li>
+                  <li>Payment confirms automatically ✅</li>
+                </ol>
               </div>
-            </div>
-
-            {/* Phone */}
-            <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                Phone Number
-              </label>
-              <div className="flex">
-                <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-gray-200 bg-gray-50 text-sm text-gray-600 font-medium">
-                  +265
-                </span>
-                <input
-                  type="tel"
-                  inputMode="numeric"
-                  value={phone}
-                  onChange={(e) =>
-                    setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))
-                  }
-                  placeholder="995049331"
-                  required
-                  maxLength={9}
-                  className="flex-1 min-w-0 px-3 py-2.5 border border-gray-200 rounded-r-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                />
-              </div>
-              <p className="text-[11px] text-gray-400 mt-1">
-                Enter the number that will receive the prompt
-              </p>
             </div>
 
             <button
               type="submit"
               className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white font-medium py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
             >
-              <Smartphone size={16} />
-              Pay MWK {amount.toLocaleString()}
+              <Hash size={16} />
+              Get Account Number
             </button>
-
-            <p className="text-[11px] text-gray-400 text-center leading-relaxed">
-              You'll receive a USSD prompt on your phone. Enter your PIN to
-              confirm. The payment confirms automatically — no receipt upload
-              needed.
-            </p>
           </form>
         )}
 
-        {/* ==================== PROCESSING ==================== */}
-        {step === "processing" && (
-          <div className="p-6 text-center">
-            <div className="w-16 h-16 rounded-full bg-[var(--color-primary-light)] flex items-center justify-center mx-auto mb-4">
-              <Loader2
-                size={28}
-                className="animate-spin text-[var(--color-primary)]"
-              />
-            </div>
-            <h3 className="text-base font-semibold text-gray-800 mb-1">
-              Check your phone
-            </h3>
-            <p className="text-xs text-gray-500 leading-relaxed mb-4">
-              A prompt was sent to <strong>{phone}</strong>. Enter your PIN to
-              confirm the payment of{" "}
-              <strong>MWK {amount.toLocaleString()}</strong>.
-            </p>
+        {/* ==================== PROCESSING — SHOW TAN ==================== */}
+        {step === "processing" && timedAccountNumber && (
+          <div className="p-5">
+            <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-4 mb-4">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle size={16} className="text-emerald-600" />
+                <p className="text-xs font-semibold text-emerald-800">
+                  Account number ready
+                </p>
+              </div>
 
-            <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
-              <Clock size={12} />
-              <span>Waiting... {elapsed}s</span>
+              <p className="text-[11px] text-emerald-700 mb-1">
+                Send this exact amount to the account below:
+              </p>
+
+              <div className="bg-white rounded-lg p-3 mb-3 border border-emerald-200">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wide">
+                  Account Number
+                </p>
+                <div className="flex items-center justify-between gap-2 mt-1">
+                  <p className="text-xl font-bold font-mono text-emerald-700 tracking-wider">
+                    {timedAccountNumber}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleCopy}
+                    className={`flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1.5 rounded-lg transition-all ${
+                      copied
+                        ? "bg-emerald-600 text-white"
+                        : "bg-emerald-100 text-emerald-700 hover:bg-emerald-200"
+                    }`}
+                  >
+                    {copied ? (
+                      <>
+                        <CheckCircle size={11} /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy size={11} /> Copy
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-white rounded-lg p-3 border border-emerald-200">
+                <p className="text-[10px] text-gray-500 uppercase tracking-wide">
+                  Amount
+                </p>
+                <p className="text-lg font-bold text-emerald-700 mt-1">
+                  MWK {amount.toLocaleString()}
+                </p>
+              </div>
+
+              <p className="text-[10px] text-emerald-600 mt-3 text-center">
+                This account number expires in{" "}
+                <strong>
+                  {minutesLeft} minute{minutesLeft === 1 ? "" : "s"}
+                </strong>
+              </p>
             </div>
 
-            <div className="mt-6 pt-4 border-t border-gray-100">
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
+              <p className="text-[11px] text-amber-800 font-medium mb-1">
+                ⚠️ Important
+              </p>
+              <ul className="text-[11px] text-amber-700 space-y-0.5 list-disc list-inside">
+                <li>
+                  Send the <strong>exact amount</strong> shown above
+                </li>
+                <li>
+                  Use any bank or mobile money app (Airtel, Mpamba, banks)
+                </li>
+                <li>Payment confirms automatically in 10-60 seconds</li>
+              </ul>
+            </div>
+
+            <div className="flex items-center justify-center gap-2 text-xs text-gray-500 mb-4">
+              <Loader2 size={12} className="animate-spin" />
+              <span>Waiting for your payment... {elapsed}s</span>
+            </div>
+
+            <div className="pt-3 border-t border-gray-100">
               <button
                 type="button"
                 onClick={handleClose}
-                className="text-xs text-gray-500 hover:text-gray-700"
+                className="w-full text-xs text-gray-500 hover:text-gray-700 py-2"
               >
-                Close (payment will still confirm in background)
+                Close (payment will still confirm)
               </button>
             </div>
           </div>
@@ -377,7 +391,7 @@ export default function PayOnlineModal({
               <XCircle size={32} className="text-red-600" />
             </div>
             <h3 className="text-base font-semibold text-gray-800 mb-1">
-              Payment failed
+              Payment not completed
             </h3>
             <p className="text-xs text-gray-500 leading-relaxed mb-4">
               {failureReason || "The payment could not be completed."}
@@ -391,7 +405,11 @@ export default function PayOnlineModal({
                 Close
               </button>
               <button
-                onClick={handleRetry}
+                onClick={() => {
+                  setStep("form");
+                  setError("");
+                  setFailureReason(null);
+                }}
                 className="flex-1 bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white py-2.5 rounded-xl text-sm font-medium"
               >
                 Try Again

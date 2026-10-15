@@ -7,7 +7,7 @@ const rateLimit = require("express-rate-limit");
 const cron = require("node-cron");
 const {
   reconcileStalePending,
-} = require("./src/controllers/malipo.controller");
+} = require("./src/controllers/onekhusa.controller");
 
 dotenv.config();
 

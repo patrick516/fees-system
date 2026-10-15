@@ -3,7 +3,7 @@ const router = express.Router();
 const multer = require("multer");
 const path = require("path");
 
-const malipoController = require("../controllers/malipo.controller");
+const onekhusaController = require("../controllers/onekhusa.controller");
 const {
   recordCashPayment,
   submitPayment,
@@ -23,7 +23,6 @@ const {
 } = require("../middleware/auth");
 const { requirePermission } = require("../middleware/role");
 
-// Multer — memory storage so we can upload to Cloudinary
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -35,23 +34,24 @@ const upload = multer({
   },
 });
 
-//  MALIPO ONLINE PAYMENTS
-// Parent initiates a mobile money payment
-router.post("/malipo/initiate", verifyParent, malipoController.initiatePayment);
+// ==================== ONEKHUSA ONLINE PAYMENTS ====================
+router.post(
+  "/onekhusa/initiate",
+  verifyParent,
+  onekhusaController.initiatePayment,
+);
 
-// Public — Malipo calls this to confirm
-router.post("/malipo/webhook", malipoController.webhook);
+// Public — OneKhusa calls this
+router.post("/onekhusa/webhook", onekhusaController.webhook);
 
 // Parent or staff polls for status
 router.get(
-  "/malipo/:id/status",
+  "/onekhusa/:id/status",
   verifyStaffOrParent,
-  malipoController.getStatus,
+  onekhusaController.getStatus,
 );
 
-//  STAFF ROUTES
-
-// Payment channel insights — for the admin dashboard
+// ==================== STAFF ROUTES ====================
 router.get(
   "/insights",
   verifyStaff,
@@ -59,7 +59,6 @@ router.get(
   getPaymentInsights,
 );
 
-// Dashboard summary — powers the Dashboard page (revenue stats, debtor counts)
 router.get(
   "/summary",
   verifyStaff,
@@ -67,7 +66,6 @@ router.get(
   getPaymentSummary,
 );
 
-// List pending payments
 router.get(
   "/pending",
   verifyStaff,
@@ -75,7 +73,6 @@ router.get(
   getPendingPayments,
 );
 
-// List all payments
 router.get(
   "/",
   verifyStaff,
@@ -83,7 +80,6 @@ router.get(
   getPayments,
 );
 
-// Record a cash payment
 router.post(
   "/cash",
   verifyStaff,
@@ -91,7 +87,6 @@ router.post(
   recordCashPayment,
 );
 
-// Verify a pending payment
 router.patch(
   "/:id/verify",
   verifyStaff,
@@ -99,7 +94,6 @@ router.patch(
   verifyPayment,
 );
 
-// Reject a pending payment
 router.patch(
   "/:id/reject",
   verifyStaff,
