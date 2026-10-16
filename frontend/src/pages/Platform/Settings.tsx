@@ -108,7 +108,7 @@ export default function PlatformSettingsPage() {
   }
 
   return (
-    <div className="p-8 max-w-3xl">
+    <div className={`p-8 ${mode === "view" ? "w-full" : "max-w-3xl"}`}>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">
           Platform Settings
@@ -328,7 +328,7 @@ export default function PlatformSettingsPage() {
         </form>
       )}
 
-      {/* ============ VIEW MODE — saved summary as table ============ */}
+      {/* ============ VIEW MODE — saved summary in one row ============ */}
       {mode === "view" && settings && (
         <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
           {/* Header */}
@@ -348,101 +348,96 @@ export default function PlatformSettingsPage() {
             </button>
           </div>
 
-          {/* Table */}
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-1/2">
-                  Setting
-                </th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-1/2">
-                  Value
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              <tr className="hover:bg-slate-50 transition">
-                <td className="px-5 py-3 text-slate-600">Platform Name</td>
-                <td className="px-5 py-3 text-slate-900 font-medium">
+          {/* One row */}
+          <div className="overflow-x-auto">
+            <div className="flex divide-x divide-slate-100 min-w-max w-full">
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  Platform
+                </p>
+                <p className="text-sm font-medium text-slate-900 whitespace-nowrap">
                   {settings.name || "—"}
-                </td>
-              </tr>
-              <tr className="hover:bg-slate-50 transition">
-                <td className="px-5 py-3 text-slate-600">Contact Email</td>
-                <td className="px-5 py-3 text-slate-900">
+                </p>
+              </div>
+
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  Email
+                </p>
+                <p className="text-sm text-slate-900 whitespace-nowrap">
                   {settings.email || "—"}
-                </td>
-              </tr>
-              <tr className="hover:bg-slate-50 transition">
-                <td className="px-5 py-3 text-slate-600">Contact Phone</td>
-                <td className="px-5 py-3 text-slate-900">
+                </p>
+              </div>
+
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  Phone
+                </p>
+                <p className="text-sm text-slate-900 whitespace-nowrap">
                   {settings.phone || "—"}
-                </td>
-              </tr>
-              <tr className="hover:bg-slate-50 transition">
-                <td className="px-5 py-3 text-slate-600">Currency</td>
-                <td className="px-5 py-3 text-slate-900">
-                  {settings.currency || "MWK"}
-                </td>
-              </tr>
-              <tr className="hover:bg-slate-50 transition">
-                <td className="px-5 py-3 text-slate-600">Price per Term</td>
-                <td className="px-5 py-3 text-slate-900">
-                  <span className="font-mono">
-                    {settings.currency || "MWK"}{" "}
-                    {Number(settings.defaultTermPrice || 0).toLocaleString()}
-                  </span>
-                </td>
-              </tr>
-              <tr className="hover:bg-slate-50 transition">
-                <td className="px-5 py-3 text-slate-600">Default Trial Days</td>
-                <td className="px-5 py-3 text-slate-900">
+                </p>
+              </div>
+
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  Price / Term
+                </p>
+                <p className="text-sm text-slate-900 font-mono whitespace-nowrap">
+                  {settings.currency || "MWK"}{" "}
+                  {Number(settings.defaultTermPrice || 0).toLocaleString()}
+                </p>
+              </div>
+
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  Trial
+                </p>
+                <p className="text-sm text-slate-900 whitespace-nowrap">
                   {settings.defaultTrialDays ?? 30}{" "}
                   <span className="text-slate-400 text-xs">days</span>
-                </td>
-              </tr>
-              <tr className="hover:bg-slate-50 transition">
-                <td className="px-5 py-3 text-slate-600">Merchant Account</td>
-                <td className="px-5 py-3">
-                  {settings.subscriptionMerchantAccount ? (
-                    <span className="font-mono text-slate-900">
-                      {settings.subscriptionMerchantAccount}
-                    </span>
-                  ) : (
-                    <span className="text-slate-400">Not set</span>
-                  )}
-                </td>
-              </tr>
-              <tr className="hover:bg-slate-50 transition">
-                <td className="px-5 py-3 text-slate-600">
-                  Webhook Secret — Success
-                </td>
-                <td className="px-5 py-3">
-                  {settings.hasSubscriptionSecretSuccess ? (
-                    <span className="inline-flex items-center gap-1 text-green-700 font-medium">
-                      <CheckCircle2 size={14} /> Configured
-                    </span>
-                  ) : (
-                    <span className="text-slate-400">Not set</span>
-                  )}
-                </td>
-              </tr>
-              <tr className="hover:bg-slate-50 transition">
-                <td className="px-5 py-3 text-slate-600">
-                  Webhook Secret — Reversed
-                </td>
-                <td className="px-5 py-3">
-                  {settings.hasSubscriptionSecretReversed ? (
-                    <span className="inline-flex items-center gap-1 text-green-700 font-medium">
-                      <CheckCircle2 size={14} /> Configured
-                    </span>
-                  ) : (
-                    <span className="text-slate-400">Not set</span>
-                  )}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+                </p>
+              </div>
+
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  Merchant Acct
+                </p>
+                {settings.subscriptionMerchantAccount ? (
+                  <p className="text-sm font-mono text-slate-900 whitespace-nowrap">
+                    {settings.subscriptionMerchantAccount}
+                  </p>
+                ) : (
+                  <p className="text-sm text-slate-400">Not set</p>
+                )}
+              </div>
+
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  Secret · Success
+                </p>
+                {settings.hasSubscriptionSecretSuccess ? (
+                  <span className="inline-flex items-center gap-1 text-sm text-green-700 font-medium whitespace-nowrap">
+                    <CheckCircle2 size={14} /> Configured
+                  </span>
+                ) : (
+                  <p className="text-sm text-slate-400">Not set</p>
+                )}
+              </div>
+
+              <div className="px-5 py-4">
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  Secret · Reversed
+                </p>
+                {settings.hasSubscriptionSecretReversed ? (
+                  <span className="inline-flex items-center gap-1 text-sm text-green-700 font-medium whitespace-nowrap">
+                    <CheckCircle2 size={14} /> Configured
+                  </span>
+                ) : (
+                  <p className="text-sm text-slate-400">Not set</p>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

@@ -40,7 +40,7 @@ import PermissionGuard from "./components/shared/PermissionGuard";
 import PlatformLogin from "./pages/Platform/Login";
 import PlatformLayout from "./pages/Platform/Layout";
 import PlatformDashboard from "./pages/Platform/Dashboard";
-import PlatformAddSchool from "./pages/Platform/AddSchool";
+
 import PlatformSchoolDetail from "./pages/Platform/SchoolDetail";
 import PlatformSettingsPage from "./pages/Platform/Settings";
 import PlatformSubscriptions from "./pages/Platform/Subscriptions";
@@ -322,7 +322,10 @@ function App() {
             element={<Navigate to="/platform/dashboard" replace />}
           />
           <Route path="dashboard" element={<PlatformDashboard />} />
-          <Route path="schools/new" element={<PlatformAddSchool />} />
+          <Route
+            path="schools/new"
+            element={<Navigate to="/platform/dashboard" replace />}
+          />
           <Route path="schools/:id" element={<PlatformSchoolDetail />} />
           <Route path="subscriptions" element={<PlatformSubscriptions />} />
           <Route path="settings" element={<PlatformSettingsPage />} />

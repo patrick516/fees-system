@@ -3,7 +3,7 @@ import { useNavigate, useParams, Link } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import api from "../../lib/axios";
 import { applyTheme } from "../../lib/theme";
-import { School, Eye, EyeOff, Loader2, ShieldAlert } from "lucide-react";
+import { Eye, EyeOff, Loader2, ShieldAlert } from "lucide-react";
 
 interface Branding {
   name: string;
@@ -151,7 +151,7 @@ const Login = () => {
       <div className="absolute inset-0 bg-black/40" />
 
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-10">
-        {/* Logo */}
+        {/* Logo — school's own logo if set, otherwise SchoolPay fallback */}
         <div className="mb-6 flex items-center justify-center">
           {schoolBranding?.logo ? (
             <img
@@ -160,9 +160,11 @@ const Login = () => {
               className="h-16 w-auto object-contain"
             />
           ) : (
-            <div className="w-14 h-14 bg-[var(--color-primary)] rounded-2xl flex items-center justify-center">
-              <School size={28} className="text-white" />
-            </div>
+            <img
+              src="/images/SchoolPayLogo.jpg"
+              alt="SchoolPay"
+              className="h-20 w-20 object-contain rounded-2xl bg-white p-2 shadow-lg"
+            />
           )}
         </div>
 
@@ -284,8 +286,11 @@ const Login = () => {
 
         {/* Footer */}
         <p className="text-xs text-white/70 mt-8 text-center">
-          © {new Date().getFullYear()} {schoolBranding?.name || "Your School"}.
-          All rights reserved.
+          © {new Date().getFullYear()}{" "}
+          {schoolBranding?.name && schoolBranding.name !== "Pending Setup"
+            ? schoolBranding.name
+            : "SchoolPay"}
+          . All rights reserved.
         </p>
       </div>
     </div>
