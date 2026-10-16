@@ -943,6 +943,28 @@ router.put(
   requirePermission("settings", "write"),
   schoolController.updateNotificationDefaults,
 );
+
+// OneKhusa status (read-only)
+router.get(
+  "/settings/onekhusa-status",
+  verifyStaff,
+  requirePermission("settings", "read"),
+  schoolController.getOneKhusaStatus,
+);
+
+// Settlement account
+router.get(
+  "/settings/settlement-account",
+  verifyStaff,
+  requirePermission("settings", "read"),
+  schoolController.getSettlementAccount,
+);
+router.post(
+  "/settings/settlement-change-request",
+  verifyStaff,
+  requirePermission("settings", "write"),
+  schoolController.requestSettlementChange,
+);
 router.get("/public", schoolController.getPublicSchool);
 router.get("/public/:schoolId", schoolController.getPublicInfo);
 router.get("/lookup-by-email", schoolController.lookupByEmail);

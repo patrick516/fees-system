@@ -1,20 +1,47 @@
-//  
 enum Term {
   TERM_1
   TERM_2
   TERM_3
 }
 
+enum PlatformRole {
+  OWNER
+  SUPPORT
+}
+
+enum SubscriptionStatus {
+  TRIAL
+  ACTIVE
+  GRACE
+  READONLY
+  LOCKED
+  SUSPENDED
+}
+
 //  PLATFORM 
 model Platform {
-  id        String   @id @default(uuid())
-  name      String   @default("SchoolPay Malawi")
-  email     String
-  phone     String
+  id    String @id @default(uuid())
+  name  String @default("SchoolPay Malawi")
+  email String
+  phone String
+
+  // ============ Subscription Defaults (per new school) ============
+  defaultTermPrice Float  @default(0)
+  defaultTrialDays Int    @default(30)
+  currency         String @default("MWK")
+
+  // ============ Your own OneKhusa merchant (subscription revenue) ============
+  // This is where SCHOOLS' subscription payments land — not parents' fees.
+  subscriptionMerchantAccount       String?
+  subscriptionWebhookSecretSuccess  String?
+  subscriptionWebhookSecretReversed String?
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  schools School[]
+  schools       School[]
+  admins        PlatformAdmin[]
+  notifications Notification[]
 
   @@map("platform")
 }
@@ -35,42 +62,64 @@ model School {
   motto        String?
   primaryColor String  @default("#1e3a8a")
 
-  isActive         Boolean   @default(true)
-  subscriptionPaid Boolean   @default(false)
-  subscriptionDate DateTime?
-  nextPaymentDate  DateTime?
+  isActive Boolean @default(true)
 
   bankAccounts        Json?
   airtelMoneyNumber   String?
   mpambaNumber        String?
   paymentInstructions String?
 
-  activeTerm          Term?
-  activeAcademicYear  String?
-  activeTermStartDate DateTime?
-  activeTermEndDate   DateTime?
-
-  // Notification preference: { "defaultChannel": "SMS" | "EMAIL" | "BOTH" }
+  activeTerm           Term?
+  activeAcademicYear   String?
+  activeTermStartDate  DateTime?
+  activeTermEndDate    DateTime?
   notificationDefaults Json?
+
+  // ============ OneKhusa (per-school merchant) ============
+  onekhusaMerchantAccount       String? @unique
+  onekhusaWebhookSecretSuccess  String?
+  onekhusaWebhookSecretReversed String?
+
+  // ============ Settlement Account (online payments) ============
+  // Separate from `bankAccounts` — that one is for manual receipt upload.
+  // This is where ONLINE payments land (used by owner when creating
+  // the school's merchant account in OneKhusa).
+  settlementBankName      String?
+  settlementAccountName   String?
+  settlementAccountNumber String?
+  settlementBranch        String?
+
+  //  Subscription (billing by owner) 
+  subscriptionStatus SubscriptionStatus @default(TRIAL)
+  trialEndsAt        DateTime?
+  subscriptionEndsAt DateTime?
+  setupCompleted     Boolean            @default(false)
+
+  //  Legacy subscription fields (keep, do not use) 
+  subscriptionPaid Boolean   @default(false)
+  subscriptionDate DateTime?
+  nextPaymentDate  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  staff            Staff[]
-  departments      Department[]
-  roles            Role[]
-  classes          Class[]
-  students         Student[]
-  payments         FeePayment[]
-  notificationLogs NotificationLog[]
-  feeStructures    FeeStructure[]
-  examPeriods      ExamPeriod[]
-  subjects         Subject[]
-  gradeBoundaries  GradeBoundary[]
-  examResults      ExamResult[]
-  pendingExamRows  PendingExamRow[]
-  termActivations  TermActivation[]
+  staff                Staff[]
+  departments          Department[]
+  roles                Role[]
+  classes              Class[]
+  students             Student[]
+  payments             FeePayment[]
+  notificationLogs     NotificationLog[]
+  feeStructures        FeeStructure[]
+  examPeriods          ExamPeriod[]
+  subjects             Subject[]
+  gradeBoundaries      GradeBoundary[]
+  examResults          ExamResult[]
+  pendingExamRows      PendingExamRow[]
+  termActivations      TermActivation[]
+  subscriptionPayments SubscriptionPayment[]
+  notifications        Notification[]
 
   @@map("schools")
 }
@@ -158,10 +207,10 @@ model Staff {
 
   passwordResetToken   String?   @unique
   passwordResetExpires DateTime?
-  failedLoginAttempts Int       @default(0)
-  lockedUntil         DateTime?
-  refreshTokenHash    String?
-  refreshTokenExpires DateTime?
+  failedLoginAttempts  Int       @default(0)
+  lockedUntil          DateTime?
+  refreshTokenHash     String?
+  refreshTokenExpires  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -223,4 +272,102 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+model PlatformAdmin {
+  id         String   @id @default(uuid())
+  platformId String
+  platform   Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  fullName String
+  email    String       @unique
+  phone    String
+  role     PlatformRole @default(OWNER)
+
+  passwordHash String?
+  avatar       String?
+
+  isActive  Boolean   @default(true)
+  lastLogin DateTime?
+
+  // Email verification
+  emailVerified            Boolean   @default(false)
+  emailVerificationOtp     String?
+  emailVerificationExpires DateTime?
+
+  // Password
+  mustChangePassword Boolean   @default(false)
+  passwordChangedAt  DateTime?
+
+  // Invitations (owner invites support staff)
+  invitedById       String?
+  invitedBy         PlatformAdmin?  @relation("PlatformInvitedBy", fields: [invitedById], references: [id], onDelete: SetNull)
+  invited           PlatformAdmin[] @relation("PlatformInvitedBy")
+  invitedAt         DateTime?
+  invitationToken   String?         @unique
+  invitationExpires DateTime?
+
+  // Password reset
+  passwordResetToken   String?   @unique
+  passwordResetExpires DateTime?
+
+  // Login lockout
+  failedLoginAttempts Int       @default(0)
+  lockedUntil         DateTime?
+
+  // Refresh token (session)
+  refreshTokenHash    String?
+  refreshTokenExpires DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  markedSubscriptionPayments SubscriptionPayment[]
+  resolvedNotifications      Notification[]        @relation("ResolvedNotifications")
+
+  @@index([email])
+  @@map("platform_admins")
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  RESOLVED
+}
+
+//  NOTIFICATION 
+// In-app notifications for the platform owner (you).
+// e.g. a school requests a settlement account change.
+model Notification {
+  id         String   @id @default(uuid())
+  platformId String
+  platform   Platform @relation(fields: [platformId], references: [id], onDelete: Cascade)
+
+  // Optional link to a school (for school-originated events)
+  schoolId String?
+  school   School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  // What kind of event
+  type    String // "SETTLEMENT_CHANGE_REQUEST"
+  title   String
+  message String
+  payload Json? // event-specific data
+
+  status NotificationStatus @default(UNREAD)
+
+  // Who triggered it (denormalized snapshot)
+  actorStaffId String?
+  actorName    String?
+
+  // Resolution
+  resolvedAt   DateTime?
+  resolvedById String?
+  resolvedBy   PlatformAdmin? @relation("ResolvedNotifications", fields: [resolvedById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([platformId, status])
+  @@index([schoolId])
+  @@map("notifications")
 }

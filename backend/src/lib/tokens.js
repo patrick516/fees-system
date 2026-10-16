@@ -29,14 +29,16 @@ const signAccessToken = (payload) =>
 
 const verifyAccessToken = (token) => jwt.verify(token, getAccessSecret());
 
-const signRefreshToken = (staffId) =>
-  jwt.sign({ id: staffId, type: "REFRESH" }, getRefreshSecret(), {
-    expiresIn: `${REFRESH_TTL_HOURS}h`,
+const signRefreshToken = (id, type = "REFRESH") =>
+  jwt.sign({ id, type }, getRefreshSecret(), {
+    expiresIn: REFRESH_TTL_HOURS * 3600,
   });
 
-const verifyRefreshToken = (token) => {
+const verifyRefreshToken = (token, expectedType = "REFRESH") => {
   const decoded = jwt.verify(token, getRefreshSecret());
-  if (decoded.type !== "REFRESH") throw new Error("Invalid token type");
+  if (decoded.type !== expectedType) {
+    throw new Error(`Invalid token type: expected ${expectedType}`);
+  }
   return decoded;
 };
 

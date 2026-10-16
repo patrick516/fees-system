@@ -15,6 +15,8 @@ import DepartmentsCard from "../../components/Settings/DepartmentsCard";
 import RolesCard from "../../components/Settings/RolesCard";
 import EditSchoolModal from "../../components/Settings/EditSchoolModal";
 import NotificationPreferencesCard from "../../components/Settings/NotificationPreferencesCard";
+import SettlementAccountCard from "../../components/Settings/SettlementAccountCard";
+import OneKhusaStatusCard from "../../components/Settings/OneKhusaStatusCard";
 
 const SettingsPage = () => {
   const { settings, loading } = useSchoolSettings();
@@ -145,6 +147,8 @@ const SettingsPage = () => {
         </div>
       </div>
 
+      <SettlementAccountCard />
+      <OneKhusaStatusCard />
       <DepartmentsCard />
       <RolesCard />
       <NotificationPreferencesCard />

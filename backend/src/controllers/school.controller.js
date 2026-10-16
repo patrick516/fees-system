@@ -249,10 +249,177 @@ const getPublicInfo = async (req, res) => {
       .json({ success: false, message: "Failed to get school info" });
   }
 };
+// ==================== ONEKHUSA STATUS (read-only) ====================
+// GET /api/schools/settings/onekhusa-status
+// Returns whether the school is configured for online payments.
+// NEVER returns the raw webhook secrets — only booleans.
+const getOneKhusaStatus = async (req, res) => {
+  try {
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: {
+        onekhusaMerchantAccount: true,
+        onekhusaWebhookSecretSuccess: true,
+        onekhusaWebhookSecretReversed: true,
+      },
+    });
 
+    if (!school) {
+      return res
+        .status(404)
+        .json({ success: false, message: "School not found" });
+    }
+
+    // Mask merchant account: show first 2 + last 2 digits only
+    let masked = null;
+    if (school.onekhusaMerchantAccount) {
+      const m = String(school.onekhusaMerchantAccount);
+      masked = m.length <= 4 ? "••••" : `${m.slice(0, 2)}••••${m.slice(-2)}`;
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        configured: !!school.onekhusaMerchantAccount,
+        merchantAccountMasked: masked,
+        hasSuccessSecret: !!school.onekhusaWebhookSecretSuccess,
+        hasReversedSecret: !!school.onekhusaWebhookSecretReversed,
+      },
+    });
+  } catch (err) {
+    console.error("getOneKhusaStatus error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load status" });
+  }
+};
+
+// ==================== SETTLEMENT ACCOUNT (read-only for school) ====================
+// GET /api/schools/settings/settlement-account
+// Returns current settlement + any pending change request.
+const getSettlementAccount = async (req, res) => {
+  try {
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: {
+        settlementBankName: true,
+        settlementAccountName: true,
+        settlementAccountNumber: true,
+        settlementBranch: true,
+      },
+    });
+
+    if (!school) {
+      return res
+        .status(404)
+        .json({ success: false, message: "School not found" });
+    }
+
+    // Any pending (UNREAD or READ) settlement request for this school?
+    const pending = await prisma.notification.findFirst({
+      where: {
+        schoolId: req.schoolId,
+        type: "SETTLEMENT_CHANGE_REQUEST",
+        status: { in: ["UNREAD", "READ"] },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        ...school,
+        isLocked: !!school.settlementAccountNumber,
+        pendingRequest: pending
+          ? {
+              id: pending.id,
+              submittedAt: pending.createdAt,
+              proposed: pending.payload,
+            }
+          : null,
+      },
+    });
+  } catch (err) {
+    console.error("getSettlementAccount error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load settlement account" });
+  }
+};
+
+// POST /api/schools/settings/settlement-change-request
+// Body: { bankName, accountName, accountNumber, branch, reason }
+// School submits a request. Creates a notification for the platform owner.
+const requestSettlementChange = async (req, res) => {
+  try {
+    const { bankName, accountName, accountNumber, branch, reason } = req.body;
+
+    if (!bankName || !accountName || !accountNumber) {
+      return res.status(400).json({
+        success: false,
+        message: "Bank name, account name and account number are required",
+      });
+    }
+
+    // Only one pending at a time
+    const existing = await prisma.notification.findFirst({
+      where: {
+        schoolId: req.schoolId,
+        type: "SETTLEMENT_CHANGE_REQUEST",
+        status: { in: ["UNREAD", "READ"] },
+      },
+    });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message: "You already have a pending settlement change request.",
+        code: "REQUEST_PENDING",
+      });
+    }
+
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: { id: true, name: true, platformId: true },
+    });
+    if (!school) {
+      return res
+        .status(404)
+        .json({ success: false, message: "School not found" });
+    }
+
+    const notification = await prisma.notification.create({
+      data: {
+        platformId: school.platformId,
+        schoolId: school.id,
+        type: "SETTLEMENT_CHANGE_REQUEST",
+        title: "Settlement Account Change Request",
+        message: `${school.name} requested a change to their settlement account.`,
+        payload: {
+          bankName: bankName.trim(),
+          accountName: accountName.trim(),
+          accountNumber: accountNumber.trim(),
+          branch: branch?.trim() || null,
+          reason: reason?.trim() || null,
+        },
+        actorStaffId: req.staff.id,
+        actorName: req.staff.fullName,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Request submitted. The platform owner will review it.",
+      data: { id: notification.id },
+    });
+  } catch (err) {
+    console.error("requestSettlementChange error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to submit request" });
+  }
+};
 // ==================== UPDATE NOTIFICATION DEFAULTS ====================
-// PUT /api/schools/notification-defaults
-// Body: { defaultChannel: "SMS" | "EMAIL" | "BOTH" }
+
 const updateNotificationDefaults = async (req, res) => {
   try {
     const { defaultChannel } = req.body;
@@ -290,4 +457,7 @@ module.exports = {
   getBySlug,
   getPublicSchool,
   updateNotificationDefaults,
+  getOneKhusaStatus,
+  getSettlementAccount,
+  requestSettlementChange,
 };

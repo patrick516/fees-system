@@ -36,6 +36,16 @@ import RateLimitModal from "./components/shared/RateLimitModal";
 import MainLayout from "./components/Layout/MainLayout";
 import PermissionGuard from "./components/shared/PermissionGuard";
 
+// Pages — Platform (owner portal)
+import PlatformLogin from "./pages/Platform/Login";
+import PlatformLayout from "./pages/Platform/Layout";
+import PlatformDashboard from "./pages/Platform/Dashboard";
+import PlatformAddSchool from "./pages/Platform/AddSchool";
+import PlatformSchoolDetail from "./pages/Platform/SchoolDetail";
+import PlatformSettingsPage from "./pages/Platform/Settings";
+import PlatformSubscriptions from "./pages/Platform/Subscriptions";
+import { usePlatformAuthStore } from "./store/platformAuthStore";
+
 //  GUARDS
 
 // Standard protected route — redirects to /login or /force-change-password
@@ -46,6 +56,16 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   if (mustChangePassword)
     return <Navigate to="/force-change-password" replace />;
 
+  return <>{children}</>;
+};
+// Platform-owner protected route
+const PlatformProtectedRoute = ({
+  children,
+}: {
+  children: React.ReactNode;
+}) => {
+  const { isAuthenticated } = usePlatformAuthStore();
+  if (!isAuthenticated) return <Navigate to="/platform/login" replace />;
   return <>{children}</>;
 };
 
@@ -285,6 +305,27 @@ function App() {
               </PermissionGuard>
             }
           />
+        </Route>
+
+        {/*  PLATFORM (owner portal) — mounted BEFORE catch-all  */}
+        <Route path="/platform/login" element={<PlatformLogin />} />
+        <Route
+          path="/platform"
+          element={
+            <PlatformProtectedRoute>
+              <PlatformLayout />
+            </PlatformProtectedRoute>
+          }
+        >
+          <Route
+            index
+            element={<Navigate to="/platform/dashboard" replace />}
+          />
+          <Route path="dashboard" element={<PlatformDashboard />} />
+          <Route path="schools/new" element={<PlatformAddSchool />} />
+          <Route path="schools/:id" element={<PlatformSchoolDetail />} />
+          <Route path="subscriptions" element={<PlatformSubscriptions />} />
+          <Route path="settings" element={<PlatformSettingsPage />} />
         </Route>
 
         {/* Catch all */}

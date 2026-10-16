@@ -8,6 +8,7 @@ const cron = require("node-cron");
 const {
   reconcileStalePending,
 } = require("./src/controllers/onekhusa.controller");
+const { sweepSubscriptions } = require("./src/lib/subscriptionCron");
 
 dotenv.config();
 
@@ -83,7 +84,7 @@ const authLimiter = rateLimit({
 });
 
 const loginLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
+  windowMs: 60 * 1000,
   max: isProd
     ? parseInt(process.env.LOGIN_RATE_LIMIT_PER_MIN || "10", 10)
     : 1000,
@@ -94,8 +95,6 @@ const loginLimiter = rateLimit({
   skip: (req) => req.method === "OPTIONS",
   standardHeaders: true,
   legacyHeaders: false,
-  // Key by IP
-  keyGenerator: (req) => req.ip,
 });
 
 // Generous limiter for everything else
@@ -117,12 +116,27 @@ app.use("/api/auth/verify-email", otpLimiter);
 app.use("/api/auth/resend-otp", otpLimiter);
 app.use("/api/auth/accept-invitation", authLimiter);
 app.use("/api/auth", authLimiter);
+
+// Platform owner login — same strict limiter
+app.use("/api/platform/auth/login", loginLimiter);
+app.use("/api/platform/setup", authLimiter);
+app.use("/api/platform", readLimiter);
+
 app.use("/api/", readLimiter);
 
-// Malipo reconciliation — every 5 minutes, catch stuck payments
 cron.schedule("*/5 * * * *", () => {
   reconcileStalePending().catch((err) =>
     console.error("[malipo-cron] Sweep failed:", err.message),
+  );
+});
+
+// Subscription sweep — run on startup, then daily at 1 AM
+sweepSubscriptions().catch((err) =>
+  console.error("[sub-cron] Startup sweep failed:", err.message),
+);
+cron.schedule("0 1 * * *", () => {
+  sweepSubscriptions().catch((err) =>
+    console.error("[sub-cron] Sweep failed:", err.message),
   );
 });
 
@@ -159,6 +173,11 @@ const staffRoutes = require("./src/routes/staff.routes");
 const departmentRoutes = require("./src/routes/department.routes");
 const roleRoutes = require("./src/routes/role.routes");
 const auditRoutes = require("./src/routes/audit.routes");
+const platformAuthRoutes = require("./src/routes/platformAuth.routes");
+const platformSchoolRoutes = require("./src/routes/platformSchool.routes");
+const platformSubscriptionRoutes = require("./src/routes/platformSubscription.routes");
+const platformSettingsRoutes = require("./src/routes/platformSettings.routes");
+const notificationRoutes = require("./src/routes/notification.routes");
 
 app.use("/api/auth", authRoutes);
 app.use("/api/students", studentRoutes);
@@ -171,8 +190,13 @@ app.use("/api/staff", staffRoutes);
 app.use("/api/departments", departmentRoutes);
 app.use("/api/roles", roleRoutes);
 app.use("/api/audit", auditRoutes);
+app.use("/api/platform/schools", platformSchoolRoutes);
+app.use("/api/platform/subscriptions", platformSubscriptionRoutes);
+app.use("/api/platform/settings", platformSettingsRoutes);
+app.use("/api/platform/notifications", notificationRoutes);
+app.use("/api/platform", platformAuthRoutes);
 
-// ============ 404 ============
+//  404
 app.use((req, res) => {
   res.status(404).json({
     success: false,
@@ -180,7 +204,7 @@ app.use((req, res) => {
   });
 });
 
-// ============ ERROR HANDLER ============
+//  ERROR HANDLER
 app.use((err, req, res, next) => {
   console.error("Error:", err.message);
   res.status(err.status || 500).json({

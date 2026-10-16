@@ -125,6 +125,49 @@ const sendInvitationEmail = async ({
     htmlContent: html,
   });
 };
+// ==================== PLATFORM SCHOOL INVITE ====================
+// Sent when the platform owner invites a school by email only.
+// Different from sendInvitationEmail because no school name exists yet.
+const sendPlatformSchoolInviteEmail = async ({
+  to,
+  name,
+  inviteToken,
+  expiresInDays = 7,
+}) => {
+  const acceptUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/accept-invite?token=${inviteToken}`;
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #f8fafc;">
+      <div style="background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+        <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">You're invited to SchoolPay</h2>
+        <p style="margin: 0 0 20px; color: #64748b; font-size: 14px; line-height: 1.5;">
+          Hi ${name || "there"},
+        </p>
+        <p style="margin: 0 0 20px; color: #64748b; font-size: 14px; line-height: 1.5;">
+          You've been invited to set up and manage a school on <strong>SchoolPay</strong>.
+          Click the button below to accept the invitation, create your password,
+          and complete your school's details.
+        </p>
+        <a href="${acceptUrl}" style="display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;">
+          Accept Invitation →
+        </a>
+        <p style="margin: 24px 0 0; color: #94a3b8; font-size: 11px; line-height: 1.5;">
+          This invitation expires in ${expiresInDays} days. If the button doesn't work, paste this into your browser:<br>
+          <span style="color: #64748b; word-break: break-all;">${acceptUrl}</span>
+        </p>
+      </div>
+      <p style="text-align: center; color: #94a3b8; font-size: 11px; margin-top: 16px;">
+        ${SENDER_NAME} • Automated message, please do not reply
+      </p>
+    </div>
+  `;
+  return sendEmail({
+    to,
+    toName: name,
+    subject: "You're invited to SchoolPay",
+    htmlContent: html,
+  });
+};
+
 //  PASSWORD RESET
 const sendPasswordResetEmail = async ({
   to,
@@ -174,5 +217,6 @@ module.exports = {
   sendEmail,
   sendOtpEmail,
   sendInvitationEmail,
+  sendPlatformSchoolInviteEmail,
   sendPasswordResetEmail,
 };

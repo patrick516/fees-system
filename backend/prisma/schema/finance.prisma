@@ -81,17 +81,17 @@ model FeePayment {
   verifiedAt      DateTime?
   rejectionReason String?
 
-  requiredAmount Float?
-  balance        Float?
-  isDebtor       Boolean @default(false)
-  creditApplied  Float   @default(0)
-  overpayment    Float   @default(0)
-  malipoTransactionId  String?  
-  malipoStatus         String?  
-  malipoCustomerRef    String?  
-  malipoFailureReason  String?  
-  malipoRawResponse    Json?   
-  paymentChannel       String?   
+  requiredAmount      Float?
+  balance             Float?
+  isDebtor            Boolean @default(false)
+  creditApplied       Float   @default(0)
+  overpayment         Float   @default(0)
+  malipoTransactionId String?
+  malipoStatus        String?
+  malipoCustomerRef   String?
+  malipoFailureReason String?
+  malipoRawResponse   Json?
+  paymentChannel      String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -121,8 +121,8 @@ model NotificationLog {
 
   // Content
   message  String
-  subject  String? 
-  type     String 
+  subject  String?
+  type     String
   template String?
 
   // Result
@@ -144,4 +144,45 @@ model NotificationLog {
   @@index([type])
   @@index([createdAt])
   @@map("sms_logs")
+}
+
+// ==================== SUBSCRIPTION PAYMENT ====================
+// Every subscription payment a school makes to the platform.
+// Separate from FeePayment — this is PLATFORM revenue, not school fees.
+model SubscriptionPayment {
+  id       String @id @default(uuid())
+  schoolId String
+  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+
+  amount       Float
+  currency     String @default("MWK")
+  term         Term
+  academicYear String
+
+  // How it was paid
+  method String // "ONEKHUSA" | "MANUAL"
+
+  // ---------- Online payments (via OneKhusa) ----------
+  onekhusaTransactionRef String? @unique
+  onekhusaTimedAccount   String?
+  onekhusaStatus         String? // "Processing" | "Completed" | "Failed"
+  onekhusaRawResponse    Json?
+
+  // ---------- Status ----------
+  status PaymentStatus @default(PENDING)
+  paidAt DateTime?
+
+  // ---------- Manual marking by owner ----------
+  markedById String?
+  markedBy   PlatformAdmin? @relation(fields: [markedById], references: [id], onDelete: SetNull)
+
+  notes String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([schoolId])
+  @@index([status])
+  @@index([term, academicYear])
+  @@map("subscription_payments")
 }

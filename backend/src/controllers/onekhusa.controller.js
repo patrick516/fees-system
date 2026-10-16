@@ -5,11 +5,12 @@ const onekhusa = require("../lib/onekhusa");
 const { reconcileVerifiedPayment } = require("../lib/paymentReconciliation");
 const { sendNotifications } = require("../lib/notifier");
 const { generateReceiptNumber } = require("../lib/utils");
+const { computeExtendedEnd } = require("../lib/subscription");
 
 const MIN_AMOUNT = 100; // MWK
 const STALE_AFTER_MS = 16 * 60 * 1000; // TAN expires in 15 min
 
-// ==================== INITIATE PAYMENT ====================
+//  INITIATE PAYMENT
 // POST /api/payments/onekhusa/initiate
 const initiatePayment = async (req, res) => {
   try {
@@ -29,7 +30,6 @@ const initiatePayment = async (req, res) => {
       });
     }
 
-    // Parent can only pay for their own child
     if (req.student && req.student.id !== studentId) {
       return res.status(403).json({
         success: false,
@@ -51,6 +51,15 @@ const initiatePayment = async (req, res) => {
         .json({ success: false, message: "Student not found" });
     }
 
+    // ⭐ THE KEY MULTI-SCHOOL CHECK
+    if (!student.school.onekhusaMerchantAccount) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "This school has not been configured for online payments yet. Please contact your school administrator.",
+      });
+    }
+
     const year = academicYear || student.school.activeAcademicYear;
     if (!year) {
       return res
@@ -58,7 +67,6 @@ const initiatePayment = async (req, res) => {
         .json({ success: false, message: "Academic year is required" });
     }
 
-    // Get fee structure for context
     const feeStructure = await prisma.feeStructure.findFirst({
       where: {
         schoolId: student.schoolId,
@@ -69,7 +77,6 @@ const initiatePayment = async (req, res) => {
       },
     });
 
-    // Generate receipt + create PENDING payment
     const paymentCount = await prisma.feePayment.count({
       where: { schoolId: student.schoolId },
     });
@@ -80,7 +87,7 @@ const initiatePayment = async (req, res) => {
         schoolId: student.schoolId,
         studentId,
         amount: parseFloat(amount),
-        paymentMethod: "AIRTEL_MONEY", // placeholder, will be updated by webhook
+        paymentMethod: "AIRTEL_MONEY",
         term,
         academicYear: year,
         receiptNumber,
@@ -93,28 +100,25 @@ const initiatePayment = async (req, res) => {
     });
 
     // Reference must be 5-25 alphanumeric
-    // Our UUIDs are 36 chars with dashes — need to shorten
-    const reference =
-      `${receiptNumber.replace(/[^A-Z0-9]/g, "")}${Date.now().toString(36).toUpperCase()}`.slice(
-        0,
-        25,
-      );
+    const reference = `${receiptNumber.replace(/[^A-Z0-9]/g, "")}${Date.now()
+      .toString(36)
+      .toUpperCase()}`.slice(0, 25);
 
-    // Fire the Request-to-Pay
     try {
       const result = await onekhusa.requestToPay({
+        // ⭐ pass THIS SCHOOL's merchant account
+        merchantAccountNumber: student.school.onekhusaMerchantAccount,
         referenceNumber: reference,
         amount: Number(amount),
         description: `School fees - ${student.fullName}`,
         capturedBy: student.school.email || "admin@schoolpay.mw",
       });
 
-      // Save the TAN + reference on the payment record
       await prisma.feePayment.update({
         where: { id: payment.id },
         data: {
-          malipoTransactionId: reference, // our merchant reference
-          malipoCustomerRef: result.timedAccountNumber, // the TAN
+          malipoTransactionId: reference,
+          malipoCustomerRef: result.timedAccountNumber,
           malipoStatus: "AwaitingPayment",
           malipoRawResponse: result,
         },
@@ -135,6 +139,8 @@ const initiatePayment = async (req, res) => {
       });
     } catch (paymentErr) {
       console.error("========== ONEKHUSA INITIATE FAILED ==========");
+      console.error("School:", student.school.name);
+      console.error("Merchant:", student.school.onekhusaMerchantAccount);
       console.error("Message:", paymentErr.message);
       console.error("Status:", paymentErr.response?.status);
       console.error(
@@ -170,50 +176,183 @@ const initiatePayment = async (req, res) => {
   }
 };
 
-// ==================== WEBHOOK ====================
+//  SUBSCRIPTION WEBHOOK HANDLER
+// Called when the webhook's merchant account matches the platform's
+// subscriptionMerchantAccount (not any school's account).
+const handleSubscriptionWebhook = async (body, platform, eventType) => {
+  const { transactionReferenceNumber, transactionStatusCode, metaData } = body;
+  const ref = metaData?.referenceNumber;
+  if (!ref) {
+    console.warn("[onekhusa-sub] Missing referenceNumber");
+    return;
+  }
+
+  const payment = await prisma.subscriptionPayment.findFirst({
+    where: {
+      onekhusaTransactionRef: ref,
+      method: "ONEKHUSA",
+    },
+  });
+
+  if (!payment) {
+    console.warn("[onekhusa-sub] No subscription payment for ref:", ref);
+    return;
+  }
+
+  if (payment.status !== "PENDING") {
+    console.log("[onekhusa-sub] Payment already resolved, skipping");
+    return;
+  }
+
+  if (eventType === "payrequest.success" && transactionStatusCode === "S") {
+    const school = await prisma.school.findUnique({
+      where: { id: payment.schoolId },
+    });
+    if (!school) {
+      console.warn("[onekhusa-sub] School not found for payment");
+      return;
+    }
+
+    const newEnd = computeExtendedEnd(school, 90);
+
+    await prisma.$transaction([
+      prisma.subscriptionPayment.update({
+        where: { id: payment.id },
+        data: {
+          status: "VERIFIED",
+          paidAt: new Date(),
+          onekhusaStatus: "Completed",
+          onekhusaRawResponse: body,
+        },
+      }),
+      prisma.school.update({
+        where: { id: school.id },
+        data: {
+          subscriptionStatus: "ACTIVE",
+          subscriptionEndsAt: newEnd,
+          trialEndsAt: null,
+        },
+      }),
+    ]);
+
+    console.log(
+      `[onekhusa-sub] ✓ ${school.name} subscription extended to ${newEnd.toISOString()}`,
+    );
+  } else if (eventType === "payrequest.reversed") {
+    await prisma.subscriptionPayment.update({
+      where: { id: payment.id },
+      data: {
+        status: "REJECTED",
+        onekhusaStatus: "Reversed",
+        onekhusaRawResponse: body,
+      },
+    });
+    console.log(`[onekhusa-sub] Payment ${payment.id} reversed`);
+  }
+};
+
+//  WEBHOOK
 // POST /api/payments/onekhusa/webhook
+// ⭐ Routes by beneficiaryAccountNumber to find the right school.
 const webhook = async (req, res) => {
-  // Respond IMMEDIATELY, then process in background (per OneKhusa docs)
+  // Respond IMMEDIATELY per OneKhusa's 30s timeout requirement
   res.status(200).send("acknowledged");
 
   try {
     const signature = req.headers["x-onekhusa-webhook-signature"];
     const eventType = req.headers["x-onekhusa-webhook-event"];
 
-    // ============================================================
-    // DIAGNOSTIC — log everything on every webhook so we can inspect
-    // the real signature scheme. Remove the console logs once verified.
-    // ============================================================
     console.log("========== ONEKHUSA WEBHOOK RECEIVED ==========");
     console.log("Event:", eventType);
     console.log("Signature:", signature);
     console.log("Body:", JSON.stringify(req.body, null, 2));
-    console.log("Headers:", JSON.stringify(req.headers, null, 2));
     console.log("================================================");
 
-    // ============================================================
-    // SIGNATURE VERIFICATION
-    // Disabled by default while we learn the exact signing scheme.
-    // Enable by setting ONEKHUSA_WEBHOOK_VERIFY=true in .env
-    // ============================================================
-    const shouldVerify = process.env.ONEKHUSA_WEBHOOK_VERIFY === "true";
+    // ============ STEP 1: Identify which school ============
+    const merchantAccount = req.body.beneficiaryAccountNumber;
+    if (!merchantAccount) {
+      console.warn("[onekhusa] Webhook missing beneficiaryAccountNumber");
+      return;
+    }
 
-    if (shouldVerify) {
-      // Pick the secret based on the event
-      let secret = null;
-      if (eventType === "payrequest.success") {
-        secret = process.env.ONEKHUSA_WEBHOOK_SECRET_SUCCESS;
-      } else if (eventType === "payrequest.reversed") {
-        secret = process.env.ONEKHUSA_WEBHOOK_SECRET_REVERSED;
-      }
+    const school = await prisma.school.findFirst({
+      where: { onekhusaMerchantAccount: String(merchantAccount) },
+      select: {
+        id: true,
+        name: true,
+        onekhusaWebhookSecretSuccess: true,
+        onekhusaWebhookSecretReversed: true,
+        notificationDefaults: true,
+      },
+    });
 
-      if (!secret) {
-        console.warn(`[onekhusa] No secret configured for event: ${eventType}`);
+    // If no school matches, check if this is the PLATFORM's subscription
+    // merchant account (schools paying SchoolPay for their subscription).
+    if (!school) {
+      const platform = await prisma.platform.findFirst({
+        where: { subscriptionMerchantAccount: String(merchantAccount) },
+      });
+
+      if (platform) {
+        console.log(
+          `[onekhusa] Routed to PLATFORM (subscription): ${merchantAccount}`,
+        );
+
+        // Verify signature if enabled
+        const shouldVerify = process.env.ONEKHUSA_WEBHOOK_VERIFY === "true";
+        if (shouldVerify && platform.subscriptionWebhookSecretSuccess) {
+          const secret =
+            eventType === "payrequest.success"
+              ? platform.subscriptionWebhookSecretSuccess
+              : platform.subscriptionWebhookSecretReversed;
+
+          if (!secret) {
+            console.warn(
+              `[onekhusa-sub] No secret for ${eventType} — skipping verification`,
+            );
+          } else {
+            const rawBody = JSON.stringify(req.body);
+            const expected = crypto
+              .createHmac("sha512", secret)
+              .update(rawBody)
+              .digest("hex");
+            if (expected !== signature) {
+              console.warn("[onekhusa-sub] Signature mismatch");
+              return;
+            }
+          }
+        }
+
+        await handleSubscriptionWebhook(req.body, platform, eventType);
         return;
       }
 
-      // Compute HMAC-SHA512 of the raw payload. Try multiple input formats
-      // because different gateways do it differently.
+      console.warn(
+        `[onekhusa] No school or platform found for merchant account: ${merchantAccount}`,
+      );
+      return;
+    }
+
+    console.log(`[onekhusa] Routed to school: ${school.name}`);
+
+    // ============ STEP 2: Verify signature (if enabled) ============
+    const shouldVerify = process.env.ONEKHUSA_WEBHOOK_VERIFY === "true";
+
+    if (shouldVerify) {
+      let secret = null;
+      if (eventType === "payrequest.success") {
+        secret = school.onekhusaWebhookSecretSuccess;
+      } else if (eventType === "payrequest.reversed") {
+        secret = school.onekhusaWebhookSecretReversed;
+      }
+
+      if (!secret) {
+        console.warn(
+          `[onekhusa] No webhook secret configured for ${school.name} / ${eventType}`,
+        );
+        return;
+      }
+
       const rawBody = JSON.stringify(req.body);
       const candidates = {
         "json-string-hex": crypto
@@ -224,10 +363,6 @@ const webhook = async (req, res) => {
           .createHmac("sha512", secret)
           .update(rawBody)
           .digest("base64"),
-        "utf8-hex": crypto
-          .createHmac("sha512", secret)
-          .update(Buffer.from(rawBody, "utf8"))
-          .digest("hex"),
       };
 
       const matched = Object.entries(candidates).find(
@@ -235,28 +370,16 @@ const webhook = async (req, res) => {
       );
 
       if (!matched) {
-        console.warn(
-          `[onekhusa] Signature mismatch for ${eventType}. ` +
-            `Header=${signature} ` +
-            `Candidates=${JSON.stringify(candidates)}`,
-        );
+        console.warn(`[onekhusa] Signature mismatch for ${school.name}`);
         return;
       }
-
       console.log(`[onekhusa] Signature verified (${matched[0]})`);
     }
 
-    // ============================================================
-    // Process the event
-    // ============================================================
-    const {
-      transactionReferenceNumber,
-      transactionAmount,
-      transactionStatusCode, // "S" = success, "R" = reversed
-      metaData,
-    } = req.body;
+    // ============ STEP 3: Process ============
+    const { transactionReferenceNumber, transactionStatusCode, metaData } =
+      req.body;
 
-    // Get our merchant reference from metaData
     const merchantRef = metaData?.referenceNumber;
     if (!merchantRef) {
       console.warn("[onekhusa] Webhook missing referenceNumber");
@@ -264,7 +387,10 @@ const webhook = async (req, res) => {
     }
 
     const payment = await prisma.feePayment.findFirst({
-      where: { malipoTransactionId: merchantRef },
+      where: {
+        malipoTransactionId: merchantRef,
+        schoolId: school.id, // ⭐ double-check it belongs to this school
+      },
       include: {
         student: {
           select: {
@@ -282,14 +408,12 @@ const webhook = async (req, res) => {
       return;
     }
 
-    // Idempotency — skip if already resolved
     if (payment.status !== "PENDING") {
       console.log("[onekhusa] Payment already resolved, skipping");
       return;
     }
 
     if (eventType === "payrequest.success" && transactionStatusCode === "S") {
-      // Success!
       await prisma.feePayment.update({
         where: { id: payment.id },
         data: {
@@ -305,11 +429,6 @@ const webhook = async (req, res) => {
         where: { id: payment.id },
       });
       const reconcile = await reconcileVerifiedPayment(refreshed);
-
-      const school = await prisma.school.findUnique({
-        where: { id: payment.schoolId },
-        select: { name: true, notificationDefaults: true },
-      });
 
       const message =
         `Payment of MWK ${payment.amount.toLocaleString()} received for ${payment.student.fullName}. ` +
@@ -338,13 +457,14 @@ const webhook = async (req, res) => {
         channel: school?.notificationDefaults?.defaultChannel || "BOTH",
         type: "payment_verified",
         templateKey: "payment_verified",
-        schoolId: payment.schoolId,
+        schoolId: school.id,
         schoolName: school.name,
       }).catch((e) => console.error("OneKhusa notif error:", e));
 
-      console.log(`[onekhusa] Payment ${payment.id} verified ✓`);
+      console.log(
+        `[onekhusa] ✓ ${school.name} — Payment ${payment.id} verified`,
+      );
     } else if (eventType === "payrequest.reversed") {
-      // Reversal — mark the payment rejected
       await prisma.feePayment.update({
         where: { id: payment.id },
         data: {
@@ -354,15 +474,14 @@ const webhook = async (req, res) => {
           malipoRawResponse: req.body,
         },
       });
-      console.log(`[onekhusa] Payment ${payment.id} reversed`);
+      console.log(`[onekhusa] ${school.name} — Payment ${payment.id} reversed`);
     }
   } catch (err) {
     console.error("[onekhusa] Webhook processing error:", err);
   }
 };
 
-//  STATUS POLL
-// GET /api/payments/onekhusa/:id/status
+// ==================== STATUS POLL ====================
 const getStatus = async (req, res) => {
   try {
     const payment = await prisma.feePayment.findUnique({
@@ -376,13 +495,11 @@ const getStatus = async (req, res) => {
         receiptNumber: true,
       },
     });
-
     if (!payment) {
       return res
         .status(404)
         .json({ success: false, message: "Payment not found" });
     }
-
     return res.json({
       success: true,
       data: {
@@ -403,7 +520,6 @@ const getStatus = async (req, res) => {
 };
 
 // ==================== RECONCILIATION ====================
-// Cleans up TANs that expired without payment
 const reconcileStalePending = async () => {
   try {
     const stale = await prisma.feePayment.findMany({

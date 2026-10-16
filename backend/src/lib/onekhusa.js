@@ -6,8 +6,8 @@ const BASE_URL =
     ? "https://api.onekhusa.com/v1"
     : "https://api.onekhusa.com/sandbox/v1";
 
-//  TOKEN CACHE
-// Tokens last 5 minutes. Cache them until ~30s before expiry.
+// ==================== TOKEN CACHE ====================
+// Tokens are per-organisation, valid 5 min. Cache until ~30s before expiry.
 let cachedToken = null;
 let tokenExpiresAt = 0;
 
@@ -23,16 +23,10 @@ const getAccessToken = async () => {
       apiKey: process.env.ONEKHUSA_API_KEY,
       apiSecret: process.env.ONEKHUSA_API_SECRET,
       organisationId: process.env.ONEKHUSA_ORGANISATION_ID,
-      merchantAccountNumber: parseInt(
-        process.env.ONEKHUSA_MERCHANT_ACCOUNT,
-        10,
-      ),
+      merchantAccountNumber: 75480583, // any valid merchant under our org works here
     },
     {
-      headers: {
-        "Content-Type": "application/json",
-        "Accept-Language": "en",
-      },
+      headers: { "Content-Type": "application/json", "Accept-Language": "en" },
       timeout: 15000,
     },
   );
@@ -45,7 +39,7 @@ const getAccessToken = async () => {
   return cachedToken;
 };
 
-//  AUTHENTICATED REQUEST
+// ==================== AUTHENTICATED REQUEST ====================
 const authedRequest = async (method, path, body, extraHeaders = {}) => {
   const token = await getAccessToken();
 
@@ -66,15 +60,10 @@ const authedRequest = async (method, path, body, extraHeaders = {}) => {
   return res.data;
 };
 
-//  REQUEST TO PAY (TAN)
-/**
- * Initiates a Request-to-Pay. Returns a TAN (timed account number)
- * the customer will send money to.
- *
- * referenceNumber: our merchant reference (payment UUID). Must be 5-25
- *                  alphanumeric chars. We use the payment UUID with dashes.
- */
+// ==================== REQUEST TO PAY (TAN) ====================
+// merchantAccountNumber is now a PARAM — each school passes its own
 const requestToPay = async ({
+  merchantAccountNumber,
   referenceNumber,
   amount,
   description,
@@ -84,17 +73,13 @@ const requestToPay = async ({
     "POST",
     "/collections/requestToPay/initiate",
     {
-      merchantAccountNumber: parseInt(
-        process.env.ONEKHUSA_MERCHANT_ACCOUNT,
-        10,
-      ),
+      merchantAccountNumber: parseInt(merchantAccountNumber, 10),
       transactionAmount: Number(amount),
       transactionDescription: description,
       referenceNumber,
       capturedBy,
     },
     {
-      // Required for idempotency
       "X-Idempotency-Key": `rtp-${referenceNumber}`,
     },
   );
