@@ -125,13 +125,12 @@ const sendInvitationEmail = async ({
     htmlContent: html,
   });
 };
-// ==================== PLATFORM SCHOOL INVITE ====================
-// Sent when the platform owner invites a school by email only.
-// Different from sendInvitationEmail because no school name exists yet.
+
 const sendPlatformSchoolInviteEmail = async ({
   to,
   name,
   inviteToken,
+  tempPassword,
   expiresInDays = 7,
 }) => {
   const acceptUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/accept-invite?token=${inviteToken}`;
@@ -144,14 +143,42 @@ const sendPlatformSchoolInviteEmail = async ({
         </p>
         <p style="margin: 0 0 20px; color: #64748b; font-size: 14px; line-height: 1.5;">
           You've been invited to set up and manage a school on <strong>SchoolPay</strong>.
-          Click the button below to accept the invitation, create your password,
-          and complete your school's details.
+          Choose one of the two options below to get started.
         </p>
-        <a href="${acceptUrl}" style="display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;">
-          Accept Invitation →
-        </a>
+
+        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+          <p style="margin: 0 0 8px; color: #1e3a8a; font-size: 12px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">
+            Option 1 — Set Your Own Password
+          </p>
+          <p style="margin: 0 0 12px; color: #475569; font-size: 13px; line-height: 1.5;">
+            Click the button below. You'll be prompted to create a password
+            of your choice, then log in with it.
+          </p>
+          <a href="${acceptUrl}" style="display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;">
+            Accept Invitation →
+          </a>
+        </div>
+
+        <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+          <p style="margin: 0 0 8px; color: #475569; font-size: 12px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">
+            Option 2 — Use a Temporary Password
+          </p>
+          <p style="margin: 0 0 12px; color: #475569; font-size: 13px; line-height: 1.5;">
+            Log in with the temporary password below. You'll be asked to
+            change it on first login.
+          </p>
+          <p style="margin: 0; font-size: 18px; font-weight: 700; color: #1e3a8a; font-family: 'Courier New', monospace; letter-spacing: 1px;">
+            ${tempPassword}
+          </p>
+        </div>
+
+        <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.5;">
+          <strong>Login email:</strong> ${to}
+        </p>
+
         <p style="margin: 24px 0 0; color: #94a3b8; font-size: 11px; line-height: 1.5;">
-          This invitation expires in ${expiresInDays} days. If the button doesn't work, paste this into your browser:<br>
+          Both the invitation link and the temporary password expire in ${expiresInDays} days.
+          If the button doesn't work, paste this into your browser:<br>
           <span style="color: #64748b; word-break: break-all;">${acceptUrl}</span>
         </p>
       </div>

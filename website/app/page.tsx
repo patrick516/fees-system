@@ -1,14 +1,7 @@
 "use client";
 import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
-import {
-  School,
-  Eye,
-  EyeOff,
-  Loader2,
-  ChevronRight,
-  CalendarIcon,
-} from "lucide-react";
+import { Eye, EyeOff, Loader2, ChevronRight, CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import api from "../lib/axios";
 import { useAuthStore } from "../store/authStore";
@@ -219,25 +212,27 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
       {/* Logo */}
+      {/* Logo — school's own logo if set, otherwise SchoolPay fallback */}
       <div className="mb-6 flex flex-col items-center animate-fade-in">
         {logoSrc ? (
-          <img
-            src={logoSrc}
-            alt={schoolBranding?.name || "School"}
-            className="h-16 w-auto max-w-[180px] object-contain mb-4"
-          />
+          <>
+            <img
+              src={logoSrc}
+              alt={schoolBranding?.name || "School"}
+              className="h-16 w-auto max-w-[180px] object-contain mb-4"
+            />
+            {schoolBranding?.name && (
+              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+                {schoolBranding.name}
+              </h1>
+            )}
+          </>
         ) : (
-          <div className="w-16 h-16 bg-[var(--color-primary)] rounded-2xl flex items-center justify-center mb-4 overflow-hidden shadow-sm">
-            <School size={30} className="text-white" />
-          </div>
-        )}
-        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-          SchoolPay
-        </h1>
-        {schoolBranding?.name && (
-          <p className="text-sm text-gray-500 font-medium mt-1">
-            {schoolBranding.name}
-          </p>
+          <img
+            src="/images/SchoolPayLogo.jpg"
+            alt="SchoolPay"
+            className="h-20 w-20 object-contain rounded-2xl bg-white p-2 shadow-lg mb-4"
+          />
         )}
         <p className="text-sm text-gray-400 mt-1">
           Parent &amp; Guardian Portal

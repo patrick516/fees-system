@@ -1,5 +1,5 @@
-// backend/src/controllers/platformSchool.controller.js
 const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const prisma = require("../config/db");
 const { createDefaultRolesForSchool } = require("../lib/defaultRoles");
 const { sendPlatformSchoolInviteEmail } = require("../lib/mailer");
@@ -81,8 +81,10 @@ const listSchools = async (req, res) => {
 // ==================== INVITE SCHOOL ====================
 // POST /api/platform/schools/invite
 // Body: { email, schoolName?, trialDays? }
-// Owner invites by email only. Creates a placeholder school, seeds roles,
-// creates the School Admin staff with an invitation token, sends email.
+// Creates a placeholder school, seeds roles, creates the admin with:
+//   - a temp password (for immediate login)
+//   - an invitation token (for the "set your own password" link)
+// Email contains BOTH. Either path works independently.
 const inviteSchool = async (req, res) => {
   try {
     const { email, schoolName, trialDays } = req.body;
@@ -94,7 +96,7 @@ const inviteSchool = async (req, res) => {
     }
     const cleanEmail = String(email).toLowerCase().trim();
 
-    // Email collision check — a person can only be one thing
+    // Email collision check
     const [existingStaff, existingPlatformAdmin] = await Promise.all([
       prisma.staff.findUnique({ where: { email: cleanEmail } }),
       prisma.platformAdmin.findUnique({ where: { email: cleanEmail } }),
@@ -132,14 +134,21 @@ const inviteSchool = async (req, res) => {
         .replace(/^-|-$/g, "") || "school";
     const slug = `${slugBase}-${Date.now().toString(36)}`;
 
-    // Trial: use provided trialDays or platform default
+    // Trial window
     const days =
       Number.isFinite(Number(trialDays)) && Number(trialDays) >= 0
         ? Number(trialDays)
         : platform.defaultTrialDays;
     const trialEndsAt = new Date(Date.now() + days * 24 * 60 * 60 * 1000);
 
-    // Invitation token
+    // Temp password — 3 blocks of 4 chars, e.g. "SP-x7Km-2pQr-9nLs"
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    const pick = () => chars[crypto.randomInt(0, chars.length)];
+    const block = () => Array.from({ length: 4 }, pick).join("");
+    const tempPassword = `SP-${block()}-${block()}-${block()}`;
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+    // Invitation token (for the alternative link-based path)
     const inviteToken = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(
       Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000,
@@ -174,11 +183,11 @@ const inviteSchool = async (req, res) => {
           fullName: "School Administrator",
           email: cleanEmail,
           phone: "",
-          passwordHash: null,
-          emailVerified: false,
+          passwordHash, // temp password — hashed
+          emailVerified: true, // owner invited them; skip email verification
           invitationToken: inviteToken,
           invitationExpires: inviteExpires,
-          mustChangePassword: true,
+          mustChangePassword: true, // force change on first login
         },
       });
 
@@ -190,6 +199,7 @@ const inviteSchool = async (req, res) => {
       to: cleanEmail,
       name: "there",
       inviteToken,
+      tempPassword,
       expiresInDays: INVITE_TTL_DAYS,
     }).catch((e) => console.error("Invite email failed:", e));
 
