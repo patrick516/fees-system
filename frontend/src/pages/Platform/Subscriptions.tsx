@@ -5,7 +5,6 @@ import {
   ChevronLeft,
   ChevronRight,
   Search,
-  Filter,
   Activity,
   Clock,
   AlertTriangle,

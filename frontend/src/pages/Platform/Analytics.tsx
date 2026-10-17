@@ -1,12 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import {
-  Loader2,
-  TrendingUp,
-  AlertTriangle,
-  ShieldCheck,
-  Clock,
-} from "lucide-react";
+import { Loader2, AlertTriangle, ShieldCheck, Clock } from "lucide-react";
 import platformApi from "../../lib/platformApi";
 
 export default function PlatformAnalytics() {
