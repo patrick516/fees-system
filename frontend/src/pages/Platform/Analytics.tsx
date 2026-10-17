@@ -5,7 +5,7 @@ import {
   TrendingUp,
   AlertTriangle,
   ShieldCheck,
-  ArrowRight,
+  Clock,
 } from "lucide-react";
 import platformApi from "../../lib/platformApi";
 
@@ -37,7 +37,7 @@ export default function PlatformAnalytics() {
   if (!data)
     return <div className="p-8 text-slate-500">Failed to load analytics.</div>;
 
-  const { stats, atRiskSchools, loyalPayers, recentTransactions, currency } =
+  const { stats, partialSchools, unpaidSchools, recentTransactions, currency } =
     data;
 
   const formatMoney = (amt: number) =>
@@ -77,6 +77,32 @@ export default function PlatformAnalytics() {
 
         <div className="bg-white rounded-2xl border border-slate-200 p-6">
           <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
+            Payment Health
+          </p>
+          <div className="space-y-2 mt-3">
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-slate-600">Fully Paid:</span>
+              <span className="font-bold text-green-600">
+                {stats.fullyPaidCount} schools
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-slate-600">Partially Paid:</span>
+              <span className="font-bold text-orange-600">
+                {stats.partiallyPaidCount} schools
+              </span>
+            </div>
+            <div className="flex justify-between items-center text-sm">
+              <span className="text-slate-600">Unpaid / Trial:</span>
+              <span className="font-bold text-red-600">
+                {stats.unpaidCount} schools
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-2xl border border-slate-200 p-6">
+          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
             Total Transactions
           </p>
           <p className="text-3xl font-bold text-slate-900">
@@ -86,36 +112,24 @@ export default function PlatformAnalytics() {
             Successfully verified payments.
           </p>
         </div>
-
-        <div className="bg-white rounded-2xl border border-slate-200 p-6">
-          <p className="text-xs font-medium text-slate-500 uppercase tracking-wide mb-2">
-            At-Risk Schools
-          </p>
-          <p className="text-3xl font-bold text-red-600">
-            {atRiskSchools.length}
-          </p>
-          <p className="text-sm text-slate-500 mt-4">
-            Currently in Grace, Readonly, or Locked.
-          </p>
-        </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Loyal Payers (Promotions) */}
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2 bg-green-50/50">
-            <TrendingUp size={18} className="text-green-600" />
-            <h2 className="text-sm font-semibold text-green-900">
-              Loyal Payers (Promotion Candidates)
+        {/* Partial Payments (Action Required) */}
+        <div className="bg-white rounded-2xl border border-orange-200 overflow-hidden">
+          <div className="px-5 py-4 border-b border-orange-100 flex items-center gap-2 bg-orange-50/50">
+            <Clock size={18} className="text-orange-600" />
+            <h2 className="text-sm font-semibold text-orange-900">
+              Outstanding Balances
             </h2>
           </div>
-          <div className="divide-y divide-slate-100">
-            {loyalPayers.length === 0 ? (
+          <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
+            {partialSchools.length === 0 ? (
               <p className="p-5 text-sm text-slate-500">
-                No active paid schools yet.
+                No partial payments. Everyone is up to date!
               </p>
             ) : (
-              loyalPayers.map((s: any) => (
+              partialSchools.map((s: any) => (
                 <div
                   key={s.id}
                   className="px-5 py-3 flex items-center justify-between"
@@ -123,36 +137,40 @@ export default function PlatformAnalytics() {
                   <div>
                     <p className="font-medium text-slate-900">{s.name}</p>
                     <p className="text-xs text-slate-500">
-                      {s._count.subscriptionPayments} successful terms
+                      Paid: {formatMoney(s.paid)} / Expected:{" "}
+                      {formatMoney(data.expectedAmount)}
                     </p>
                   </div>
-                  <Link
-                    to={`/platform/schools/${s.id}`}
-                    className="text-xs font-semibold text-blue-700 hover:underline"
-                  >
-                    View
-                  </Link>
+                  <div className="text-right">
+                    <p className="text-sm font-bold text-red-600">
+                      {formatMoney(s.balance)}
+                    </p>
+                    <Link
+                      to={`/platform/schools/${s.id}`}
+                      className="text-xs font-semibold text-blue-700 hover:underline"
+                    >
+                      Manage
+                    </Link>
+                  </div>
                 </div>
               ))
             )}
           </div>
         </div>
 
-        {/* At-Risk Schools */}
+        {/* Unpaid Schools */}
         <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2 bg-red-50/50">
-            <AlertTriangle size={18} className="text-red-600" />
-            <h2 className="text-sm font-semibold text-red-900">
-              At-Risk Schools (Follow Up)
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center gap-2 bg-slate-50">
+            <AlertTriangle size={18} className="text-slate-600" />
+            <h2 className="text-sm font-semibold text-slate-900">
+              Unpaid / Trial Schools
             </h2>
           </div>
           <div className="divide-y divide-slate-100 max-h-[300px] overflow-y-auto">
-            {atRiskSchools.length === 0 ? (
-              <p className="p-5 text-sm text-slate-500">
-                All schools are in good standing!
-              </p>
+            {unpaidSchools.length === 0 ? (
+              <p className="p-5 text-sm text-slate-500">No unpaid schools.</p>
             ) : (
-              atRiskSchools.map((s: any) => (
+              unpaidSchools.map((s: any) => (
                 <div
                   key={s.id}
                   className="px-5 py-3 flex items-center justify-between"
@@ -161,8 +179,8 @@ export default function PlatformAnalytics() {
                     <p className="font-medium text-slate-900">{s.name}</p>
                     <p className="text-xs text-slate-500">
                       Status:{" "}
-                      <span className="font-semibold text-red-600">
-                        {s.subscriptionStatus}
+                      <span className="font-semibold text-slate-700">
+                        {s.status}
                       </span>
                     </p>
                   </div>

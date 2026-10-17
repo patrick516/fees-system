@@ -256,20 +256,23 @@ const getPaymentHistory = async (req, res) => {
 };
 
 // ==================== PLATFORM ANALYTICS ====================
-// GET /api/platform/subscriptions/analytics
 const getAnalytics = async (req, res) => {
   try {
-    // 1. Total Revenue
+    // 1. Fetch Platform Defaults
+    const platform = await prisma.platform.findFirst({
+      select: { defaultTermPrice: true, currency: true },
+    });
+    const expectedAmount = platform?.defaultTermPrice || 0;
+    const currency = platform?.currency || "MWK";
+
+    // 2. Fetch All Payments
     const payments = await prisma.subscriptionPayment.findMany({
-      where: {
-        status: "VERIFIED",
-        school: { platformId: req.platformId },
-      },
+      where: { status: "VERIFIED", school: { platformId: req.platformId } },
+      orderBy: { paidAt: "desc" },
+      include: { school: { select: { name: true } } },
     });
 
     const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
-
-    // Revenue by method
     const onekhusaRevenue = payments
       .filter((p) => p.method === "ONEKHUSA")
       .reduce((sum, p) => sum + p.amount, 0);
@@ -277,75 +280,87 @@ const getAnalytics = async (req, res) => {
       .filter((p) => p.method === "MANUAL")
       .reduce((sum, p) => sum + p.amount, 0);
 
-    // 2. At-Risk Schools (Grace, Readonly, Locked)
-    const atRiskSchools = await prisma.school.findMany({
-      where: {
-        platformId: req.platformId,
-        subscriptionStatus: { in: ["GRACE", "READONLY", "LOCKED"] },
-      },
+    // 3. Fetch Schools & calculate their payment health for current term
+    const schools = await prisma.school.findMany({
+      where: { platformId: req.platformId },
       select: {
         id: true,
         name: true,
         subscriptionStatus: true,
-        subscriptionEndsAt: true,
-        trialEndsAt: true,
-      },
-    });
-
-    // 3. Loyal Payers (Active schools with multiple payments)
-    // We count payments per school to find the most loyal ones
-    const activeSchools = await prisma.school.findMany({
-      where: {
-        platformId: req.platformId,
-        subscriptionStatus: "ACTIVE",
-      },
-      select: {
-        id: true,
-        name: true,
-        _count: {
-          select: { subscriptionPayments: { where: { status: "VERIFIED" } } },
+        activeTerm: true,
+        activeAcademicYear: true,
+        subscriptionPayments: {
+          where: { status: "VERIFIED" },
+          select: { amount: true, term: true, academicYear: true },
         },
       },
     });
 
-    // Sort by most payments
-    const loyalPayers = activeSchools
-      .filter((s) => s._count.subscriptionPayments > 0)
-      .sort(
-        (a, b) => b._count.subscriptionPayments - a._count.subscriptionPayments,
-      )
-      .slice(0, 5); // Top 5
+    let fullyPaidCount = 0;
+    let partiallyPaidCount = 0;
+    let unpaidCount = 0;
+    const partialSchools = [];
+    const unpaidSchools = [];
 
-    // 4. Recent Transactions
-    const recentTransactions = await prisma.subscriptionPayment.findMany({
-      where: {
-        status: "VERIFIED",
-        school: { platformId: req.platformId },
-      },
-      orderBy: { paidAt: "desc" },
-      take: 10,
-      include: {
-        school: { select: { name: true } },
-      },
-    });
+    for (const school of schools) {
+      // If they don't have an active term yet, they are technically unpaid for the term
+      const term = school.activeTerm || "TERM_1";
+      const year = school.activeAcademicYear || "2026-2027";
 
-    const platform = await prisma.platform.findFirst({
-      select: { currency: true },
-    });
+      // Sum payments for THIS specific term and academic year
+      const paidThisTerm = school.subscriptionPayments
+        .filter((p) => p.term === term && p.academicYear === year)
+        .reduce((sum, p) => sum + p.amount, 0);
+
+      const balance = Math.max(0, expectedAmount - paidThisTerm);
+
+      if (paidThisTerm >= expectedAmount && expectedAmount > 0) {
+        fullyPaidCount++;
+      } else if (paidThisTerm > 0) {
+        partiallyPaidCount++;
+        partialSchools.push({
+          id: school.id,
+          name: school.name,
+          term,
+          academicYear: year,
+          paid: paidThisTerm,
+          balance,
+        });
+      } else {
+        unpaidCount++;
+        unpaidSchools.push({
+          id: school.id,
+          name: school.name,
+          term,
+          academicYear: year,
+          status: school.subscriptionStatus,
+        });
+      }
+    }
+
+    // 4. At-Risk Schools (Status based)
+    const atRiskSchools = schools.filter((s) =>
+      ["GRACE", "READONLY", "LOCKED"].includes(s.subscriptionStatus),
+    );
 
     return res.json({
       success: true,
       data: {
-        currency: platform?.currency || "MWK",
+        currency,
+        expectedAmount,
         stats: {
           totalRevenue,
           onekhusaRevenue,
           manualRevenue,
           totalPayments: payments.length,
+          fullyPaidCount,
+          partiallyPaidCount,
+          unpaidCount,
         },
+        partialSchools,
+        unpaidSchools,
         atRiskSchools,
-        loyalPayers,
-        recentTransactions,
+        recentTransactions: payments.slice(0, 10),
       },
     });
   } catch (err) {
@@ -355,7 +370,6 @@ const getAnalytics = async (req, res) => {
       .json({ success: false, message: "Failed to load analytics" });
   }
 };
-
 module.exports = {
   listSubscriptions,
   markPaid,
