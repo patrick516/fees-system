@@ -274,7 +274,7 @@ export default function PayOnlineModal({
 
               <div className="bg-white rounded-lg p-3 mb-3 border border-emerald-200">
                 <p className="text-[10px] text-gray-500 uppercase tracking-wide">
-                  Account Number
+                  Pay Bill / Account Number
                 </p>
                 <div className="flex items-center justify-between gap-2 mt-1">
                   <p className="text-xl font-bold font-mono text-emerald-700 tracking-wider">
@@ -319,19 +319,45 @@ export default function PayOnlineModal({
               </p>
             </div>
 
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-4">
-              <p className="text-[11px] text-amber-800 font-medium mb-1">
-                ⚠️ Important
+            {/* 🎯 DETAILED INSTRUCTIONS BLOCK */}
+            <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 mb-4">
+              <p className="text-[11px] font-bold text-slate-700 uppercase tracking-wide mb-3">
+                How to pay from your phone:
               </p>
-              <ul className="text-[11px] text-amber-700 space-y-0.5 list-disc list-inside">
-                <li>
-                  Send the <strong>exact amount</strong> shown above
-                </li>
-                <li>
-                  Use any bank or mobile money app (Airtel, Mpamba, banks)
-                </li>
-                <li>Payment confirms automatically in 10-60 seconds</li>
-              </ul>
+
+              <div className="space-y-3 text-[11px] text-slate-600">
+                <div className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-red-500 mt-1 shrink-0" />
+                  <p>
+                    <strong>Airtel Money:</strong> Dial{" "}
+                    <code className="bg-slate-200 px-1 rounded">*211#</code> →
+                    Select <strong>5 (Pay Bill)</strong> → Enter Account Number{" "}
+                    <strong>{timedAccountNumber}</strong> → Enter Amount{" "}
+                    <strong>{amount.toLocaleString()}</strong> → Enter PIN.
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-blue-500 mt-1 shrink-0" />
+                  <p>
+                    <strong>TNM Mpamba:</strong> Dial{" "}
+                    <code className="bg-slate-200 px-1 rounded">*444#</code> →
+                    Select <strong>4 (Pay Bill)</strong> → Enter Account Number{" "}
+                    <strong>{timedAccountNumber}</strong> → Enter Amount{" "}
+                    <strong>{amount.toLocaleString()}</strong> → Enter PIN.
+                  </p>
+                </div>
+
+                <div className="flex items-start gap-2">
+                  <div className="w-1.5 h-1.5 rounded-full bg-green-500 mt-1 shrink-0" />
+                  <p>
+                    <strong>Bank App:</strong> Open your bank app → Select{" "}
+                    <strong>Pay Bill / Merchant</strong> → Enter Account Number{" "}
+                    <strong>{timedAccountNumber}</strong> → Enter Amount{" "}
+                    <strong>{amount.toLocaleString()}</strong>.
+                  </p>
+                </div>
+              </div>
             </div>
 
             <div className="flex items-center justify-center gap-2 text-xs text-gray-500 mb-4">
