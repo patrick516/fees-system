@@ -39,6 +39,10 @@ const getSettings = async (req, res) => {
         defaultTermPrice: platform.defaultTermPrice,
         defaultTrialDays: platform.defaultTrialDays,
         subscriptionMerchantAccount: platform.subscriptionMerchantAccount,
+        subscriptionWebhookSecretSuccess:
+          platform.subscriptionWebhookSecretSuccess || "",
+        subscriptionWebhookSecretReversed:
+          platform.subscriptionWebhookSecretReversed || "",
         hasSubscriptionSecretSuccess:
           !!platform.subscriptionWebhookSecretSuccess,
         hasSubscriptionSecretReversed:

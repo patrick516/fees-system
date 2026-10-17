@@ -3,8 +3,7 @@ import axios from "axios";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
 import { applyTheme } from "./lib/theme";
-
-// Pages — Auth
+import SubscriptionLocked from "./pages/Subscription/Locked"; // <-- ADD THIS
 import Login from "./pages/Auth/Login";
 import Signup from "./pages/Auth/Signup";
 import VerifyEmail from "./pages/Auth/VerifyEmail";
@@ -12,8 +11,6 @@ import AcceptInvitation from "./pages/Auth/AcceptInvitation";
 import ForceChangePassword from "./pages/Auth/ForceChangePassword";
 import ForgotPassword from "./pages/Auth/ForgotPassword";
 import ResetPassword from "./pages/Auth/ResetPassword";
-
-// Pages — App
 import Dashboard from "./pages/Dashboard/index";
 import StudentsPage from "./pages/Students/index";
 import AddStudent from "./pages/Students/Add";
@@ -44,20 +41,26 @@ import PlatformDashboard from "./pages/Platform/Dashboard";
 import PlatformSchoolDetail from "./pages/Platform/SchoolDetail";
 import PlatformSettingsPage from "./pages/Platform/Settings";
 import PlatformSubscriptions from "./pages/Platform/Subscriptions";
+import PlatformAnalytics from "./pages/Platform/Analytics";
 import { usePlatformAuthStore } from "./store/platformAuthStore";
 
 //  GUARDS
-
-// Standard protected route — redirects to /login or /force-change-password
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, mustChangePassword } = useAuthStore();
+  const { isAuthenticated, mustChangePassword, staff } = useAuthStore();
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (mustChangePassword)
     return <Navigate to="/force-change-password" replace />;
 
+  // Hard cutoff for Locked or Suspended accounts
+  const status = (staff?.school as any)?.subscriptionStatus;
+  if (status === "LOCKED" || status === "SUSPENDED") {
+    return <SubscriptionLocked />;
+  }
+
   return <>{children}</>;
 };
+
 // Platform-owner protected route
 const PlatformProtectedRoute = ({
   children,
@@ -328,6 +331,7 @@ function App() {
           />
           <Route path="schools/:id" element={<PlatformSchoolDetail />} />
           <Route path="subscriptions" element={<PlatformSubscriptions />} />
+          <Route path="analytics" element={<PlatformAnalytics />} />
           <Route path="settings" element={<PlatformSettingsPage />} />
         </Route>
 

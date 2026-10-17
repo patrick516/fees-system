@@ -6,6 +6,13 @@ const BREVO_API_KEY = process.env.BREVO_API_KEY;
 const SENDER_NAME = process.env.BREVO_SENDER_NAME || "SchoolPay";
 const SENDER_EMAIL = process.env.BREVO_SENDER_EMAIL;
 
+// Reusable logo HTML to keep templates clean
+const LOGO_HEADER = `
+  <div style="text-align: center; margin-bottom: 24px;">
+    <img src="https://fees-system-one.vercel.app/images/SchoolPayLogo.jpg" alt="SchoolPay" width="64" height="64" style="border-radius: 12px; object-fit: contain;" />
+  </div>
+`;
+
 const sendEmail = async ({ to, toName, subject, htmlContent }) => {
   if (!BREVO_API_KEY) {
     console.warn("⚠️  BREVO_API_KEY missing — email not sent:", subject);
@@ -47,6 +54,9 @@ const sendOtpEmail = async ({
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #f8fafc;">
       <div style="background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+        
+        ${LOGO_HEADER}
+
         <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">Verify your email</h2>
         <p style="margin: 0 0 24px; color: #64748b; font-size: 14px; line-height: 1.5;">
           Hi ${name || "there"}, use the code below to ${purpose}. It expires in 10 minutes.
@@ -73,7 +83,7 @@ const sendOtpEmail = async ({
   });
 };
 
-//  INVITATION EMAIL
+//  INVITATION EMAIL (School Staff)
 const sendInvitationEmail = async ({
   to,
   name,
@@ -86,6 +96,9 @@ const sendInvitationEmail = async ({
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #f8fafc;">
       <div style="background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+
+        ${LOGO_HEADER}
+
         <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">You've been invited</h2>
         <p style="margin: 0 0 20px; color: #64748b; font-size: 14px; line-height: 1.5;">
           <strong>${schoolName}</strong> has invited you to join as a <strong>${role}</strong>.
@@ -126,6 +139,7 @@ const sendInvitationEmail = async ({
   });
 };
 
+//  PLATFORM SCHOOL INVITE EMAIL (Owner invites School Admin)
 const sendPlatformSchoolInviteEmail = async ({
   to,
   name,
@@ -137,6 +151,9 @@ const sendPlatformSchoolInviteEmail = async ({
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #f8fafc;">
       <div style="background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+        
+        ${LOGO_HEADER}
+
         <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">You're invited to SchoolPay</h2>
         <p style="margin: 0 0 20px; color: #64748b; font-size: 14px; line-height: 1.5;">
           Hi ${name || "there"},
@@ -207,6 +224,9 @@ const sendPasswordResetEmail = async ({
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #f8fafc;">
       <div style="background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+
+        ${LOGO_HEADER}
+
         <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">Reset your password</h2>
         <p style="margin: 0 0 24px; color: #64748b; font-size: 14px; line-height: 1.6;">
           Hi ${name || "there"}, we received a request to reset your SchoolPay password.

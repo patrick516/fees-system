@@ -14,7 +14,7 @@ router.get("/", controller.listSubscriptions);
 
 // History — any platform admin
 router.get("/:schoolId/history", controller.getPaymentHistory);
-
+router.get("/analytics", controller.getAnalytics);
 // Mutations — OWNER only
 router.post("/:schoolId/mark-paid", requireOwner, controller.markPaid);
 router.post("/:schoolId/extend-trial", requireOwner, controller.extendTrial);

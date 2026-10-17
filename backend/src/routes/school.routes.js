@@ -965,9 +965,20 @@ router.post(
   requirePermission("settings", "write"),
   schoolController.requestSettlementChange,
 );
+router.post(
+  "/subscription/pay",
+  verifyStaff,
+  requirePermission("settings", "write"),
+  schoolController.initiateSubscriptionPayment,
+);
 router.get("/public", schoolController.getPublicSchool);
 router.get("/public/:schoolId", schoolController.getPublicInfo);
 router.get("/lookup-by-email", schoolController.lookupByEmail);
 router.get("/by-slug/:slug", schoolController.getBySlug);
+router.get(
+  "/subscription/status/:paymentId",
+  verifyStaff,
+  schoolController.getSubscriptionPaymentStatus,
+);
 
 module.exports = router;

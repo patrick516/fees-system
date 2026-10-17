@@ -9,6 +9,9 @@ const {
   reconcileStalePending,
 } = require("./src/controllers/onekhusa.controller");
 const { sweepSubscriptions } = require("./src/lib/subscriptionCron");
+const {
+  requireActiveSubscription,
+} = require("./src/middleware/subscriptionGuard");
 
 dotenv.config();
 
@@ -179,22 +182,37 @@ const platformSubscriptionRoutes = require("./src/routes/platformSubscription.ro
 const platformSettingsRoutes = require("./src/routes/platformSettings.routes");
 const notificationRoutes = require("./src/routes/notification.routes");
 
+// ==================== MOUNT ROUTES ====================
+
+// Auth and platform routes are NOT affected by subscription locks
 app.use("/api/auth", authRoutes);
-app.use("/api/students", studentRoutes);
-app.use("/api/payments", paymentRoutes);
-app.use("/api/schools", schoolRoutes);
-app.use("/api/sms", smsRoutes);
-app.use("/api/reports", reportRoutes);
-app.use("/api/exams", examRoutes);
-app.use("/api/staff", staffRoutes);
-app.use("/api/departments", departmentRoutes);
-app.use("/api/roles", roleRoutes);
-app.use("/api/audit", auditRoutes);
 app.use("/api/platform/schools", platformSchoolRoutes);
 app.use("/api/platform/subscriptions", platformSubscriptionRoutes);
 app.use("/api/platform/settings", platformSettingsRoutes);
 app.use("/api/platform/notifications", notificationRoutes);
 app.use("/api/platform", platformAuthRoutes);
+
+// Apply subscription guard to all school data routes
+app.use("/api/students", requireActiveSubscription, studentRoutes);
+app.use("/api/payments", requireActiveSubscription, paymentRoutes);
+app.use("/api/sms", requireActiveSubscription, smsRoutes);
+app.use("/api/reports", requireActiveSubscription, reportRoutes);
+app.use("/api/exams", requireActiveSubscription, examRoutes);
+app.use("/api/staff", requireActiveSubscription, staffRoutes);
+app.use("/api/departments", requireActiveSubscription, departmentRoutes);
+app.use("/api/roles", requireActiveSubscription, roleRoutes);
+app.use("/api/audit", requireActiveSubscription, auditRoutes);
+
+// Schools routes need special handling: block everything EXCEPT the subscription pay route
+app.use(
+  "/api/schools",
+  (req, res, next) => {
+    // Allow the subscription payment endpoint even if locked
+    if (req.path === "/subscription/pay") return next();
+    requireActiveSubscription(req, res, next);
+  },
+  schoolRoutes,
+);
 
 //  404
 app.use((req, res) => {

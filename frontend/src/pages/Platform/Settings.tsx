@@ -1,8 +1,13 @@
-// frontend/src/pages/Platform/Settings.tsx
 import { useEffect, useState } from "react";
 import { Eye, EyeOff, CheckCircle2, Pencil } from "lucide-react";
 import platformApi from "../../lib/platformApi";
-
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 interface PlatformSettings {
   id: string;
   name: string;
@@ -12,6 +17,8 @@ interface PlatformSettings {
   defaultTermPrice: number;
   defaultTrialDays: number;
   subscriptionMerchantAccount: string | null;
+  subscriptionWebhookSecretSuccess: string;
+  subscriptionWebhookSecretReversed: string;
   hasSubscriptionSecretSuccess: boolean;
   hasSubscriptionSecretReversed: boolean;
 }
@@ -38,8 +45,8 @@ export default function PlatformSettingsPage() {
   const [showSecretSuccess, setShowSecretSuccess] = useState(false);
   const [showSecretReversed, setShowSecretReversed] = useState(false);
 
-  // "edit" shows the form; "view" shows the saved summary
-  const [mode, setMode] = useState<"edit" | "view">("edit");
+  // Default to "view" — table shows first, Edit reveals the form
+  const [mode, setMode] = useState<"edit" | "view">("view");
 
   const load = async () => {
     setLoading(true);
@@ -54,6 +61,8 @@ export default function PlatformSettingsPage() {
       setDefaultTermPrice(s.defaultTermPrice || 0);
       setDefaultTrialDays(s.defaultTrialDays ?? 30);
       setMerchantAccount(s.subscriptionMerchantAccount || "");
+      setSecretSuccess(s.subscriptionWebhookSecretSuccess || "");
+      setSecretReversed(s.subscriptionWebhookSecretReversed || "");
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to load settings");
     } finally {
@@ -193,15 +202,18 @@ export default function PlatformSettingsPage() {
                 <label className="block text-xs font-medium text-slate-700 mb-1">
                   Currency
                 </label>
-                <select
-                  value={currency}
-                  onChange={(e) => setCurrency(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                >
-                  <option value="MWK">MWK — Malawian Kwacha</option>
-                  <option value="USD">USD — US Dollar</option>
-                  <option value="ZAR">ZAR — South African Rand</option>
-                </select>
+                <Select value={currency} onValueChange={setCurrency}>
+                  <SelectTrigger className="w-full rounded-lg border border-slate-300 px-3 py-2 h-[38px] text-sm focus:ring-2 focus:ring-blue-600 text-slate-900 bg-white">
+                    <SelectValue placeholder="Select a currency" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="MWK">MWK — Malawian Kwacha</SelectItem>
+                    <SelectItem value="USD">USD — US Dollar</SelectItem>
+                    <SelectItem value="ZAR">
+                      ZAR — South African Rand
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">

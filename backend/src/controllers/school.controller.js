@@ -448,6 +448,126 @@ const updateNotificationDefaults = async (req, res) => {
   }
 };
 
+// ==================== INITIATE SUBSCRIPTION PAYMENT ====================
+// POST /api/schools/subscription/pay
+const onekhusa = require("../lib/onekhusa"); // Make sure this is imported at top
+
+const initiateSubscriptionPayment = async (req, res) => {
+  try {
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+    });
+    const platform = await prisma.platform.findFirst();
+
+    if (!platform?.subscriptionMerchantAccount) {
+      return res.status(400).json({
+        success: false,
+        message: "Platform subscription payment is not configured yet.",
+      });
+    }
+
+    const amount = platform.defaultTermPrice;
+    if (!amount || amount <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Subscription price is not set.",
+      });
+    }
+
+    const term = school.activeTerm || "TERM_1";
+    const academicYear = school.activeAcademicYear || "2026-2027";
+
+    // OneKhusa requires reference numbers to be 5-25 alphanumeric characters (no hyphens)
+    // We slice the slug first to guarantee the timestamp is never truncated
+    const cleanSlug = school.slug
+      .replace(/[^a-zA-Z0-9]/g, "")
+      .toUpperCase()
+      .slice(0, 10);
+    const timestamp = Date.now().toString(36).toUpperCase();
+    const reference = `SUB${cleanSlug}${timestamp}`; // e.g., SUBPENDINGSETM1B2C3
+
+    // 1. Create payment record
+    const payment = await prisma.subscriptionPayment.create({
+      data: {
+        schoolId: school.id,
+        amount,
+        currency: platform.currency || "MWK",
+        term,
+        academicYear,
+        method: "ONEKHUSA",
+        status: "PENDING",
+        onekhusaTransactionRef: reference,
+        onekhusaStatus: "Processing",
+      },
+    });
+
+    // 2. Call OneKhusa using the PLATFORM's merchant account
+    const result = await onekhusa.requestToPay({
+      merchantAccountNumber: platform.subscriptionMerchantAccount,
+      referenceNumber: reference,
+      amount,
+      description: `SchoolPay Subscription - ${school.name}`,
+      capturedBy: platform.email || "admin@schoolpay.mw",
+    });
+
+    // 3. Update record with TAN
+    await prisma.subscriptionPayment.update({
+      where: { id: payment.id },
+      data: {
+        onekhusaTimedAccount: result.timedAccountNumber,
+        onekhusaStatus: "AwaitingPayment",
+        onekhusaRawResponse: result,
+      },
+    });
+
+    return res.status(202).json({
+      success: true,
+      message: "Payment initiated. Send money to the account number.",
+      data: {
+        paymentId: payment.id,
+        timedAccountNumber: result.timedAccountNumber,
+        amount,
+        expiryDate: result.expiryDate,
+      },
+    });
+  } catch (err) {
+    console.error(" ONEKHUSA SUBSCRIPTION INITIATE FAILED ");
+    console.error("Message:", err.message);
+    console.error("Status:", err.response?.status);
+    console.error(
+      "Response body:",
+      JSON.stringify(err.response?.data, null, 2),
+    );
+    console.error("=======");
+
+    return res.status(500).json({
+      success: false,
+      message:
+        err.response?.data?.errors?.[0]?.description ||
+        "Failed to initiate payment",
+    });
+  }
+};
+
+// ==================== CHECK SUBSCRIPTION PAYMENT STATUS ====================
+// GET /api/schools/subscription/status/:paymentId
+const getSubscriptionPaymentStatus = async (req, res) => {
+  try {
+    const payment = await prisma.subscriptionPayment.findFirst({
+      where: { id: req.params.paymentId, schoolId: req.schoolId },
+      select: { status: true },
+    });
+
+    if (!payment) {
+      return res.status(404).json({ success: false, message: "Not found" });
+    }
+
+    return res.json({ success: true, status: payment.status });
+  } catch (err) {
+    return res.status(500).json({ success: false, message: "Failed" });
+  }
+};
+
 module.exports = {
   getSettings,
   updateSettings,
@@ -460,4 +580,6 @@ module.exports = {
   getOneKhusaStatus,
   getSettlementAccount,
   requestSettlementChange,
+  initiateSubscriptionPayment,
+  getSubscriptionPaymentStatus,
 };

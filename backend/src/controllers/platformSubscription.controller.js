@@ -160,13 +160,10 @@ const markPaid = async (req, res) => {
   }
 };
 
-// ==================== EXTEND TRIAL (owner) ====================
-// POST /api/platform/subscriptions/:schoolId/extend-trial
-// Body: { days }
 const extendTrial = async (req, res) => {
   try {
     const { schoolId } = req.params;
-    const { days = 30 } = req.body;
+    const { days } = req.body;
 
     const school = await prisma.school.findFirst({
       where: { id: schoolId, platformId: req.platformId },
@@ -177,35 +174,40 @@ const extendTrial = async (req, res) => {
         .json({ success: false, message: "School not found" });
     }
 
-    const n = Math.max(1, Number(days) || 30);
+    // Allow positive or negative numbers. If not a number, default to 0.
+    const n = Number(days) || 0;
+
+    // Base date: if trial is in the future, add/subtract from there.
+    // Otherwise, start from today.
     const base =
       school.trialEndsAt && new Date(school.trialEndsAt) > new Date()
         ? new Date(school.trialEndsAt)
         : new Date();
+
     const newTrialEnd = new Date(base.getTime() + n * 24 * 60 * 60 * 1000);
 
     await prisma.school.update({
       where: { id: school.id },
       data: {
         trialEndsAt: newTrialEnd,
-        subscriptionStatus: "TRIAL",
+        subscriptionStatus: "TRIAL", // Reset to trial if they were in grace/locked
       },
     });
 
     return res.json({
       success: true,
-      message: `Trial extended by ${n} days`,
+      message: `Trial adjusted by ${n} days`,
       data: { trialEndsAt: newTrialEnd },
     });
   } catch (err) {
     console.error("extendTrial error:", err);
     return res
       .status(500)
-      .json({ success: false, message: "Failed to extend trial" });
+      .json({ success: false, message: "Failed to adjust trial" });
   }
 };
 
-// ==================== PAYMENT HISTORY (owner) ====================
+//  PAYMENT HISTORY (owner)
 // GET /api/platform/subscriptions/:schoolId/history
 const getPaymentHistory = async (req, res) => {
   try {
@@ -253,9 +255,111 @@ const getPaymentHistory = async (req, res) => {
   }
 };
 
+// ==================== PLATFORM ANALYTICS ====================
+// GET /api/platform/subscriptions/analytics
+const getAnalytics = async (req, res) => {
+  try {
+    // 1. Total Revenue
+    const payments = await prisma.subscriptionPayment.findMany({
+      where: {
+        status: "VERIFIED",
+        school: { platformId: req.platformId },
+      },
+    });
+
+    const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
+
+    // Revenue by method
+    const onekhusaRevenue = payments
+      .filter((p) => p.method === "ONEKHUSA")
+      .reduce((sum, p) => sum + p.amount, 0);
+    const manualRevenue = payments
+      .filter((p) => p.method === "MANUAL")
+      .reduce((sum, p) => sum + p.amount, 0);
+
+    // 2. At-Risk Schools (Grace, Readonly, Locked)
+    const atRiskSchools = await prisma.school.findMany({
+      where: {
+        platformId: req.platformId,
+        subscriptionStatus: { in: ["GRACE", "READONLY", "LOCKED"] },
+      },
+      select: {
+        id: true,
+        name: true,
+        subscriptionStatus: true,
+        subscriptionEndsAt: true,
+        trialEndsAt: true,
+      },
+    });
+
+    // 3. Loyal Payers (Active schools with multiple payments)
+    // We count payments per school to find the most loyal ones
+    const activeSchools = await prisma.school.findMany({
+      where: {
+        platformId: req.platformId,
+        subscriptionStatus: "ACTIVE",
+      },
+      select: {
+        id: true,
+        name: true,
+        _count: {
+          select: { subscriptionPayments: { where: { status: "VERIFIED" } } },
+        },
+      },
+    });
+
+    // Sort by most payments
+    const loyalPayers = activeSchools
+      .filter((s) => s._count.subscriptionPayments > 0)
+      .sort(
+        (a, b) => b._count.subscriptionPayments - a._count.subscriptionPayments,
+      )
+      .slice(0, 5); // Top 5
+
+    // 4. Recent Transactions
+    const recentTransactions = await prisma.subscriptionPayment.findMany({
+      where: {
+        status: "VERIFIED",
+        school: { platformId: req.platformId },
+      },
+      orderBy: { paidAt: "desc" },
+      take: 10,
+      include: {
+        school: { select: { name: true } },
+      },
+    });
+
+    const platform = await prisma.platform.findFirst({
+      select: { currency: true },
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        currency: platform?.currency || "MWK",
+        stats: {
+          totalRevenue,
+          onekhusaRevenue,
+          manualRevenue,
+          totalPayments: payments.length,
+        },
+        atRiskSchools,
+        loyalPayers,
+        recentTransactions,
+      },
+    });
+  } catch (err) {
+    console.error("getAnalytics error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load analytics" });
+  }
+};
+
 module.exports = {
   listSubscriptions,
   markPaid,
   extendTrial,
   getPaymentHistory,
+  getAnalytics,
 };
