@@ -42,6 +42,7 @@ import PlatformSchoolDetail from "./pages/Platform/SchoolDetail";
 import PlatformSettingsPage from "./pages/Platform/Settings";
 import PlatformSubscriptions from "./pages/Platform/Subscriptions";
 import PlatformAnalytics from "./pages/Platform/Analytics";
+import PlatformOneKhusaMerchants from "./pages/Platform/OneKhusaMerchants";
 import { usePlatformAuthStore } from "./store/platformAuthStore";
 
 //  GUARDS
@@ -332,6 +333,7 @@ function App() {
           <Route path="schools/:id" element={<PlatformSchoolDetail />} />
           <Route path="subscriptions" element={<PlatformSubscriptions />} />
           <Route path="analytics" element={<PlatformAnalytics />} />
+          <Route path="onekhusa" element={<PlatformOneKhusaMerchants />} />
           <Route path="settings" element={<PlatformSettingsPage />} />
         </Route>
 

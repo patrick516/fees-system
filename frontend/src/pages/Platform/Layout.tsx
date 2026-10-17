@@ -7,9 +7,9 @@ const NAV = [
   { to: "/platform/dashboard", label: "Dashboard" },
   { to: "/platform/subscriptions", label: "Subscriptions" },
   { to: "/platform/analytics", label: "Revenue & Analytics" },
+  { to: "/platform/onekhusa", label: "OneKhusa Merchants" },
   { to: "/platform/settings", label: "Settings" },
 ];
-
 export default function PlatformLayout() {
   const { admin, logout } = usePlatformAuthStore();
   const location = useLocation();

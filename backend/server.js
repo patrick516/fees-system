@@ -181,6 +181,7 @@ const platformSchoolRoutes = require("./src/routes/platformSchool.routes");
 const platformSubscriptionRoutes = require("./src/routes/platformSubscription.routes");
 const platformSettingsRoutes = require("./src/routes/platformSettings.routes");
 const notificationRoutes = require("./src/routes/notification.routes");
+const platformOnekhusaRoutes = require("./src/routes/platformOnekhusa.routes");
 
 // ==================== MOUNT ROUTES ====================
 
@@ -190,6 +191,7 @@ app.use("/api/platform/schools", platformSchoolRoutes);
 app.use("/api/platform/subscriptions", platformSubscriptionRoutes);
 app.use("/api/platform/settings", platformSettingsRoutes);
 app.use("/api/platform/notifications", notificationRoutes);
+app.use("/api/platform/onekhusa", platformOnekhusaRoutes);
 app.use("/api/platform", platformAuthRoutes);
 
 // Apply subscription guard to all school data routes
