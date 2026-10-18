@@ -131,7 +131,7 @@ export default function PlatformLogin() {
           <img
             src="/images/SchoolPayLogo.jpg"
             alt="SchoolPay"
-            className="h-28 w-28 mx-auto mb-4 rounded-2xl object-contain bg-white p-3 shadow-2xl ring-4 ring-white/30"
+            className="h-16 w-16 mx-auto mb-4 rounded-2xl object-contain bg-white p-3 shadow-2xl ring-4 ring-white/30"
           />
           <h1 className="text-2xl font-semibold text-white drop-shadow-md">
             SchoolPay Platform
