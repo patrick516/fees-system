@@ -1,5 +1,6 @@
 // @ts-nocheck
 const prisma = require("../config/db");
+
 const getFeesReport = async (req, res) => {
   try {
     const { term, classId, academicYear } = req.query;
@@ -26,6 +27,8 @@ const getFeesReport = async (req, res) => {
           },
           select: {
             amount: true,
+            platformFee: true,
+            netAmount: true,
             term: true,
             academicYear: true,
             balance: true,
@@ -58,7 +61,18 @@ const getFeesReport = async (req, res) => {
     // Build report rows
     const rows = students.map((student) => {
       const termPayments = student.payments;
+
+      //  Calculate Gross, Fees, and Net
       const totalPaid = termPayments.reduce((sum, p) => sum + p.amount, 0);
+      const totalPlatformFee = termPayments.reduce(
+        (sum, p) => sum + (p.platformFee || 0),
+        0,
+      );
+      const totalNetPaid = termPayments.reduce(
+        (sum, p) => sum + (p.netAmount || p.amount),
+        0,
+      );
+
       const latestPayment = termPayments[0] || null;
 
       // Find fee structure for this student's class
@@ -98,6 +112,8 @@ const getFeesReport = async (req, res) => {
         academicYear: year,
         requiredAmount,
         totalPaid,
+        platformFee: totalPlatformFee,
+        netAmount: totalNetPaid,
         balance,
         isDebtor,
         isPaidFull,
@@ -119,12 +135,17 @@ const getFeesReport = async (req, res) => {
       noPayment: rows.filter((r) => r.noPayment).length,
       debtors: rows.filter((r) => r.isDebtor).length,
       hasCredit: rows.filter((r) => r.hasCredit).length,
+
+      //  Financial Summaries
       totalCollected: rows.reduce((sum, r) => sum + r.totalPaid, 0),
+      totalFees: rows.reduce((sum, r) => sum + r.platformFee, 0),
+      totalNetCollected: rows.reduce((sum, r) => sum + r.netAmount, 0),
+
       totalOutstanding: rows.reduce((sum, r) => sum + (r.balance || 0), 0),
       totalRequired: rows.reduce((sum, r) => sum + (r.requiredAmount || 0), 0),
     };
 
-    // Group by class for class summary - FIXED: removed TypeScript type annotations
+    // Group by class for class summary
     const byClass = {};
     for (const row of rows) {
       if (!byClass[row.className]) {
@@ -137,6 +158,8 @@ const getFeesReport = async (req, res) => {
           noPayment: 0,
           debtors: 0,
           totalCollected: 0,
+          totalFees: 0,
+          totalNetCollected: 0,
           totalOutstanding: 0,
         };
       }
@@ -145,11 +168,14 @@ const getFeesReport = async (req, res) => {
       if (row.isPartial) byClass[row.className].partial++;
       if (row.noPayment) byClass[row.className].noPayment++;
       if (row.isDebtor) byClass[row.className].debtors++;
+
       byClass[row.className].totalCollected += row.totalPaid;
+      byClass[row.className].totalFees += row.platformFee;
+      byClass[row.className].totalNetCollected += row.netAmount;
+
       byClass[row.className].totalOutstanding += row.balance || 0;
     }
 
-    // FIXED: removed TypeScript type annotations from sort parameters
     const classSummary = Object.values(byClass).sort(
       (a, b) => a.classLevel - b.classLevel,
     );

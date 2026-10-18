@@ -127,7 +127,9 @@ export type Term = "TERM_1" | "TERM_2" | "TERM_3";
 export interface Payment {
   id: string;
   amount: number;
-  paymentMethod: PaymentMethod;
+  platformFee?: number | null;
+  netAmount?: number | null;
+  paymentMethod: string;
   term: Term;
   academicYear: string;
   receiptNumber: string;
@@ -156,8 +158,9 @@ export interface PaymentSummary {
   outstandingBalance: number;
   totalCredit: number;
   totalCashReceived: number;
+  totalFees: number;
+  totalNetCollected: number;
   todayCollected: number;
-
   pendingCount: number;
   verifiedCount: number;
   rejectedCount: number;

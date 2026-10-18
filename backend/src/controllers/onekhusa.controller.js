@@ -414,6 +414,10 @@ const webhook = async (req, res) => {
     }
 
     if (eventType === "payrequest.success" && transactionStatusCode === "S") {
+      // 🎯 Extract the fee data sent by OneKhusa
+      const amountReceived = req.body.beneficiary?.amountReceived;
+      const transactionFee = req.body.transaction?.transactionFee;
+
       await prisma.feePayment.update({
         where: { id: payment.id },
         data: {
@@ -422,6 +426,10 @@ const webhook = async (req, res) => {
           malipoStatus: "Completed",
           malipoTransactionId: transactionReferenceNumber,
           malipoRawResponse: req.body,
+          platformFee:
+            transactionFee !== undefined ? parseFloat(transactionFee) : null,
+          netAmount:
+            amountReceived !== undefined ? parseFloat(amountReceived) : null,
         },
       });
 

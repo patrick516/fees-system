@@ -742,6 +742,8 @@ const getMyChildPayments = async (req, res) => {
       select: {
         id: true,
         amount: true,
+        platformFee: true,
+        netAmount: true,
         paymentMethod: true,
         term: true,
         academicYear: true,
@@ -802,10 +804,9 @@ const getPaymentSummary = async (req, res) => {
 
     const baseWhere = { schoolId: req.schoolId, academicYear: year };
     if (resolvedTerm) baseWhere.term = resolvedTerm;
-
-    // ============ RAW COUNTS (for status panel) ============
     const [
       totalCashReceivedAgg,
+      totalFeesAgg,
       todayCollectedAgg,
       pendingCount,
       verifiedCount,
@@ -814,7 +815,11 @@ const getPaymentSummary = async (req, res) => {
     ] = await Promise.all([
       prisma.feePayment.aggregate({
         where: { ...baseWhere, status: "VERIFIED" },
-        _sum: { amount: true },
+        _sum: { amount: true, netAmount: true },
+      }),
+      prisma.feePayment.aggregate({
+        where: { ...baseWhere, status: "VERIFIED" },
+        _sum: { platformFee: true },
       }),
       prisma.feePayment.aggregate({
         where: {
@@ -898,6 +903,11 @@ const getPaymentSummary = async (req, res) => {
 
         // ===== Cash view (raw) =====
         totalCashReceived: totalCashReceivedAgg._sum.amount || 0,
+        totalFees: totalFeesAgg._sum.platformFee || 0,
+        totalNetCollected:
+          totalCashReceivedAgg._sum.netAmount ||
+          totalCashReceivedAgg._sum.amount ||
+          0,
         todayCollected: todayCollectedAgg._sum.amount || 0,
 
         // ===== Counts =====

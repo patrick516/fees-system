@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import {
-  Download,
   FileSpreadsheet,
   FileText,
   Filter,
@@ -128,6 +127,7 @@ export default function ReportsPage() {
 
     const wb = XLSX.utils.book_new();
 
+    // ==================== SHEET 1: SUMMARY ====================
     const summaryData = [
       [settings?.name || "SCHOOL FEES REPORT"],
       ...(settings?.motto ? [[settings.motto]] : []),
@@ -142,22 +142,31 @@ export default function ReportsPage() {
       ["No Payment", report.summary.noPayment],
       ["Debtors", report.summary.debtors],
       [],
-      ["Total Collected", report.summary.totalCollected],
-      ["Total Outstanding", report.summary.totalOutstanding],
+      ["FINANCIAL SUMMARY"],
       ["Total Required", report.summary.totalRequired],
+      ["Gross Collected (Parents)", report.summary.totalCollected],
+      ["Processing Fees (OneKhusa)", report.summary.totalFees || 0],
+      [
+        "Net Collected (To Bank)",
+        report.summary.totalNetCollected || report.summary.totalCollected,
+      ],
+      ["Total Outstanding", report.summary.totalOutstanding],
     ];
     const ws1 = XLSX.utils.aoa_to_sheet(summaryData);
-    ws1["!cols"] = [{ wch: 25 }, { wch: 20 }];
+    ws1["!cols"] = [{ wch: 30 }, { wch: 20 }];
     XLSX.utils.book_append_sheet(wb, ws1, "Summary");
 
+    // ==================== SHEET 2: BY CLASS ====================
     const classHeaders = [
       "Class",
-      "Total Students",
+      "Students",
       "Paid Full",
       "Partial",
       "No Payment",
       "Debtors",
-      "Total Collected",
+      "Gross Collected",
+      "Fees",
+      "Net Collected",
       "Outstanding",
     ];
     const classRows = report.classSummary.map((c: any) => [
@@ -168,21 +177,25 @@ export default function ReportsPage() {
       c.noPayment,
       c.debtors,
       c.totalCollected,
+      c.totalFees || 0,
+      c.totalNetCollected || c.totalCollected,
       c.totalOutstanding,
     ]);
     const ws2 = XLSX.utils.aoa_to_sheet([classHeaders, ...classRows]);
     ws2["!cols"] = classHeaders.map(() => ({ wch: 18 }));
     XLSX.utils.book_append_sheet(wb, ws2, "By Class");
 
+    // ==================== SHEET 3: STUDENT DETAILS ====================
     const detailHeaders = [
       "Student ID",
       "Full Name",
       "Class",
-      "Gender",
       "Parent Name",
       "Parent Phone",
       "Required (MWK)",
-      "Paid (MWK)",
+      "Gross Paid (MWK)",
+      "Fees (MWK)",
+      "Net Paid (MWK)",
       "Balance (MWK)",
       "Status",
       "Last Payment Date",
@@ -191,11 +204,12 @@ export default function ReportsPage() {
       r.studentCode,
       r.fullName,
       r.className,
-      r.gender,
       r.parentName,
       r.parentPhone,
       r.requiredAmount || 0,
       r.totalPaid,
+      r.platformFee || 0,
+      r.netAmount || r.totalPaid,
       r.balance || 0,
       statusLabels[r.paymentStatus] || r.paymentStatus,
       r.lastPaymentDate
@@ -207,11 +221,12 @@ export default function ReportsPage() {
       { wch: 14 },
       { wch: 22 },
       { wch: 12 },
-      { wch: 8 },
       { wch: 20 },
       { wch: 16 },
       { wch: 16 },
-      { wch: 14 },
+      { wch: 16 },
+      { wch: 12 },
+      { wch: 16 },
       { wch: 14 },
       { wch: 18 },
       { wch: 18 },
@@ -229,10 +244,7 @@ export default function ReportsPage() {
   const exportToPDF = () => {
     if (!report) return;
 
-    // School's brand color — CSS vars don't work in the separate print window,
-    // so we inject the real hex into the PDF CSS.
     const brand = settings?.primaryColor || "#1e3a5f";
-
     const termText = filters.term ? termLabel(filters.term) : "All Terms";
     const classLabel = filters.classId
       ? classes.find((c) => c.id === filters.classId)?.name || "All Classes"
@@ -246,7 +258,6 @@ export default function ReportsPage() {
           )
         : 0;
 
-    // Resolve logo URL to absolute
     const logoUrl = settings?.logo
       ? settings.logo.startsWith("http") || settings.logo.startsWith("data:")
         ? settings.logo
@@ -281,11 +292,11 @@ export default function ReportsPage() {
   <meta charset="utf-8">
   <title>${settings?.name || "School"} — Fees Report</title>
   <style>
-    @page { size: A4; margin: 14mm 12mm; }
+    @page { size: A4 landscape; margin: 12mm; } /* Landscape for more columns */
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body {
       font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif;
-      font-size: 10.5px;
+      font-size: 10px;
       color: #1e293b;
       line-height: 1.45;
       background: white;
@@ -294,227 +305,72 @@ export default function ReportsPage() {
     }
 
     /* HEADER */
-    .header {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      padding-bottom: 14px;
-      border-bottom: 3px solid ${brand};
-      margin-bottom: 18px;
-    }
-    .header-logo {
-      width: 68px;
-      height: 68px;
-      object-fit: contain;
-      flex-shrink: 0;
-    }
-    .header-logo-placeholder {
-      width: 68px;
-      height: 68px;
-      background: #f1f5f9;
-      border-radius: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #94a3b8;
-      font-size: 9px;
-      font-weight: 600;
-      flex-shrink: 0;
-    }
+    .header { display: flex; align-items: center; gap: 16px; padding-bottom: 14px; border-bottom: 3px solid ${brand}; margin-bottom: 18px; }
+    .header-logo { width: 68px; height: 68px; object-fit: contain; flex-shrink: 0; }
+    .header-logo-placeholder { width: 68px; height: 68px; background: #f1f5f9; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 9px; font-weight: 600; flex-shrink: 0; }
     .header-content { flex: 1; min-width: 0; }
-    .school-name {
-      font-size: 19px;
-      font-weight: 800;
-      color: ${brand};
-      letter-spacing: -0.3px;
-      line-height: 1.15;
-    }
-    .school-motto {
-      font-size: 10.5px;
-      color: #64748b;
-      font-style: italic;
-      margin-top: 2px;
-    }
-    .report-title {
-      font-size: 12px;
-      font-weight: 600;
-      color: #334155;
-      margin-top: 6px;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .header-meta {
-      text-align: right;
-      font-size: 9.5px;
-      color: #64748b;
-      line-height: 1.6;
-      white-space: nowrap;
-    }
+    .school-name { font-size: 19px; font-weight: 800; color: ${brand}; line-height: 1.15; }
+    .school-motto { font-size: 10.5px; color: #64748b; font-style: italic; margin-top: 2px; }
+    .report-title { font-size: 12px; font-weight: 600; color: #334155; margin-top: 6px; text-transform: uppercase; letter-spacing: 1px; }
+    .header-meta { text-align: right; font-size: 9.5px; color: #64748b; line-height: 1.6; white-space: nowrap; }
     .header-meta strong { color: ${brand}; font-weight: 700; }
 
     /* FILTER CHIPS */
-    .filter-row {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 18px;
-      flex-wrap: wrap;
-    }
-    .chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 5px;
-      background: #eff6ff;
-      color: ${brand};
-      padding: 4px 10px;
-      border-radius: 6px;
-      font-size: 9.5px;
-      font-weight: 600;
-      border: 1px solid #dbeafe;
-    }
+    .filter-row { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+    .chip { display: inline-flex; align-items: center; gap: 5px; background: #eff6ff; color: ${brand}; padding: 4px 10px; border-radius: 6px; font-size: 9.5px; font-weight: 600; border: 1px solid #dbeafe; }
     .chip-label { color: #64748b; font-weight: 500; }
 
     /* SECTION */
     .section { margin-bottom: 22px; page-break-inside: avoid; }
-    .section-title {
-      font-size: 12px;
-      font-weight: 700;
-      color: ${brand};
-      padding-left: 10px;
-      border-left: 4px solid ${brand};
-      margin-bottom: 12px;
-      letter-spacing: 0.3px;
-    }
+    .section-title { font-size: 12px; font-weight: 700; color: ${brand}; padding-left: 10px; border-left: 4px solid ${brand}; margin-bottom: 12px; letter-spacing: 0.3px; }
 
     /* STAT CARDS */
-    .stats-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-    .stat-card {
-      border: 1px solid #e2e8f0;
-      border-radius: 10px;
-      padding: 12px 14px;
-      background: #ffffff;
-    }
-    .stat-label {
-      font-size: 9px;
-      font-weight: 600;
-      color: #64748b;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 5px;
-    }
-    .stat-value {
-      font-size: 22px;
-      font-weight: 800;
-      line-height: 1;
-      letter-spacing: -0.5px;
-    }
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+    .stat-card { border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px 14px; background: #ffffff; }
+    .stat-label { font-size: 9px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+    .stat-value { font-size: 22px; font-weight: 800; line-height: 1; letter-spacing: -0.5px; }
     .stat-value.green { color: #16a34a; }
     .stat-value.red { color: #dc2626; }
     .stat-value.blue { color: ${brand}; }
     .stat-value.amber { color: #ca8a04; }
     .stat-value.slate { color: #475569; }
-    .stat-sub {
-      font-size: 9px;
-      color: #94a3b8;
-      margin-top: 4px;
-    }
+    .stat-sub { font-size: 9px; color: #94a3b8; margin-top: 4px; }
 
     /* MONEY CARDS */
-    .money-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 10px;
-      margin-bottom: 14px;
-    }
-    .money-card {
-      border-radius: 10px;
-      padding: 12px 14px;
-      border: 1px solid;
-    }
+    .money-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 14px; }
+    .money-card { border-radius: 10px; padding: 12px 14px; border: 1px solid; }
     .money-card.collected { background: #f0fdf4; border-color: #bbf7d0; }
-    .money-card.outstanding { background: #fef2f2; border-color: #fecaca; }
-    .money-card.required { background: #eff6ff; border-color: #bfdbfe; }
-    .money-label {
-      font-size: 9px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      margin-bottom: 4px;
-    }
+    .money-card.fees { background: #fef2f2; border-color: #fecaca; }
+    .money-card.net { background: #eff6ff; border-color: #bfdbfe; }
+    .money-card.outstanding { background: #fff7ed; border-color: #fed7aa; }
+    .money-label { font-size: 9px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
     .money-card.collected .money-label { color: #15803d; }
-    .money-card.outstanding .money-label { color: #b91c1c; }
-    .money-card.required .money-label { color: ${brand}; }
-    .money-value {
-      font-size: 17px;
-      font-weight: 800;
-      letter-spacing: -0.3px;
-    }
+    .money-card.fees .money-label { color: #b91c1c; }
+    .money-card.net .money-label { color: ${brand}; }
+    .money-card.outstanding .money-label { color: #c2410c; }
+    .money-value { font-size: 17px; font-weight: 800; letter-spacing: -0.3px; }
     .money-card.collected .money-value { color: #15803d; }
-    .money-card.outstanding .money-value { color: #b91c1c; }
-    .money-card.required .money-value { color: ${brand}; }
+    .money-card.fees .money-value { color: #b91c1c; }
+    .money-card.net .money-value { color: ${brand}; }
+    .money-card.outstanding .money-value { color: #c2410c; }
 
     /* PROGRESS */
     .progress-wrap { margin-top: 8px; }
-    .progress-track {
-      height: 6px;
-      background: #e2e8f0;
-      border-radius: 999px;
-      overflow: hidden;
-      margin-top: 4px;
-    }
-    .progress-fill {
-      height: 100%;
-      background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%);
-      border-radius: 999px;
-    }
-    .progress-text {
-      display: flex;
-      justify-content: space-between;
-      font-size: 9px;
-      color: #64748b;
-      margin-top: 4px;
-    }
+    .progress-track { height: 6px; background: #e2e8f0; border-radius: 999px; overflow: hidden; margin-top: 4px; }
+    .progress-fill { height: 100%; background: linear-gradient(90deg, #22c55e 0%, #16a34a 100%); border-radius: 999px; }
+    .progress-text { display: flex; justify-content: space-between; font-size: 9px; color: #64748b; margin-top: 4px; }
     .progress-text strong { color: ${brand}; }
 
     /* TABLES */
-    table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 9.5px;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid #e2e8f0;
-    }
-    thead th {
-      background: ${brand};
-      color: #ffffff;
-      font-size: 8.5px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 9px 8px;
-      text-align: left;
-      white-space: nowrap;
-    }
+    table { width: 100%; border-collapse: collapse; font-size: 9px; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
+    thead th { background: ${brand}; color: #ffffff; font-size: 8.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; padding: 9px 8px; text-align: left; white-space: nowrap; }
     thead th.right { text-align: right; }
     thead th.center { text-align: center; }
-    tbody td {
-      padding: 8px;
-      border-top: 1px solid #f1f5f9;
-      vertical-align: middle;
-    }
+    tbody td { padding: 8px; border-top: 1px solid #f1f5f9; vertical-align: middle; }
     tbody tr:nth-child(even) td { background: #f8fafc; }
     tbody td.right { text-align: right; }
     tbody td.center { text-align: center; }
-    tbody td.mono {
-      font-family: 'Courier New', monospace;
-      font-size: 9px;
-      color: #475569;
-    }
+    tbody td.mono { font-family: 'Courier New', monospace; font-size: 9px; color: #475569; }
     tbody td.bold { font-weight: 700; color: #1e293b; }
     tbody td.green { color: #16a34a; font-weight: 600; }
     tbody td.red { color: #dc2626; font-weight: 600; }
@@ -522,25 +378,9 @@ export default function ReportsPage() {
     tbody td.muted { color: #94a3b8; }
 
     /* FOOTER */
-    .footer {
-      margin-top: 24px;
-      padding-top: 12px;
-      border-top: 1px solid #e2e8f0;
-      display: flex;
-      justify-content: space-between;
-      font-size: 8.5px;
-      color: #94a3b8;
-    }
+    .footer { margin-top: 24px; padding-top: 12px; border-top: 1px solid #e2e8f0; display: flex; justify-content: space-between; font-size: 8.5px; color: #94a3b8; }
     .footer strong { color: ${brand}; font-weight: 700; }
-
-    .empty-state {
-      padding: 24px;
-      text-align: center;
-      color: #94a3b8;
-      font-size: 10px;
-      border: 1px dashed #e2e8f0;
-      border-radius: 8px;
-    }
+    .empty-state { padding: 24px; text-align: center; color: #94a3b8; font-size: 10px; border: 1px dashed #e2e8f0; border-radius: 8px; }
 
     @media print {
       body { padding: 0; }
@@ -554,15 +394,11 @@ export default function ReportsPage() {
 
   <!-- HEADER -->
   <div class="header">
-    ${
-      logoUrl
-        ? `<img src="${logoUrl}" alt="Logo" class="header-logo" />`
-        : `<div class="header-logo-placeholder">LOGO</div>`
-    }
+    ${logoUrl ? `<img src="${logoUrl}" alt="Logo" class="header-logo" />` : `<div class="header-logo-placeholder">LOGO</div>`}
     <div class="header-content">
       <div class="school-name">${settings?.name || "School Fees Report"}</div>
       ${settings?.motto ? `<div class="school-motto">"${settings.motto}"</div>` : ""}
-      <div class="report-title">School Fees Collection Report</div>
+      <div class="report-title">School Fees Collection & Transparency Report</div>
     </div>
     <div class="header-meta">
       <div>Generated on</div>
@@ -581,7 +417,7 @@ export default function ReportsPage() {
 
   <!-- SECTION 1 -->
   <div class="section">
-    <div class="section-title">1. Overview</div>
+    <div class="section-title">1. Overview & Financial Summary</div>
 
     <div class="stats-grid">
       <div class="stat-card">
@@ -606,18 +442,27 @@ export default function ReportsPage() {
       </div>
     </div>
 
+    <!-- TRANSPARENCY BREAKDOWN -->
     <div class="money-grid">
       <div class="money-card collected">
-        <div class="money-label">Total Collected</div>
+        <div class="money-label">Gross Collected</div>
         <div class="money-value">MWK ${report.summary.totalCollected.toLocaleString()}</div>
+        <div style="font-size:8px;color:#64748b;margin-top:4px;">Paid by parents</div>
+      </div>
+      <div class="money-card fees">
+        <div class="money-label">Processing Fees</div>
+        <div class="money-value">- MWK ${(report.summary.totalFees || 0).toLocaleString()}</div>
+        <div style="font-size:8px;color:#64748b;margin-top:4px;">OneKhusa deductions</div>
+      </div>
+      <div class="money-card net">
+        <div class="money-label">Net to Bank</div>
+        <div class="money-value">MWK ${(report.summary.totalNetCollected || report.summary.totalCollected).toLocaleString()}</div>
+        <div style="font-size:8px;color:#64748b;margin-top:4px;">Actual money received</div>
       </div>
       <div class="money-card outstanding">
-        <div class="money-label">Total Outstanding</div>
+        <div class="money-label">Outstanding</div>
         <div class="money-value">MWK ${report.summary.totalOutstanding.toLocaleString()}</div>
-      </div>
-      <div class="money-card required">
-        <div class="money-label">Total Required</div>
-        <div class="money-value">MWK ${report.summary.totalRequired.toLocaleString()}</div>
+        <div style="font-size:8px;color:#64748b;margin-top:4px;">Fees still owed</div>
       </div>
     </div>
 
@@ -626,7 +471,7 @@ export default function ReportsPage() {
         <div class="progress-fill" style="width:${collectionPct}%"></div>
       </div>
       <div class="progress-text">
-        <span><strong>${collectionPct}%</strong> collected</span>
+        <span><strong>${collectionPct}%</strong> of required fees collected</span>
         <span>Target: <strong>MWK ${report.summary.totalRequired.toLocaleString()}</strong></span>
       </div>
     </div>
@@ -646,7 +491,9 @@ export default function ReportsPage() {
                 <th class="center">Paid Full</th>
                 <th class="center">Partial</th>
                 <th class="center">Debtors</th>
-                <th class="right">Collected</th>
+                <th class="right">Gross Collected</th>
+                <th class="right">Fees</th>
+                <th class="right">Net Collected</th>
                 <th class="right">Outstanding</th>
               </tr>
             </thead>
@@ -661,6 +508,8 @@ export default function ReportsPage() {
                   <td class="center" style="color:#ca8a04;font-weight:600;">${c.partial}</td>
                   <td class="center ${c.debtors > 0 ? "red" : "muted"}">${c.debtors}</td>
                   <td class="right green">MWK ${c.totalCollected.toLocaleString()}</td>
+                  <td class="right red">- MWK ${(c.totalFees || 0).toLocaleString()}</td>
+                  <td class="right bold">MWK ${(c.totalNetCollected || c.totalCollected).toLocaleString()}</td>
                   <td class="right ${c.totalOutstanding > 0 ? "red" : "green"}">
                     ${c.totalOutstanding > 0 ? `MWK ${c.totalOutstanding.toLocaleString()}` : "✓ Clear"}
                   </td>
@@ -683,11 +532,12 @@ export default function ReportsPage() {
             <thead>
               <tr>
                 <th>Student</th>
-                <th>Student ID</th>
                 <th>Class</th>
                 <th>Parent / Guardian</th>
                 <th class="right">Required</th>
-                <th class="right">Paid</th>
+                <th class="right">Gross Paid</th>
+                <th class="right">Fees</th>
+                <th class="right">Net Paid</th>
                 <th class="right">Balance</th>
                 <th class="center">Status</th>
               </tr>
@@ -697,8 +547,10 @@ export default function ReportsPage() {
                 .map(
                   (r: any) => `
                 <tr>
-                  <td class="bold">${r.fullName}</td>
-                  <td class="mono">${r.studentCode}</td>
+                  <td>
+                    <div class="bold">${r.fullName}</div>
+                    <div class="mono" style="font-size:8px;">${r.studentCode}</div>
+                  </td>
                   <td class="slate">${r.className}</td>
                   <td>
                     <div style="font-weight:600;color:#334155;">${r.parentName}</div>
@@ -708,6 +560,10 @@ export default function ReportsPage() {
                     ${r.requiredAmount ? `MWK ${r.requiredAmount.toLocaleString()}` : "—"}
                   </td>
                   <td class="right green">MWK ${r.totalPaid.toLocaleString()}</td>
+                  <td class="right red">
+                    ${r.platformFee ? `- MWK ${r.platformFee.toLocaleString()}` : "—"}
+                  </td>
+                  <td class="right bold">MWK ${(r.netAmount || r.totalPaid).toLocaleString()}</td>
                   <td class="right ${r.balance > 0 ? "red" : "green"}">
                     ${
                       r.balance === null
@@ -757,7 +613,7 @@ export default function ReportsPage() {
         <div>
           <h2 className="text-lg font-semibold text-gray-800">Fee Reports</h2>
           <p className="text-sm text-gray-500">
-            Generate and export fee collection reports
+            Generate transparent fee collection reports
           </p>
         </div>
         {generated && (
@@ -949,26 +805,42 @@ export default function ReportsPage() {
             </div>
           </div>
 
-          {/* Financial Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* Financial Summary (Transparent) */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-green-50 border border-green-100 rounded-xl p-5">
-              <p className="text-xs text-gray-500 mb-1">Total Collected</p>
+              <p className="text-xs text-gray-500 mb-1">Gross Collected</p>
               <p className="text-xl font-bold text-green-600">
                 {formatMWK(report.summary.totalCollected)}
               </p>
+              <p className="text-[10px] text-gray-400 mt-1">Paid by parents</p>
             </div>
             <div className="bg-red-50 border border-red-100 rounded-xl p-5">
-              <p className="text-xs text-gray-500 mb-1">Total Outstanding</p>
+              <p className="text-xs text-gray-500 mb-1">Processing Fees</p>
               <p className="text-xl font-bold text-red-600">
-                {formatMWK(report.summary.totalOutstanding)}
+                - {formatMWK(report.summary.totalFees || 0)}
+              </p>
+              <p className="text-[10px] text-gray-400 mt-1">
+                OneKhusa deductions
               </p>
             </div>
             <div className="bg-blue-50 border border-blue-100 rounded-xl p-5">
-              <p className="text-xs text-gray-500 mb-1">Total Required</p>
+              <p className="text-xs text-gray-500 mb-1">Net to Bank</p>
               <p className="text-xl font-bold text-[var(--color-primary)]">
-                {formatMWK(report.summary.totalRequired)}
+                {formatMWK(
+                  report.summary.totalNetCollected ||
+                    report.summary.totalCollected,
+                )}
               </p>
-              <div className="mt-2 bg-gray-200 rounded-full h-1.5">
+              <p className="text-[10px] text-gray-400 mt-1">
+                Actual money received
+              </p>
+            </div>
+            <div className="bg-orange-50 border border-orange-100 rounded-xl p-5">
+              <p className="text-xs text-gray-500 mb-1">Outstanding</p>
+              <p className="text-xl font-bold text-orange-600">
+                {formatMWK(report.summary.totalOutstanding)}
+              </p>
+              <div className="mt-2 bg-gray-200/50 rounded-full h-1.5">
                 <div
                   className="bg-green-500 h-1.5 rounded-full"
                   style={{
@@ -985,16 +857,6 @@ export default function ReportsPage() {
                   }}
                 />
               </div>
-              <p className="text-xs text-gray-400 mt-1">
-                {report.summary.totalRequired > 0
-                  ? Math.round(
-                      (report.summary.totalCollected /
-                        report.summary.totalRequired) *
-                        100,
-                    )
-                  : 0}
-                % collected
-              </p>
             </div>
           </div>
 
@@ -1007,7 +869,7 @@ export default function ReportsPage() {
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-100">
                   <tr>
-                    <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
                       Class
                     </th>
                     <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">
@@ -1016,19 +878,16 @@ export default function ReportsPage() {
                     <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">
                       Paid Full
                     </th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                      Partial
+                    <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                      Gross
                     </th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                      No Payment
+                    <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                      Fees
                     </th>
-                    <th className="text-center px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                      Debtors
+                    <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                      Net
                     </th>
-                    <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">
-                      Collected
-                    </th>
-                    <th className="text-right px-6 py-3 text-xs font-medium text-gray-500 uppercase">
+                    <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
                       Outstanding
                     </th>
                   </tr>
@@ -1036,34 +895,25 @@ export default function ReportsPage() {
                 <tbody className="divide-y divide-gray-50">
                   {report.classSummary.map((cls: any) => (
                     <tr key={cls.className} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 font-medium text-gray-800">
+                      <td className="px-4 py-3 font-medium text-gray-800">
                         {cls.className}
                       </td>
-                      <td className="px-4 py-4 text-center text-gray-600">
+                      <td className="px-4 py-3 text-center text-gray-600">
                         {cls.totalStudents}
                       </td>
-                      <td className="px-4 py-4 text-center">
-                        <span className="text-green-600 font-medium">
-                          {cls.paidFull}
-                        </span>
+                      <td className="px-4 py-3 text-center text-green-600 font-medium">
+                        {cls.paidFull}
                       </td>
-                      <td className="px-4 py-4 text-center">
-                        <span className="text-yellow-600 font-medium">
-                          {cls.partial}
-                        </span>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <span className="text-gray-400">{cls.noPayment}</span>
-                      </td>
-                      <td className="px-4 py-4 text-center">
-                        <span className="text-red-600 font-medium">
-                          {cls.debtors}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-right text-green-600 font-medium">
+                      <td className="px-4 py-3 text-right text-green-600 font-medium">
                         {formatMWK(cls.totalCollected)}
                       </td>
-                      <td className="px-6 py-4 text-right text-red-600 font-medium">
+                      <td className="px-4 py-3 text-right text-red-600 font-medium">
+                        - {formatMWK(cls.totalFees || 0)}
+                      </td>
+                      <td className="px-4 py-3 text-right font-bold text-gray-800">
+                        {formatMWK(cls.totalNetCollected || cls.totalCollected)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-orange-600 font-medium">
                         {formatMWK(cls.totalOutstanding)}
                       </td>
                     </tr>
@@ -1082,23 +932,6 @@ export default function ReportsPage() {
                   {report.rows.length} students
                 </span>
               </h3>
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={exportToExcel}
-                  className="flex items-center gap-1.5 text-xs text-green-600 font-medium hover:text-green-700"
-                >
-                  <Download size={13} />
-                  Excel
-                </button>
-                <span className="text-gray-300">|</span>
-                <button
-                  onClick={exportToPDF}
-                  className="flex items-center gap-1.5 text-xs text-red-600 font-medium hover:text-red-700"
-                >
-                  <Download size={13} />
-                  PDF
-                </button>
-              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -1108,19 +941,19 @@ export default function ReportsPage() {
                       Student
                     </th>
                     <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                      ID
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
                       Class
-                    </th>
-                    <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                      Parent
                     </th>
                     <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
                       Required
                     </th>
                     <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                      Paid
+                      Gross Paid
+                    </th>
+                    <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                      Fees
+                    </th>
+                    <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
+                      Net Paid
                     </th>
                     <th className="text-right px-4 py-3 text-xs font-medium text-gray-500 uppercase">
                       Balance
@@ -1137,23 +970,12 @@ export default function ReportsPage() {
                         <p className="text-sm font-medium text-gray-800">
                           {row.fullName}
                         </p>
-                        <p className="text-xs text-gray-400">{row.gender}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <span className="text-xs font-mono bg-gray-100 px-2 py-0.5 rounded">
+                        <p className="text-xs font-mono text-gray-400">
                           {row.studentCode}
-                        </span>
+                        </p>
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600">
                         {row.className}
-                      </td>
-                      <td className="px-4 py-3">
-                        <p className="text-sm text-gray-600">
-                          {row.parentName}
-                        </p>
-                        <p className="text-xs text-gray-400">
-                          {row.parentPhone}
-                        </p>
                       </td>
                       <td className="px-4 py-3 text-right text-sm text-gray-600">
                         {row.requiredAmount
@@ -1163,12 +985,20 @@ export default function ReportsPage() {
                       <td className="px-4 py-3 text-right text-sm font-medium text-green-600">
                         {formatMWK(row.totalPaid)}
                       </td>
+                      <td className="px-4 py-3 text-right text-sm font-medium text-red-600">
+                        {row.platformFee
+                          ? `- ${formatMWK(row.platformFee)}`
+                          : "—"}
+                      </td>
+                      <td className="px-4 py-3 text-right text-sm font-bold text-gray-800">
+                        {formatMWK(row.netAmount || row.totalPaid)}
+                      </td>
                       <td className="px-4 py-3 text-right text-sm font-medium">
                         {row.balance !== null ? (
                           row.balance === 0 ? (
                             <span className="text-green-600">✓ Clear</span>
                           ) : (
-                            <span className="text-red-600">
+                            <span className="text-orange-600">
                               {formatMWK(row.balance)}
                             </span>
                           )

@@ -160,17 +160,31 @@ const Dashboard = () => {
           color="bg-[var(--color-primary)]"
           subtitle="Fees expected this term"
         />
-        <StatCard
-          title="Total Collected"
-          value={formatMWK(summary?.totalCollected || 0)}
-          icon={TrendingUp}
-          color="bg-[var(--color-primary)]"
-          subtitle={
-            activeYear
-              ? `${currentTerm?.replace("_", " ") || "Term"} • ${activeYear}`
-              : "This term"
-          }
-        />
+        <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between mb-4">
+            <p className="text-sm font-medium text-gray-500">Total Collected</p>
+            <div className="w-10 h-10 bg-[var(--color-primary)] rounded-lg flex items-center justify-center">
+              <TrendingUp size={20} className="text-white" />
+            </div>
+          </div>
+          <p className="text-2xl font-bold text-gray-900">
+            {formatMWK(summary?.totalCollected || 0)}
+          </p>
+
+          {/*  Fee Transparency Breakdown */}
+          <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
+            <div className="flex justify-between text-xs text-gray-500">
+              <span>Processing Fees (OneKhusa):</span>
+              <span className="text-red-500 font-medium">
+                - {formatMWK(summary?.totalFees || 0)}
+              </span>
+            </div>
+            <div className="flex justify-between text-sm font-semibold text-green-700">
+              <span>Net to School:</span>
+              <span>{formatMWK(summary?.totalNetCollected || 0)}</span>
+            </div>
+          </div>
+        </div>
         <StatCard
           title="Outstanding Balance"
           value={formatMWK(summary?.outstandingBalance || 0)}

@@ -59,6 +59,8 @@ model FeePayment {
   student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
   amount        Float
+  platformFee   Float?
+  netAmount     Float?
   currency      String        @default("MWK")
   paymentMethod PaymentMethod
   term          Term
