@@ -3,7 +3,6 @@ import {
   Upload,
   Plus,
   Loader2,
-  CheckCircle2,
   Save,
   Pencil,
   X,
@@ -641,7 +640,17 @@ const ResultsPage = () => {
 
               {/* Right Column: Upload Form / Details */}
               <div>
-                {selectedClass ? (
+                {loadingResults ? (
+                  <div className="h-full flex flex-col items-center justify-center p-8 bg-gray-50 border border-gray-200 rounded-xl">
+                    <Loader2
+                      className="animate-spin text-gray-400 mb-2"
+                      size={24}
+                    />
+                    <p className="text-sm text-gray-500">
+                      Loading class results...
+                    </p>
+                  </div>
+                ) : selectedClass ? (
                   <div className="space-y-4">
                     <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                       <h4 className="font-medium text-gray-800 text-sm mb-1">
@@ -721,12 +730,20 @@ const ResultsPage = () => {
                                     onClick={() =>
                                       handleResolvePendingRow(row.id, c.id)
                                     }
-                                    className="text-[10px] bg-gray-50 border border-gray-200 rounded px-2 py-1 hover:border-[var(--color-primary)] flex items-center gap-1"
+                                    disabled={!!resolvingRowId}
+                                    className="text-[10px] bg-gray-50 border border-gray-200 rounded px-2 py-1 hover:border-[var(--color-primary)] flex items-center gap-1 disabled:opacity-50"
                                   >
-                                    <Check
-                                      size={10}
-                                      className="text-green-600"
-                                    />{" "}
+                                    {resolvingRowId === row.id ? (
+                                      <Loader2
+                                        size={10}
+                                        className="animate-spin text-gray-400"
+                                      />
+                                    ) : (
+                                      <Check
+                                        size={10}
+                                        className="text-green-600"
+                                      />
+                                    )}{" "}
                                     {c.fullName}
                                   </button>
                                 ))}
