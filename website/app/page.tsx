@@ -91,34 +91,18 @@ export default function LoginPage() {
     const loadBranding = async () => {
       const slug = process.env.NEXT_PUBLIC_SCHOOL_SLUG;
 
-      // 1. Same endpoint the admin portal uses — reliably includes the logo + color.
+      // Only load specific branding if a custom domain is explicitly configured
       if (slug) {
         try {
           const res = await api.get(`/schools/by-slug/${slug}`);
           if (res.data?.data) {
             setSchoolBranding(res.data.data);
-            // Apply the school's brand color immediately
             applyTheme(res.data.data.primaryColor);
             return;
           }
         } catch {
-          /* fall through to public endpoint */
+          /* fall through */
         }
-      }
-
-      // 2. Fallback: public endpoint
-      try {
-        const res = await api.get("/schools/public");
-        const data = Array.isArray(res.data?.data)
-          ? res.data.data[0]
-          : res.data?.data;
-        if (data) {
-          setSchoolBranding(data);
-          applyTheme(data.primaryColor);
-          return;
-        }
-      } catch {
-        /* ignore */
       }
 
       setSchoolBranding(null);
@@ -126,7 +110,6 @@ export default function LoginPage() {
 
     loadBranding();
   }, []);
-
   const handleStudentIdLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
