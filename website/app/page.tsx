@@ -211,29 +211,17 @@ export default function LoginPage() {
 
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
-      {/* Logo */}
-      {/* Logo — school's own logo if set, otherwise SchoolPay fallback */}
+      {/* Logo & Branding */}
       <div className="mb-6 flex flex-col items-center animate-fade-in">
-        {logoSrc ? (
-          <>
-            <img
-              src={logoSrc}
-              alt={schoolBranding?.name || "School"}
-              className="h-16 w-auto max-w-[180px] object-contain mb-4"
-            />
-            {schoolBranding?.name && (
-              <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-                {schoolBranding.name}
-              </h1>
-            )}
-          </>
-        ) : (
-          <img
-            src="/images/SchoolPayLogo.jpg"
-            alt="SchoolPay"
-            className="h-20 w-20 object-contain rounded-2xl bg-white p-2 shadow-lg mb-4"
-          />
-        )}
+        <img
+          src="/images/SchoolPayLogo.jpg"
+          alt="SchoolPay"
+          className="h-20 w-20 object-contain rounded-2xl bg-white p-2 shadow-lg mb-4"
+        />
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+          {schoolBranding?.name || "SchoolPay"}
+        </h1>
+
         <p className="text-sm text-gray-400 mt-1">
           Parent &amp; Guardian Portal
         </p>
