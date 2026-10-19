@@ -34,7 +34,6 @@ export default function PayPage() {
   const router = useRouter();
   const { isAuthenticated, student, _hasHydrated } = useAuthStore();
 
-  // 🎯 Default to "receipt" since online is disabled
   const [mode, setMode] = useState<PayMode>("receipt");
 
   // Shared state
@@ -368,14 +367,18 @@ export default function PayPage() {
             Upload Receipt
           </button>
 
-          {/* Pay Online (Right / Disabled) */}
+          {/* Pay Online (Right / Active) */}
           <button
             type="button"
-            disabled
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all opacity-40 cursor-not-allowed bg-gray-50 text-gray-400"
+            onClick={() => setMode("online")}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
+              mode === "online"
+                ? "bg-gradient-to-br from-emerald-600 to-emerald-500 text-white shadow-sm"
+                : "text-gray-600 hover:bg-gray-50"
+            }`}
           >
             <Zap size={15} />
-            Pay Online (Soon)
+            Pay Online
           </button>
         </div>
 
@@ -600,11 +603,14 @@ export default function PayPage() {
           ) : (
             <button
               type="button"
-              disabled
-              className="w-full flex items-center justify-center gap-2 bg-gray-200 text-gray-400 py-3.5 rounded-xl font-semibold text-sm cursor-not-allowed"
+              onClick={openOnlineModal}
+              disabled={!canPayOnline}
+              className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white py-3.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Zap size={16} />
-              Online Payments Coming Soon
+              {canPayOnline
+                ? `Pay MWK ${amountNum.toLocaleString()} Online`
+                : "Enter an amount to continue"}
             </button>
           )}
         </div>

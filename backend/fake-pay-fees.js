@@ -30,11 +30,10 @@ async function simulateFeePayment() {
       process.exit(1);
     }
 
-    console.log(`🏫 Found pending payment for: ${payment.school.name}`);
-    console.log(`💰 Amount: ${payment.amount}`);
-    console.log(`✅ Using TAN: ${payment.malipoCustomerRef}`);
-    console.log(`🏦 Using School Merchant Account: ${schoolMerchantAccount}`);
-
+    console.log(` Found pending payment for: ${payment.school.name}`);
+    console.log(` Amount: ${payment.amount}`);
+    console.log(` Using TAN: ${payment.malipoCustomerRef}`);
+    console.log(` Using School Merchant Account: ${schoolMerchantAccount}`);
     // 2. Get Token using the SCHOOL'S merchant account
     const tokenRes = await axios.post(
       "https://api.onekhusa.com/sandbox/v1/account/getAccessToken",
@@ -46,7 +45,7 @@ async function simulateFeePayment() {
       },
     );
     const token = tokenRes.data.accessToken;
-    console.log("✅ 1. Got token successfully");
+    console.log(" 1. Got token successfully");
 
     // 3. Get Valid Connector (Airtel Money, etc)
     const connRes = await axios.get(
@@ -57,7 +56,7 @@ async function simulateFeePayment() {
     );
     const activeConnector = connRes.data.find((c) => c.isActive === true);
 
-    console.log(`✅ 2. Found connector: ${activeConnector.connectorName}`);
+    console.log(` 2. Found connector: ${activeConnector.connectorName}`);
 
     // 4. Simulate Payment on OneKhusa
     const payRes = await axios.post(
@@ -68,7 +67,7 @@ async function simulateFeePayment() {
         connectorId: activeConnector.connectorId,
         timedAccountNumber: payment.malipoCustomerRef,
         currencyCode: payment.currency || "MWK",
-        capturedBy: "parent@example.com",
+        capturedBy: "kulinjipatricks@gmail.com",
       },
       {
         headers: {
@@ -80,19 +79,26 @@ async function simulateFeePayment() {
       },
     );
 
-    console.log("✅ 3. Payment simulated successfully on OneKhusa!");
+    console.log(" 3. Payment simulated successfully on OneKhusa!");
 
     // 5. Force the webhook to LOCALHOST
-    console.log("📡 Forcing webhook to localhost...");
+    console.log(" Forcing webhook to localhost...");
 
     const webhookPayload = {
-      // 🎯 CRITICAL: The webhook routes by beneficiaryAccountNumber to find the school
       beneficiaryAccountNumber: String(schoolMerchantAccount),
       transactionReferenceNumber:
         payRes.data.transaction.transactionReferenceNumber,
       transactionStatusCode: "S",
       metaData: {
-        referenceNumber: payment.malipoTransactionId, // The reference we sent to OneKhusa
+        referenceNumber: payment.malipoTransactionId,
+      },
+      // Add these to simulate the real fee deductions
+      beneficiary: {
+        amountReceived: payRes.data.beneficiary.amountReceived, // e.g., 197,500
+        accountNumber: payRes.data.beneficiary.accountNumber,
+      },
+      transaction: {
+        transactionFee: payRes.data.transaction.transactionFee, // e.g., 2,500
       },
     };
 

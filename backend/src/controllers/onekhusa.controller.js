@@ -51,12 +51,12 @@ const initiatePayment = async (req, res) => {
         .json({ success: false, message: "Student not found" });
     }
 
-    // ⭐ THE KEY MULTI-SCHOOL CHECK
-    if (!student.school.onekhusaMerchantAccount) {
+    const merchantAccount = student.school.onekhusaMerchantAccount;
+    if (!merchantAccount || isNaN(Number(merchantAccount))) {
       return res.status(400).json({
         success: false,
         message:
-          "This school has not been configured for online payments yet. Please contact your school administrator.",
+          "This school's online payment account is configured incorrectly. Please contact the platform administrator.",
       });
     }
 

@@ -5,7 +5,6 @@ import {
   Loader2,
   CheckCircle,
   XCircle,
-  Clock,
   Copy,
   Smartphone,
   Hash,
@@ -48,6 +47,7 @@ export default function PayOnlineModal({
   const [error, setError] = useState("");
   const [elapsed, setElapsed] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const pollRef = useRef<any>(null);
   const tickRef = useRef<any>(null);
@@ -92,6 +92,7 @@ export default function PayOnlineModal({
       return;
     }
 
+    setLoading(true);
     try {
       const res = await api.post("/payments/onekhusa/initiate", {
         studentId: student?.id,
@@ -146,6 +147,8 @@ export default function PayOnlineModal({
         err.response?.data?.message ||
           "Failed to start payment. Please try again.",
       );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -249,10 +252,20 @@ export default function PayOnlineModal({
 
             <button
               type="submit"
-              className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white font-medium py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
+              disabled={loading}
+              className="w-full bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] disabled:opacity-60 disabled:cursor-not-allowed text-white font-medium py-3 rounded-xl text-sm transition-all flex items-center justify-center gap-2"
             >
-              <Hash size={16} />
-              Get Account Number
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" />
+                  Generating Account Number...
+                </>
+              ) : (
+                <>
+                  <Hash size={16} />
+                  Get Account Number
+                </>
+              )}
             </button>
           </form>
         )}
