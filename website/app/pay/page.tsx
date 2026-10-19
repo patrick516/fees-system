@@ -34,8 +34,8 @@ export default function PayPage() {
   const router = useRouter();
   const { isAuthenticated, student, _hasHydrated } = useAuthStore();
 
-  // Mode selector
-  const [mode, setMode] = useState<PayMode>("online");
+  // 🎯 Default to "receipt" since online is disabled
+  const [mode, setMode] = useState<PayMode>("receipt");
 
   // Shared state
   const [form, setForm] = useState({
@@ -157,18 +157,21 @@ export default function PayPage() {
   };
 
   const openOnlineModal = () => {
-    setError("");
-    const amount = parseFloat(form.amount);
-    if (!amount || amount <= 0) {
-      setError("Enter an amount first");
-      return;
+    // We won't reach here since button is disabled, but keep for safety
+    if (mode === "online") {
+      setError("");
+      const amount = parseFloat(form.amount);
+      if (!amount || amount <= 0) {
+        setError("Enter an amount first");
+        return;
+      }
+      setShowOnlineModal(true);
     }
-    setShowOnlineModal(true);
   };
 
   // ---------- Derived ----------
   const amountNum = parseFloat(form.amount) || 0;
-  const canPayOnline = amountNum > 0;
+  const canPayOnline = amountNum > 0 && mode === "online"; // Ensure it's always false if mode isn't online
   const canSubmitReceipt = amountNum > 0 && !!receiptFile;
 
   // ---------- Guards ----------
@@ -351,18 +354,7 @@ export default function PayPage() {
 
         {/* ============ PAYMENT MODE SWITCHER ============ */}
         <div className="bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100 flex gap-1.5">
-          <button
-            type="button"
-            onClick={() => setMode("online")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
-              mode === "online"
-                ? "bg-gradient-to-br from-emerald-600 to-emerald-500 text-white shadow-sm"
-                : "text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            <Zap size={15} />
-            Pay Online
-          </button>
+          {/* Upload Receipt (Left / Default) */}
           <button
             type="button"
             onClick={() => setMode("receipt")}
@@ -375,6 +367,16 @@ export default function PayPage() {
             <FileImage size={15} />
             Upload Receipt
           </button>
+
+          {/* Pay Online (Right / Disabled) */}
+          <button
+            type="button"
+            disabled
+            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all opacity-40 cursor-not-allowed bg-gray-50 text-gray-400"
+          >
+            <Zap size={15} />
+            Pay Online (Soon)
+          </button>
         </div>
 
         {/* ============ ERROR ============ */}
@@ -385,7 +387,7 @@ export default function PayPage() {
           </div>
         )}
 
-        {/* ============ ONLINE MODE ============ */}
+        {/* ============ ONLINE MODE (Hidden because disabled) ============ */}
         {mode === "online" && (
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
             <div className="flex items-start gap-3">
@@ -573,19 +575,7 @@ export default function PayPage() {
       {/* ============ STICKY SUBMIT BAR ============ */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
         <div className="max-w-lg mx-auto">
-          {mode === "online" ? (
-            <button
-              type="button"
-              onClick={openOnlineModal}
-              disabled={!canPayOnline}
-              className="w-full flex items-center justify-center gap-2 bg-gradient-to-br from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white py-3.5 rounded-xl font-semibold text-sm transition-all disabled:opacity-40 disabled:cursor-not-allowed"
-            >
-              <Zap size={16} />
-              {canPayOnline
-                ? `Pay MWK ${amountNum.toLocaleString()} Online`
-                : "Enter an amount to continue"}
-            </button>
-          ) : (
+          {mode === "receipt" ? (
             <button
               type="button"
               onClick={handleReceiptSubmit}
@@ -607,11 +597,20 @@ export default function PayPage() {
                 </>
               )}
             </button>
+          ) : (
+            <button
+              type="button"
+              disabled
+              className="w-full flex items-center justify-center gap-2 bg-gray-200 text-gray-400 py-3.5 rounded-xl font-semibold text-sm cursor-not-allowed"
+            >
+              <Zap size={16} />
+              Online Payments Coming Soon
+            </button>
           )}
         </div>
       </div>
 
-      {/* ============ PAY ONLINE MODAL ============ */}
+      {/* ============ PAY ONLINE MODAL (Disabled but kept for future) ============ */}
       <PayOnlineModal
         open={showOnlineModal}
         onClose={() => setShowOnlineModal(false)}
