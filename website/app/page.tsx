@@ -1,29 +1,11 @@
 "use client";
-import { useState, useEffect, useRef } from "react";
+import { useState, useRef } from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Loader2, ChevronRight, CalendarIcon } from "lucide-react";
-import { format } from "date-fns";
+import { Loader2, ChevronRight } from "lucide-react";
 import api from "../lib/axios";
 import { useAuthStore } from "../store/authStore";
-import { applyTheme } from "../lib/theme";
-import { Calendar } from "../components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "../components/ui/popover";
-type LoginMethod = "student-id" | "phone";
 
-/** Turn a relative logo path from the API into an absolute URL */
-const resolveLogo = (logo?: string | null): string | null => {
-  if (!logo) return null;
-  if (/^https?:\/\//i.test(logo) || logo.startsWith("data:")) return logo;
-  const origin = (process.env.NEXT_PUBLIC_API_URL || "").replace(
-    /\/api\/?$/,
-    "",
-  );
-  return `${origin}${logo.startsWith("/") ? "" : "/"}${logo}`;
-};
+type LoginMethod = "student-id" | "phone";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -45,7 +27,7 @@ export default function LoginPage() {
 
   const handleDobDay = (raw: string) => {
     let v = onlyDigits(raw).slice(0, 2);
-    if (v.length === 1 && Number(v) > 3) v = "0" + v; // 4-9 becomes 04-09
+    if (v.length === 1 && Number(v) > 3) v = "0" + v;
     if (v.length === 2 && Number(v) > 31) v = "31";
     if (v === "00") v = "01";
     setDobDay(v);
@@ -54,7 +36,7 @@ export default function LoginPage() {
 
   const handleDobMonth = (raw: string) => {
     let v = onlyDigits(raw).slice(0, 2);
-    if (v.length === 1 && Number(v) > 1) v = "0" + v; // 2-9 becomes 02-09
+    if (v.length === 1 && Number(v) > 1) v = "0" + v;
     if (v.length === 2 && Number(v) > 12) v = "12";
     if (v === "00") v = "01";
     setDobMonth(v);
@@ -65,7 +47,6 @@ export default function LoginPage() {
     setDobYear(onlyDigits(raw).slice(0, 4));
   };
 
-  // Backspace on an empty box goes back to the previous box
   const dobBackspace = (
     e: React.KeyboardEvent<HTMLInputElement>,
     current: string,
@@ -80,36 +61,6 @@ export default function LoginPage() {
   const [otpSent, setOtpSent] = useState(false);
   const [otpLoading, setOtpLoading] = useState(false);
 
-  const [schoolBranding, setSchoolBranding] = useState<{
-    name: string;
-    logo: string | null;
-    motto?: string | null;
-    primaryColor?: string | null;
-  } | null>(null);
-
-  useEffect(() => {
-    const loadBranding = async () => {
-      const slug = process.env.NEXT_PUBLIC_SCHOOL_SLUG;
-
-      // Only load specific branding if a custom domain is explicitly configured
-      if (slug) {
-        try {
-          const res = await api.get(`/schools/by-slug/${slug}`);
-          if (res.data?.data) {
-            setSchoolBranding(res.data.data);
-            applyTheme(res.data.data.primaryColor);
-            return;
-          }
-        } catch {
-          /* fall through */
-        }
-      }
-
-      setSchoolBranding(null);
-    };
-
-    loadBranding();
-  }, []);
   const handleStudentIdLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -190,11 +141,9 @@ export default function LoginPage() {
     }
   };
 
-  const logoSrc = resolveLogo(schoolBranding?.logo);
-
   return (
     <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
-      {/* Logo & Branding */}
+      {/* 🎯 Static SchoolPay Logo & Name */}
       <div className="mb-6 flex flex-col items-center animate-fade-in">
         <img
           src="/images/SchoolPayLogo.jpg"
@@ -202,9 +151,8 @@ export default function LoginPage() {
           className="h-20 w-20 object-contain rounded-2xl bg-white p-2 shadow-lg mb-4"
         />
         <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-          {schoolBranding?.name || "SchoolPay"}
+          SchoolPay
         </h1>
-
         <p className="text-sm text-gray-400 mt-1">
           Parent &amp; Guardian Portal
         </p>
