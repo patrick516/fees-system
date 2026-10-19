@@ -247,7 +247,7 @@ const updateRole = async (req, res) => {
   }
 };
 
-// ==================== DELETE ROLE ====================
+//  DELETE ROLE 
 // DELETE /api/roles/:id
 const deleteRole = async (req, res) => {
   try {

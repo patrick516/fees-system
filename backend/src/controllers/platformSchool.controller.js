@@ -194,14 +194,23 @@ const inviteSchool = async (req, res) => {
       return { school, admin };
     });
 
-    // Send the invite email (async, don't block)
-    sendPlatformSchoolInviteEmail({
+    //  Await the email so we know if it failed
+    const emailRes = await sendPlatformSchoolInviteEmail({
       to: cleanEmail,
       name: "there",
       inviteToken,
-      tempPassword,
       expiresInDays: INVITE_TTL_DAYS,
-    }).catch((e) => console.error("Invite email failed:", e));
+    });
+
+    if (emailRes?.success === false || emailRes?.skipped) {
+      console.error("❌ Invite email failed to send:", emailRes);
+      return res.status(201).json({
+        success: true,
+        message:
+          "School created, BUT the invitation email failed to send. Please check Brevo logs or resend.",
+        warning: "EMAIL_FAILED",
+      });
+    }
 
     return res.status(201).json({
       success: true,
