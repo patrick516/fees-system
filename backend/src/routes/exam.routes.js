@@ -11,12 +11,18 @@ const examController = require("../controllers/exam.controller");
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ==================== EXAM PERIODS ====================
+//  EXAM PERIODS
 router.get(
   "/periods",
   verifyStaff,
   requirePermission("results", "read"),
   examController.listExamPeriods,
+);
+router.get(
+  "/uploads-summary",
+  verifyStaff,
+  requirePermission("results", "read"),
+  examController.getUploadSummary,
 );
 router.post(
   "/periods",

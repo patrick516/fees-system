@@ -10,6 +10,8 @@ import {
   Trophy,
   AlertTriangle,
   Check,
+  Eye,
+  FileSpreadsheet,
 } from "lucide-react";
 import { useExamResults } from "../../hooks/useExamResults";
 import { useClasses } from "../../hooks/useStudents";
@@ -55,13 +57,24 @@ const ResultsPage = () => {
     uploadResults,
     uploading,
     getClassResults,
-    updateClassGradingSystem,
     getPendingRows,
     resolvePendingRow,
     discardPendingRow,
+    getUploadSummary,
   } = useExamResults();
-  const { classes, refetch: refetchClasses } = useClasses();
+  const { classes } = useClasses();
 
+  const [periods, setPeriods] = useState<any[]>([]);
+  const [selectedPeriod, setSelectedPeriod] = useState(
+    () => localStorage.getItem("results_selectedPeriod") || "",
+  );
+
+  // Summary of all classes for selected period
+  const [uploadSummary, setUploadSummary] = useState<any[]>([]);
+  const [loadingSummary, setLoadingSummary] = useState(false);
+
+  // Selected class to view/upload
+  const [selectedClass, setSelectedClass] = useState<string | null>(null);
   const [classResults, setClassResults] = useState<any[]>([]);
   const [resultsGradingSystem, setResultsGradingSystem] = useState<
     "POINTS" | "LETTER"
@@ -69,7 +82,6 @@ const ResultsPage = () => {
   const [loadingResults, setLoadingResults] = useState(false);
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
 
-  const [periods, setPeriods] = useState<any[]>([]);
   const [boundarySystem, setBoundarySystem] = useState<"POINTS" | "LETTER">(
     "POINTS",
   );
@@ -80,16 +92,10 @@ const ResultsPage = () => {
     defaultLetterBoundaries,
   );
   const [editingBoundaries, setEditingBoundaries] = useState(false);
-  const [selectedPeriod, setSelectedPeriod] = useState(
-    () => localStorage.getItem("results_selectedPeriod") || "",
-  );
-  const [selectedClass, setSelectedClass] = useState(
-    () => localStorage.getItem("results_selectedClass") || "",
-  );
+
   const [file, setFile] = useState<File | null>(null);
   const [message, setMessage] = useState("");
   const [savingBoundaries, setSavingBoundaries] = useState(false);
-  const [savingGradingSystem, setSavingGradingSystem] = useState(false);
   const [pendingRows, setPendingRows] = useState<any[]>([]);
   const [resolvingRowId, setResolvingRowId] = useState<string | null>(null);
 
@@ -100,7 +106,6 @@ const ResultsPage = () => {
 
   const selectedClassObj = classes.find((c: any) => c.id === selectedClass);
 
-  // Active term — single source of truth for academic year
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
 
   const [newPeriod, setNewPeriod] = useState({
@@ -110,14 +115,10 @@ const ResultsPage = () => {
     examType: "END_TERM",
   });
 
-  // Sync the exam period form with the activated values as they load
   useEffect(() => {
-    if (activeYear) {
+    if (activeYear)
       setNewPeriod((prev) => ({ ...prev, academicYear: activeYear }));
-    }
-    if (currentTerm) {
-      setNewPeriod((prev) => ({ ...prev, term: currentTerm }));
-    }
+    if (currentTerm) setNewPeriod((prev) => ({ ...prev, term: currentTerm }));
   }, [activeYear, currentTerm]);
 
   const loadBoundaries = async (system: "POINTS" | "LETTER") => {
@@ -135,48 +136,33 @@ const ResultsPage = () => {
 
       await loadBoundaries("POINTS");
       await loadBoundaries("LETTER");
-
-      const savedPeriod = localStorage.getItem("results_selectedPeriod");
-      const savedClass = localStorage.getItem("results_selectedClass");
-      if (savedPeriod && savedClass) {
-        setLoadingResults(true);
-        const r = await getClassResults(savedClass, savedPeriod);
-        if (r.success) {
-          setClassResults(r.data);
-          setResultsGradingSystem(r.gradingSystem || "POINTS");
-        }
-        setLoadingResults(false);
-
-        const p = await getPendingRows(savedClass, savedPeriod);
-        if (p.success) setPendingRows(p.data);
-      }
     })();
   }, []);
 
+  // When period changes, fetch the summary of uploads
   useEffect(() => {
-    if (selectedPeriod) {
-      localStorage.setItem("results_selectedPeriod", selectedPeriod);
+    if (!selectedPeriod) {
+      setUploadSummary([]);
+      setSelectedClass(null);
+      return;
     }
+    localStorage.setItem("results_selectedPeriod", selectedPeriod);
+
+    (async () => {
+      setLoadingSummary(true);
+      const res = await getUploadSummary(selectedPeriod);
+      if (res.success) setUploadSummary(res.data || []);
+      setLoadingSummary(false);
+
+      // If a class was previously selected, refresh its results
+      if (selectedClass) {
+        handleViewClass(selectedClass);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedPeriod]);
 
-  useEffect(() => {
-    if (selectedClass) {
-      localStorage.setItem("results_selectedClass", selectedClass);
-    }
-    // Bug fix: clear stale rankings when the filter changes so old data
-    // doesn't linger on screen looking like nothing happened
-    setClassResults([]);
-  }, [selectedClass]);
-
-  useEffect(() => {
-    setClassResults([]);
-  }, [selectedPeriod]);
-
-  const handleBoundaryChange = (
-    index: number,
-    field: "minPercent" | "maxPercent" | "gradePoint" | "gradeLabel",
-    value: string,
-  ) => {
+  const handleBoundaryChange = (index: number, field: any, value: string) => {
     const updated = [...boundaries];
     updated[index] = { ...updated[index], [field]: value };
     setBoundaries(updated);
@@ -205,21 +191,6 @@ const ResultsPage = () => {
     }
   };
 
-  const handleGradingSystemChange = async (system: "POINTS" | "LETTER") => {
-    if (!selectedClass) return;
-    setSavingGradingSystem(true);
-    const res = await updateClassGradingSystem(selectedClass, system);
-    if (res.success) {
-      await refetchClasses();
-      setMessage(
-        `${selectedClassObj?.name || "Class"} now uses ${
-          system === "LETTER" ? "letter grades" : "points"
-        }`,
-      );
-    }
-    setSavingGradingSystem(false);
-  };
-
   const handleUpload = async () => {
     if (!file || !selectedClass || !selectedPeriod) {
       setMessage("Select a class, exam period, and file first");
@@ -227,15 +198,21 @@ const ResultsPage = () => {
     }
     const res = await uploadResults(file, selectedClass, selectedPeriod);
     setMessage(res.message || (res.success ? "Uploaded" : "Upload failed"));
+
     if (res.success) {
-      handleViewResults();
-      loadPendingRows();
+      setFile(null); // Clear file input
+      handleViewClass(selectedClass); // Refresh rankings
+      loadPendingRows(selectedClass); // Refresh pending
+
+      // Refresh the summary table
+      const sumRes = await getUploadSummary(selectedPeriod);
+      if (sumRes.success) setUploadSummary(sumRes.data || []);
     }
   };
 
-  const loadPendingRows = async () => {
-    if (!selectedClass || !selectedPeriod) return;
-    const res = await getPendingRows(selectedClass, selectedPeriod);
+  const loadPendingRows = async (classId: string) => {
+    if (!classId || !selectedPeriod) return;
+    const res = await getPendingRows(classId, selectedPeriod);
     if (res.success) setPendingRows(res.data);
   };
 
@@ -247,7 +224,7 @@ const ResultsPage = () => {
     const res = await resolvePendingRow(pendingRowId, studentId);
     if (res.success) {
       setPendingRows(pendingRows.filter((r) => r.id !== pendingRowId));
-      handleViewResults();
+      handleViewClass(selectedClass!);
     } else {
       setMessage(res.message || "Failed to resolve");
     }
@@ -256,23 +233,23 @@ const ResultsPage = () => {
 
   const handleDiscardPendingRow = async (pendingRowId: string) => {
     const res = await discardPendingRow(pendingRowId);
-    if (res.success) {
+    if (res.success)
       setPendingRows(pendingRows.filter((r) => r.id !== pendingRowId));
-    }
   };
 
-  const handleViewResults = async () => {
-    if (!selectedClass || !selectedPeriod) {
-      setMessage("Select a class and exam period to view rankings");
-      return;
-    }
+  const handleViewClass = async (classId: string) => {
+    setSelectedClass(classId);
     setLoadingResults(true);
-    const res = await getClassResults(selectedClass, selectedPeriod);
+    setExpandedStudent(null);
+
+    const res = await getClassResults(classId, selectedPeriod);
     if (res.success) {
       setClassResults(res.data);
       setResultsGradingSystem(res.gradingSystem || "POINTS");
     }
     setLoadingResults(false);
+
+    loadPendingRows(classId);
   };
 
   return (
@@ -301,12 +278,10 @@ const ResultsPage = () => {
         </button>
       </div>
 
-      {/* Analytics tab */}
       <div className={activeTab === "analytics" ? "" : "hidden"}>
         <AnalyticsTab />
       </div>
 
-      {/* Upload & Manage tab */}
       <div className={activeTab === "upload" ? "space-y-6" : "hidden"}>
         <div>
           <h2 className="text-lg font-semibold text-gray-800">Exam Results</h2>
@@ -327,11 +302,7 @@ const ResultsPage = () => {
                     setBoundarySystem("POINTS");
                     setEditingBoundaries(false);
                   }}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    boundarySystem === "POINTS"
-                      ? "bg-white shadow-sm text-[var(--color-primary)]"
-                      : "text-gray-500"
-                  }`}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${boundarySystem === "POINTS" ? "bg-white shadow-sm text-[var(--color-primary)]" : "text-gray-500"}`}
                 >
                   Points (1–9)
                 </button>
@@ -340,11 +311,7 @@ const ResultsPage = () => {
                     setBoundarySystem("LETTER");
                     setEditingBoundaries(false);
                   }}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    boundarySystem === "LETTER"
-                      ? "bg-white shadow-sm text-[var(--color-primary)]"
-                      : "text-gray-500"
-                  }`}
+                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${boundarySystem === "LETTER" ? "bg-white shadow-sm text-[var(--color-primary)]" : "text-gray-500"}`}
                 >
                   Letter (A–F)
                 </button>
@@ -353,7 +320,7 @@ const ResultsPage = () => {
             {!editingBoundaries && (
               <button
                 onClick={() => setEditingBoundaries(true)}
-                className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition-colors"
+                className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
               >
                 <Pencil size={14} /> Edit
               </button>
@@ -372,11 +339,7 @@ const ResultsPage = () => {
                 {boundaries.map((b, i) => (
                   <div
                     key={i}
-                    className={`grid gap-2 items-center ${
-                      boundarySystem === "POINTS"
-                        ? "grid-cols-4"
-                        : "grid-cols-3"
-                    }`}
+                    className={`grid gap-2 items-center ${boundarySystem === "POINTS" ? "grid-cols-4" : "grid-cols-3"}`}
                   >
                     {boundarySystem === "POINTS" ? (
                       <span className="text-sm font-medium text-gray-600">
@@ -446,7 +409,7 @@ const ResultsPage = () => {
                     <Loader2 size={14} className="animate-spin" />
                   ) : (
                     <Save size={14} />
-                  )}
+                  )}{" "}
                   Save
                 </button>
                 <button
@@ -575,11 +538,7 @@ const ResultsPage = () => {
                       <td className="px-4 py-2 text-right">
                         <button
                           onClick={() => handleToggleActive(p.id, p.isActive)}
-                          className={`text-xs px-3 py-1 rounded-full font-medium ${
-                            p.isActive
-                              ? "bg-green-100 text-green-700"
-                              : "bg-gray-100 text-gray-500"
-                          }`}
+                          className={`text-xs px-3 py-1 rounded-full font-medium ${p.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
                         >
                           {p.isActive ? "Visible to parents" : "Hidden"}
                         </button>
@@ -592,181 +551,218 @@ const ResultsPage = () => {
           )}
         </div>
 
-        {/* Upload */}
+        {/* 🎯 MAIN UPLOAD & VIEW SECTION */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-          <h3 className="font-medium text-gray-800 mb-4">
-            Upload Class Results
-          </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-3">
-            <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-              <SelectTrigger className="w-full bg-transparent border-gray-200 rounded-lg text-sm h-auto py-2">
-                <SelectValue placeholder="Select exam period" />
-              </SelectTrigger>
-              <SelectContent className="bg-white">
-                {periods.map((p) => (
-                  <SelectItem key={p.id} value={p.id}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Select value={selectedClass} onValueChange={setSelectedClass}>
-              <SelectTrigger className="w-full bg-transparent border-gray-200 rounded-lg text-sm h-auto py-2">
-                <SelectValue placeholder="Select class" />
-              </SelectTrigger>
-              <SelectContent className="bg-white">
-                {classes.map((c: any) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <input
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              onChange={(e) => setFile(e.target.files?.[0] || null)}
-              className="text-sm"
-            />
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-medium text-gray-800">
+              Class Uploads & Rankings
+            </h3>
+            <div className="w-64">
+              <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
+                <SelectTrigger className="w-full bg-transparent border-gray-200 rounded-lg text-sm h-auto py-2">
+                  <SelectValue placeholder="Select exam period to view classes" />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  {periods.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          {selectedClassObj && (
-            <div className="flex items-center gap-3 mb-4 p-3 bg-gray-50 rounded-lg">
-              <span className="text-xs text-gray-500">
-                {selectedClassObj.name} grades using:
-              </span>
-              <div className="flex bg-white border border-gray-200 rounded-lg p-0.5">
-                <button
-                  onClick={() => handleGradingSystemChange("POINTS")}
-                  disabled={savingGradingSystem}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    selectedClassObj.gradingSystem === "POINTS"
-                      ? "bg-[var(--color-primary)] text-white"
-                      : "text-gray-500"
-                  }`}
-                >
-                  Points
-                </button>
-                <button
-                  onClick={() => handleGradingSystemChange("LETTER")}
-                  disabled={savingGradingSystem}
-                  className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                    selectedClassObj.gradingSystem === "LETTER"
-                      ? "bg-[var(--color-primary)] text-white"
-                      : "text-gray-500"
-                  }`}
-                >
-                  Letter Grades
-                </button>
+          {!selectedPeriod ? (
+            <div className="p-8 text-center bg-gray-50 rounded-xl border border-dashed border-gray-200">
+              <FileSpreadsheet
+                className="mx-auto text-gray-300 mb-2"
+                size={32}
+              />
+              <p className="text-sm text-gray-500">
+                Select an exam period above to manage class results.
+              </p>
+            </div>
+          ) : loadingSummary ? (
+            <div className="flex justify-center p-8">
+              <Loader2 className="animate-spin text-gray-400" />
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left Column: Class Summary List */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                  Classes for this period
+                </p>
+                {uploadSummary.length === 0 ? (
+                  <p className="text-sm text-gray-500">
+                    No classes found. Add classes in settings first.
+                  </p>
+                ) : (
+                  uploadSummary.map((sum) => (
+                    <div
+                      key={sum.classId}
+                      onClick={() => handleViewClass(sum.classId)}
+                      className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                        selectedClass === sum.classId
+                          ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]"
+                          : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                      }`}
+                    >
+                      <div>
+                        <p className="font-medium text-gray-800 text-sm">
+                          {sum.className}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-0.5">
+                          {sum.hasResults
+                            ? `✅ ${sum.studentsUploaded} students uploaded`
+                            : "❌ Not uploaded"}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-bold px-2 py-1 rounded bg-white border border-gray-200 text-gray-600">
+                          {sum.gradingSystem === "LETTER"
+                            ? "Letters"
+                            : "Points"}
+                        </span>
+                        <Eye
+                          size={16}
+                          className={
+                            sum.hasResults
+                              ? "text-[var(--color-primary)]"
+                              : "text-gray-300"
+                          }
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+
+              {/* Right Column: Upload Form / Details */}
+              <div>
+                {selectedClass ? (
+                  <div className="space-y-4">
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                      <h4 className="font-medium text-gray-800 text-sm mb-1">
+                        {selectedClassObj?.name} — Upload Results
+                      </h4>
+                      <p className="text-xs text-gray-500 mb-3">
+                        Grading System:{" "}
+                        <strong>
+                          {selectedClassObj?.gradingSystem === "LETTER"
+                            ? "Letter Grades (A-F)"
+                            : "Points (1-9)"}
+                        </strong>{" "}
+                        (Locked)
+                      </p>
+
+                      <input
+                        type="file"
+                        accept=".xlsx,.xls,.csv"
+                        onChange={(e) => setFile(e.target.files?.[0] || null)}
+                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[var(--color-primary-light)] file:text-[var(--color-primary-dark)] hover:file:bg-[var(--color-primary-light)]/80 mb-3"
+                      />
+
+                      <button
+                        onClick={handleUpload}
+                        disabled={uploading || !file}
+                        className="flex items-center justify-center gap-2 w-full bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
+                      >
+                        {uploading ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : (
+                          <Upload size={14} />
+                        )}
+                        {uploading ? "Uploading..." : "Upload Sheet"}
+                      </button>
+                      {message && (
+                        <p className="text-xs text-center mt-2 text-gray-600">
+                          {message}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Pending Name Matches */}
+                    {pendingRows.length > 0 && (
+                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
+                        <div className="flex items-center gap-2 mb-2">
+                          <AlertTriangle size={14} className="text-amber-600" />
+                          <h4 className="font-medium text-amber-900 text-xs">
+                            Pending Matches ({pendingRows.length})
+                          </h4>
+                        </div>
+                        <p className="text-[10px] text-amber-700 mb-3">
+                          Multiple students matched these names.
+                        </p>
+                        <div className="space-y-2 max-h-48 overflow-y-auto">
+                          {pendingRows.map((row) => (
+                            <div
+                              key={row.id}
+                              className="bg-white border border-amber-100 rounded p-2"
+                            >
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-xs font-semibold">
+                                  "{row.rawName}"
+                                </span>
+                                <button
+                                  onClick={() =>
+                                    handleDiscardPendingRow(row.id)
+                                  }
+                                  className="text-[10px] text-gray-400 hover:text-red-600"
+                                >
+                                  Discard
+                                </button>
+                              </div>
+                              <div className="flex flex-wrap gap-1">
+                                {row.candidates.map((c: any) => (
+                                  <button
+                                    key={c.id}
+                                    onClick={() =>
+                                      handleResolvePendingRow(row.id, c.id)
+                                    }
+                                    className="text-[10px] bg-gray-50 border border-gray-200 rounded px-2 py-1 hover:border-[var(--color-primary)] flex items-center gap-1"
+                                  >
+                                    <Check
+                                      size={10}
+                                      className="text-green-600"
+                                    />{" "}
+                                    {c.fullName}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center p-8 bg-gray-50 border border-dashed border-gray-200 rounded-xl">
+                    <Trophy className="text-gray-300 mb-2" size={32} />
+                    <p className="text-sm text-gray-500 text-center">
+                      Select a class from the left to view rankings and upload
+                      new sheets.
+                    </p>
+                  </div>
+                )}
               </div>
             </div>
           )}
-
-          <button
-            onClick={handleUpload}
-            disabled={uploading}
-            className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
-          >
-            {uploading ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Upload size={14} />
-            )}
-            {uploading ? "Uploading..." : "Upload Sheet"}
-          </button>
-          {message && (
-            <p className="text-sm mt-3 flex items-center gap-2 text-gray-600">
-              <CheckCircle2 size={14} /> {message}
-            </p>
-          )}
-          <button
-            onClick={handleViewResults}
-            disabled={loadingResults}
-            className="mt-3 flex items-center gap-2 text-sm text-[var(--color-primary)] font-medium hover:text-[var(--color-primary-dark)] transition-colors"
-          >
-            {loadingResults ? (
-              <Loader2 size={14} className="animate-spin" />
-            ) : (
-              <Trophy size={14} />
-            )}
-            View Class Rankings
-          </button>
         </div>
 
-        {/* Pending Name Matches */}
-        {pendingRows.length > 0 && (
-          <div className="bg-white rounded-xl shadow-sm border border-amber-200 p-6">
-            <div className="flex items-center gap-2 mb-2">
-              <AlertTriangle size={16} className="text-amber-600" />
-              <h3 className="font-medium text-gray-800">
-                Pending Matches ({pendingRows.length})
-              </h3>
-            </div>
-            <p className="text-xs text-gray-500 mb-4">
-              These names matched more than one student in this class. Pick the
-              correct student for each, or discard the row.
-            </p>
-            <div className="space-y-3">
-              {pendingRows.map((row) => (
-                <div
-                  key={row.id}
-                  className="border border-amber-100 bg-amber-50 rounded-lg p-4"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="font-medium text-gray-800 text-sm">
-                      "{row.rawName}"
-                    </p>
-                    <button
-                      onClick={() => handleDiscardPendingRow(row.id)}
-                      className="text-xs text-gray-400 hover:text-red-600"
-                    >
-                      Discard
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2 mb-3">
-                    {row.marks.map((m: any, i: number) => (
-                      <span
-                        key={i}
-                        className="text-xs bg-white border border-gray-200 rounded px-2 py-0.5 text-gray-600"
-                      >
-                        {m.subject}: {m.mark}%
-                      </span>
-                    ))}
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {row.candidates.map((c: any) => (
-                      <button
-                        key={c.id}
-                        onClick={() => handleResolvePendingRow(row.id, c.id)}
-                        disabled={resolvingRowId === row.id}
-                        className="flex items-center gap-1.5 text-xs bg-white border border-gray-200 rounded-lg px-3 py-1.5 hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)] disabled:opacity-40"
-                      >
-                        {resolvingRowId === row.id ? (
-                          <Loader2 size={12} className="animate-spin" />
-                        ) : (
-                          <Check size={12} className="text-green-600" />
-                        )}
-                        {c.fullName}{" "}
-                        <span className="text-gray-400 font-mono">
-                          ({c.studentCode})
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Class Rankings */}
-        {classResults.length > 0 && (
+        {/* Class Rankings (Only shows if a class is selected and has results) */}
+        {selectedClass && classResults.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
-            <h3 className="font-medium text-gray-800 mb-4">
-              Class Rankings — Best to Worst
-            </h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-medium text-gray-800">
+                {selectedClassObj?.name} Rankings — Best to Worst
+              </h3>
+              <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                {resultsGradingSystem === "LETTER" ? "Letter Grades" : "Points"}
+              </span>
+            </div>
+
             <div className="overflow-hidden rounded-lg border border-gray-100">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">

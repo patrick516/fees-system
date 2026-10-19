@@ -208,13 +208,6 @@ const setGradeBoundaries = async (req, res) => {
   }
 };
 
-// ==================== RESULTS UPLOAD ====================
-
-// POST /api/exams/results/upload
-// multipart/form-data: file, classId, examPeriodId
-// Sheet's first row is headers. One column must contain "id" (Student ID) and/or
-// one column must contain "name" (Student Name) — case-insensitive match on the header text.
-// If neither is found, the first column is treated as Student ID for backward compatibility.
 const uploadResults = async (req, res) => {
   try {
     if (!req.file) {
@@ -443,7 +436,7 @@ const uploadResults = async (req, res) => {
   }
 };
 
-// ==================== PENDING NAME MATCHES ====================
+// ==================== PENDING NAME MATCHES
 
 // GET /api/exams/pending-rows?classId=&examPeriodId=
 const getPendingRows = async (req, res) => {
@@ -779,8 +772,9 @@ const getStudentResults = async (req, res) => {
     console.error(err);
     res.status(500).json({ success: false, message: "Failed to get results" });
   }
-}; // ==================== PARENT VIEW ====================
+};
 
+//  PARENT VIEW
 const getClassResults = async (req, res) => {
   try {
     const { classId, examPeriodId } = req.query;
@@ -798,6 +792,18 @@ const getClassResults = async (req, res) => {
       return res
         .status(404)
         .json({ success: false, message: "Class not found" });
+    }
+    const isLowerForm =
+      cls.level <= 2 ||
+      cls.name.toLowerCase().includes("form 1") ||
+      cls.name.toLowerCase().includes("form 2");
+    const requiredGrading = isLowerForm ? "LETTER" : "POINTS";
+
+    if (cls.gradingSystem !== requiredGrading) {
+      return res.status(400).json({
+        success: false,
+        message: `Invalid grading system. ${cls.name} must use ${requiredGrading === "LETTER" ? "Letter Grades" : "Points"}. Please update the class settings before uploading.`,
+      });
     }
 
     const students = await prisma.student.findMany({
@@ -935,6 +941,47 @@ const updateClassGradingSystem = async (req, res) => {
       .json({ success: false, message: "Failed to update grading system" });
   }
 };
+// GET /api/exams/uploads-summary?examPeriodId=
+const getUploadSummary = async (req, res) => {
+  try {
+    const { examPeriodId } = req.query;
+    if (!examPeriodId) {
+      return res
+        .status(400)
+        .json({ success: false, message: "examPeriodId is required" });
+    }
+
+    const classes = await prisma.class.findMany({
+      where: { schoolId: req.schoolId, isActive: true },
+      orderBy: { level: "asc" },
+    });
+
+    const summary = [];
+    for (const cls of classes) {
+      // Count how many students have results for this class in this period
+      const count = await prisma.examResult.count({
+        where: {
+          examPeriodId,
+          schoolId: req.schoolId,
+          student: { classId: cls.id },
+        },
+      });
+
+      summary.push({
+        classId: cls.id,
+        className: cls.name,
+        gradingSystem: cls.gradingSystem,
+        hasResults: count > 0,
+        studentsUploaded: count,
+      });
+    }
+
+    res.json({ success: true, data: summary });
+  } catch (err) {
+    console.error("getUploadSummary error:", err);
+    res.status(500).json({ success: false, message: "Failed to get summary" });
+  }
+};
 
 module.exports = {
   createExamPeriod,
@@ -952,4 +999,5 @@ module.exports = {
   getPendingRows,
   resolvePendingRow,
   discardPendingRow,
+  getUploadSummary,
 };

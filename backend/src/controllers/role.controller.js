@@ -1,7 +1,6 @@
 // backend/src/controllers/role.controller.js
 const prisma = require("../config/db");
 
-// Valid resources and actions — must match frontend
 const VALID_RESOURCES = [
   "dashboard",
   "students",
@@ -12,6 +11,7 @@ const VALID_RESOURCES = [
   "results",
   "staff",
   "settings",
+  "audit",
 ];
 const VALID_ACTIONS = ["read", "write", "verify", "delete"];
 
@@ -222,7 +222,7 @@ const updateRole = async (req, res) => {
         actorName: req.staff.fullName,
         actorRole: req.staff.role?.name || null,
         actorEmail: req.staff.email,
-        ipAddress: extractIp(req),
+        ipAddress: req.ip || req.socket?.remoteAddress || null,
         action: "ROLE_UPDATED",
         entity: "Role",
         entityId: id,

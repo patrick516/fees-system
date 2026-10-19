@@ -79,6 +79,16 @@ export const useExamResults = () => {
       return { success: false, message: err.response?.data?.message };
     }
   };
+  const getUploadSummary = async (examPeriodId: string) => {
+    try {
+      const res = await api.get("/exams/uploads-summary", {
+        params: { examPeriodId },
+      });
+      return { success: true, data: res.data.data };
+    } catch (err: any) {
+      return { success: false, message: err.response?.data?.message };
+    }
+  };
   const getClassResults = async (classId: string, examPeriodId: string) => {
     try {
       const res = await api.get("/exams/class-results", {
@@ -168,5 +178,6 @@ export const useExamResults = () => {
     getPendingRows,
     resolvePendingRow,
     discardPendingRow,
+    getUploadSummary,
   };
 };

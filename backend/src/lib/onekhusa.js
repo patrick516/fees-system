@@ -94,30 +94,18 @@ const requestToPay = async ({
     merchantAccountNumber,
   );
 };
-// ==================== GET ALL MERCHANTS ====================
+// ==================== GET ALL MERCHANTS (Organisation) ====================
 const getAllMerchants = async (merchantAccountNumberForToken) => {
-  const result = await authedRequest(
+  return authedRequest(
     "POST",
-    "/merchants/accounts/getAll",
+    "/disbursements/single/intra/organisationMerchants",
     {
+      merchantAccountNumber: parseInt(merchantAccountNumberForToken, 10),
       organisationId: process.env.ONEKHUSA_ORGANISATION_ID,
-      pageNumber: 1,
-      numberOfReturnedRows: 10, // 🎯 Match the official example
-      isIncremental: false,
-      searchBy: "AccountName",
-      searchText: "school", // 🎯 Use a concrete, meaningful search term
     },
     {},
     merchantAccountNumberForToken,
   );
-
-  // 🎯 Log the raw response so we can see the real structure
-  console.log(
-    "[onekhusa] Raw merchants response:",
-    JSON.stringify(result, null, 2),
-  );
-
-  return result;
 };
 
 module.exports = {

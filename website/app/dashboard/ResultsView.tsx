@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { BookOpen, Trophy, Medal } from "lucide-react";
+import { BookOpen, Trophy } from "lucide-react";
 import api from "../../lib/axios";
 
 export default function ResultsView({ studentId }: { studentId: string }) {
@@ -149,57 +149,6 @@ export default function ResultsView({ studentId }: { studentId: string }) {
                 </span>
               )}
             </div>
-          </div>
-        </div>
-      )}
-
-      {/* ============ CLASS TOP 3 ============ */}
-      {results.topThree && results.topThree.length > 0 && (
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-          <div className="px-4 py-2.5 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-            <Medal size={14} className="text-yellow-500" />
-            <h3 className="text-xs font-semibold text-gray-700">
-              Class Top 3 — {results.examPeriod.name}
-            </h3>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {results.topThree.map((t: any) => {
-              const medal =
-                t.position === 1 ? "🥇" : t.position === 2 ? "🥈" : "🥉";
-              return (
-                <div
-                  key={t.position}
-                  className={`px-4 py-2.5 flex items-center justify-between ${
-                    t.isCurrentStudent ? "bg-blue-50/60" : ""
-                  }`}
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <span className="text-base shrink-0">{medal}</span>
-                    <span
-                      className={`text-sm truncate ${
-                        t.isCurrentStudent
-                          ? "font-semibold text-blue-900"
-                          : "text-gray-700"
-                      }`}
-                    >
-                      {t.fullName}
-                    </span>
-                    {t.isCurrentStudent && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold shrink-0">
-                        You
-                      </span>
-                    )}
-                  </div>
-                  <span
-                    className={`text-sm font-semibold shrink-0 ml-2 ${
-                      t.isCurrentStudent ? "text-blue-900" : "text-gray-700"
-                    }`}
-                  >
-                    {isLetter ? `${t.value}%` : `${t.value} pts`}
-                  </span>
-                </div>
-              );
-            })}
           </div>
         </div>
       )}

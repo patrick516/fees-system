@@ -24,6 +24,7 @@ const RESOURCES: { value: Resource; label: string }[] = [
   { value: "results", label: "Exam Results" },
   { value: "staff", label: "Staff" },
   { value: "settings", label: "Settings" },
+  { value: "audit", label: "Audit Trail" },
 ];
 
 const ACTIONS: { value: PermissionAction; label: string }[] = [
