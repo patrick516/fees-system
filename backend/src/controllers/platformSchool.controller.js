@@ -194,11 +194,12 @@ const inviteSchool = async (req, res) => {
       return { school, admin };
     });
 
-    //  Await the email so we know if it failed
+    // 🎯 Await the email so we know if it failed AND pass the tempPassword
     const emailRes = await sendPlatformSchoolInviteEmail({
       to: cleanEmail,
       name: "there",
       inviteToken,
+      tempPassword, // 🎯 THIS WAS MISSING
       expiresInDays: INVITE_TTL_DAYS,
     });
 
