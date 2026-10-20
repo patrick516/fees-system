@@ -93,7 +93,7 @@ const Sidebar = () => {
   const close = () => setOpen(false);
 
   const sidebarContent = (
-    <div className="w-64 bg-[var(--color-primary)] text-white flex flex-col h-full">
+    <div className="w-64 bg-[var(--color-primary)] text-white flex flex-col h-full md:rounded-2xl shadow-xl overflow-hidden">
       {/* Logo */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
