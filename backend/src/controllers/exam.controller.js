@@ -967,10 +967,26 @@ const getUploadSummary = async (req, res) => {
         },
       });
 
+      // 🎯 AUTO-ENFORCE: Form 1 & 2 = LETTER, Form 3 & 4 = POINTS
+      const isLowerForm =
+        cls.level <= 2 ||
+        cls.name.toLowerCase().includes("form 1") ||
+        cls.name.toLowerCase().includes("form 2");
+
+      const requiredGrading = isLowerForm ? "LETTER" : "POINTS";
+
+      // If the DB has the wrong grading system, silently fix it
+      if (cls.gradingSystem !== requiredGrading) {
+        await prisma.class.update({
+          where: { id: cls.id },
+          data: { gradingSystem: requiredGrading },
+        });
+      }
+
       summary.push({
         classId: cls.id,
         className: cls.name,
-        gradingSystem: cls.gradingSystem,
+        gradingSystem: requiredGrading,
         hasResults: count > 0,
         studentsUploaded: count,
       });
