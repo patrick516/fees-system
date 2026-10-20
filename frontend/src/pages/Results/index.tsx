@@ -593,48 +593,56 @@ const ResultsPage = () => {
                 <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
                   Classes for this period
                 </p>
-                {uploadSummary.length === 0 ? (
+                {uploadSummary.filter(
+                  (sum) => sum.gradingSystem === boundarySystem,
+                ).length === 0 ? (
                   <p className="text-sm text-gray-500">
-                    No classes found. Add classes in settings first.
+                    No{" "}
+                    {boundarySystem === "POINTS"
+                      ? "Form 3 or 4"
+                      : "Form 1 or 2"}{" "}
+                    classes found for this period.
                   </p>
                 ) : (
-                  uploadSummary.map((sum) => (
-                    <div
-                      key={sum.classId}
-                      onClick={() => handleViewClass(sum.classId)}
-                      className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
-                        selectedClass === sum.classId
-                          ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]"
-                          : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
-                      }`}
-                    >
-                      <div>
-                        <p className="font-medium text-gray-800 text-sm">
-                          {sum.className}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-0.5">
-                          {sum.hasResults
-                            ? `✅ ${sum.studentsUploaded} students uploaded`
-                            : "❌ Not uploaded"}
-                        </p>
+                  uploadSummary
+                    .filter((sum) => sum.gradingSystem === boundarySystem)
+                    .map((sum) => (
+                      <div
+                        key={sum.classId}
+                        onClick={() => handleViewClass(sum.classId)}
+                        className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-colors ${
+                          selectedClass === sum.classId
+                            ? "border-[var(--color-primary)] bg-[var(--color-primary-light)]"
+                            : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
+                        }`}
+                      >
+                        <div>
+                          <p className="font-medium text-gray-800 text-sm">
+                            {sum.className}
+                          </p>
+                          <p className="text-xs text-gray-500 mt-0.5">
+                            {sum.hasResults
+                              ? `✅ ${sum.studentsUploaded} students uploaded`
+                              : "❌ Not uploaded"}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] font-bold px-2 py-1 rounded bg-white border border-gray-200 text-gray-600">
+                            {sum.gradingSystem === "LETTER"
+                              ? "Letters"
+                              : "Points"}
+                          </span>
+                          <Eye
+                            size={16}
+                            className={
+                              sum.hasResults
+                                ? "text-[var(--color-primary)]"
+                                : "text-gray-300"
+                            }
+                          />
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] font-bold px-2 py-1 rounded bg-white border border-gray-200 text-gray-600">
-                          {sum.gradingSystem === "LETTER"
-                            ? "Letters"
-                            : "Points"}
-                        </span>
-                        <Eye
-                          size={16}
-                          className={
-                            sum.hasResults
-                              ? "text-[var(--color-primary)]"
-                              : "text-gray-300"
-                          }
-                        />
-                      </div>
-                    </div>
-                  ))
+                    ))
                 )}
               </div>
 
