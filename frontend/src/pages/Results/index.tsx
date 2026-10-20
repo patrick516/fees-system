@@ -597,11 +597,13 @@ const ResultsPage = () => {
                   (sum) => sum.gradingSystem === boundarySystem,
                 ).length === 0 ? (
                   <p className="text-sm text-gray-500">
-                    No{" "}
-                    {boundarySystem === "POINTS"
-                      ? "Form 3 or 4"
-                      : "Form 1 or 2"}{" "}
-                    classes found for this period.
+                    No classes found using the{" "}
+                    <strong>
+                      {boundarySystem === "POINTS"
+                        ? "Points (1-9)"
+                        : "Letter (A-F)"}
+                    </strong>{" "}
+                    grading system for this period.
                   </p>
                 ) : (
                   uploadSummary
