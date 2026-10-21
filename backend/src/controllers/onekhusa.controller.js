@@ -375,7 +375,7 @@ const webhook = async (req, res) => {
     }
 
     // ============ STEP 3: Process ============
-    // ============ STEP 3: Process ============
+
     const { transactionReferenceNumber, transactionStatusCode, metaData } =
       req.body;
 
@@ -388,7 +388,7 @@ const webhook = async (req, res) => {
     const payment = await prisma.feePayment.findFirst({
       where: {
         malipoTransactionId: merchantRef,
-        schoolId: school.id, // ⭐ double-check it belongs to this school
+        schoolId: school.id,
       },
       include: {
         student: {
