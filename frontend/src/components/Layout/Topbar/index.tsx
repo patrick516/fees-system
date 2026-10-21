@@ -25,7 +25,8 @@ const Topbar = () => {
   const [showPayModal, setShowPayModal] = useState(false);
 
   const title = pageTitles[location.pathname] || "SchoolPay";
-  const greeting = new Date().getHours() < 12 ? "morning" : "afternoon";
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? "morning" : hour < 17 ? "afternoon" : "evening";
 
   //  CALCULATE TRIAL DAYS
   const school = staff?.school as any;
