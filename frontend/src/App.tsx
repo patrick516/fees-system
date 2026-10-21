@@ -28,11 +28,9 @@ import StaffPage from "./pages/Staff/index";
 import AuditPage from "./pages/Audit/index";
 import RateLimitModal from "./components/shared/RateLimitModal";
 
-// Layout + Guards
 import MainLayout from "./components/Layout/MainLayout";
 import PermissionGuard from "./components/shared/PermissionGuard";
 
-// Pages — Platform (owner portal)
 import PlatformLogin from "./pages/Platform/Login";
 import PlatformLayout from "./pages/Platform/Layout";
 import PlatformDashboard from "./pages/Platform/Dashboard";
@@ -66,24 +64,22 @@ const PlatformProtectedRoute = ({
   children: React.ReactNode;
 }) => {
   const { isAuthenticated } = usePlatformAuthStore();
-
   if (!isAuthenticated) return <Navigate to="/platform/login" replace />;
   return <>{children}</>;
 };
 
 const ForcePasswordRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, mustChangePassword } = useAuthStore();
-
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!mustChangePassword) return <Navigate to="/dashboard" replace />;
-
   return <>{children}</>;
 };
 
 // ==================== APP ====================
 
 function App() {
-  const { staff } = useAuthStore();
+  // Only subscribe to staff, not the whole store, to prevent unnecessary re-renders
+  const staff = useAuthStore((state) => state.staff);
 
   useEffect(() => {
     applyTheme(staff?.school?.primaryColor);
@@ -122,7 +118,6 @@ function App() {
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
-
           <Route
             path="students"
             element={
@@ -163,7 +158,6 @@ function App() {
               </PermissionGuard>
             }
           />
-
           <Route
             path="payments"
             element={
@@ -188,7 +182,6 @@ function App() {
               </PermissionGuard>
             }
           />
-
           <Route
             path="classes"
             element={
@@ -273,7 +266,6 @@ function App() {
           <Route path="settings" element={<PlatformSettingsPage />} />
         </Route>
 
-        {/* Catch all */}
         <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <RateLimitModal />
