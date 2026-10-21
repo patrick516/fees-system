@@ -3,7 +3,7 @@ import axios from "axios";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
 import { applyTheme } from "./lib/theme";
-import SubscriptionLocked from "./pages/Subscription/Locked"; // <-- ADD THIS
+import SubscriptionLocked from "./pages/Subscription/Locked";
 import Login from "./pages/Auth/Login";
 import Signup from "./pages/Auth/Signup";
 import VerifyEmail from "./pages/Auth/VerifyEmail";
@@ -37,7 +37,6 @@ import PermissionGuard from "./components/shared/PermissionGuard";
 import PlatformLogin from "./pages/Platform/Login";
 import PlatformLayout from "./pages/Platform/Layout";
 import PlatformDashboard from "./pages/Platform/Dashboard";
-
 import PlatformSchoolDetail from "./pages/Platform/SchoolDetail";
 import PlatformSettingsPage from "./pages/Platform/Settings";
 import PlatformSubscriptions from "./pages/Platform/Subscriptions";
@@ -45,15 +44,58 @@ import PlatformAnalytics from "./pages/Platform/Analytics";
 import PlatformOneKhusaMerchants from "./pages/Platform/OneKhusaMerchants";
 import { usePlatformAuthStore } from "./store/platformAuthStore";
 
-//  GUARDS
+// ==================== GUARDS ====================
+
+// School Admin Protected Route
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, mustChangePassword, staff } = useAuthStore();
+  const {
+    isAuthenticated,
+    mustChangePassword,
+    staff,
+    refreshToken,
+    logout,
+    setTokens,
+  } = useAuthStore();
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    const validate = async () => {
+      if (!isAuthenticated || !refreshToken) {
+        setIsChecking(false);
+        return;
+      }
+
+      try {
+        const baseURL = import.meta.env.VITE_API_URL || "";
+        const res = await axios.post(`${baseURL}/auth/refresh`, {
+          refreshToken,
+        });
+        setTokens(res.data.data.token, res.data.data.refreshToken);
+      } catch {
+        logout();
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    validate();
+  }, [isAuthenticated, refreshToken, logout, setTokens]);
+
+  if (isChecking) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-gray-200 border-t-[var(--color-primary)] animate-spin" />
+          <p className="text-xs text-gray-400">Verifying session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (mustChangePassword)
     return <Navigate to="/force-change-password" replace />;
 
-  // Hard cutoff for Locked or Suspended accounts
   const status = (staff?.school as any)?.subscriptionStatus;
   if (status === "LOCKED" || status === "SUSPENDED") {
     return <SubscriptionLocked />;
@@ -62,18 +104,55 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Platform-owner protected route
+// Platform Owner Protected Route
 const PlatformProtectedRoute = ({
   children,
 }: {
   children: React.ReactNode;
 }) => {
-  const { isAuthenticated } = usePlatformAuthStore();
+  const { isAuthenticated, refreshToken, logout, setTokens } =
+    usePlatformAuthStore();
+  const [isChecking, setIsChecking] = useState(true);
+
+  useEffect(() => {
+    const validate = async () => {
+      if (!isAuthenticated || !refreshToken) {
+        setIsChecking(false);
+        return;
+      }
+
+      try {
+        const baseURL = import.meta.env.VITE_API_URL || "";
+        const res = await axios.post(`${baseURL}/platform/auth/refresh`, {
+          refreshToken,
+        });
+        setTokens(res.data.data.token, res.data.data.refreshToken);
+      } catch {
+        logout();
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    validate();
+  }, [isAuthenticated, refreshToken, logout, setTokens]);
+
+  if (isChecking) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-slate-200 border-t-blue-700 animate-spin" />
+          <p className="text-xs text-slate-400">Verifying session...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) return <Navigate to="/platform/login" replace />;
   return <>{children}</>;
 };
 
-// Only accessible when logged in AND mustChangePassword is true.
+// Force Password Change Route
 const ForcePasswordRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, mustChangePassword } = useAuthStore();
 
@@ -83,64 +162,19 @@ const ForcePasswordRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// ==================== APP ====================
+
 function App() {
   const { staff } = useAuthStore();
-  const [sessionChecked, setSessionChecked] = useState(false);
 
   useEffect(() => {
     applyTheme(staff?.school?.primaryColor);
   }, [staff?.school?.primaryColor]);
 
-  // Validate session once on app boot.
-  // If the refresh token is expired or missing, force logout before
-  // rendering any protected route — prevents the "flash of dashboard".
-  useEffect(() => {
-    const validate = async () => {
-      const { isAuthenticated, refreshToken, logout, setTokens } =
-        useAuthStore.getState();
-
-      // Not logged in → nothing to validate
-      if (!isAuthenticated || !refreshToken) {
-        if (isAuthenticated) logout();
-        setSessionChecked(true);
-        return;
-      }
-
-      try {
-        const baseURL = import.meta.env.VITE_API_URL || "";
-        const res = await axios.post(`${baseURL}/auth/refresh`, {
-          refreshToken,
-        });
-        // Rotated tokens — store the fresh pair
-        setTokens(res.data.data.token, res.data.data.refreshToken);
-      } catch {
-        // Refresh failed — session is dead
-        logout();
-      } finally {
-        setSessionChecked(true);
-      }
-    };
-
-    validate();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Splash screen while we validate
-  if (!sessionChecked) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-white">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-gray-200 border-t-[var(--color-primary)] animate-spin" />
-          <p className="text-xs text-gray-400">Restoring session...</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <BrowserRouter>
       <Routes>
-        {/*  PUBLIC  */}
+        {/* PUBLIC */}
         <Route path="/login" element={<Login />} />
         <Route path="/login/:slug" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
@@ -149,7 +183,7 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
 
-        {/*  FORCE PASSWORD CHANGE  */}
+        {/* FORCE PASSWORD CHANGE */}
         <Route
           path="/force-change-password"
           element={
@@ -159,7 +193,7 @@ function App() {
           }
         />
 
-        {/*  PROTECTED (MainLayout)  */}
+        {/* PROTECTED (MainLayout) */}
         <Route
           path="/"
           element={
@@ -169,11 +203,9 @@ function App() {
           }
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
-
-          {/* Dashboard — any authenticated user */}
           <Route path="dashboard" element={<Dashboard />} />
 
-          {/*  STUDENTS  */}
+          {/* STUDENTS */}
           <Route
             path="students"
             element={
@@ -215,7 +247,7 @@ function App() {
             }
           />
 
-          {/*  PAYMENTS  */}
+          {/* PAYMENTS */}
           <Route
             path="payments"
             element={
@@ -241,7 +273,7 @@ function App() {
             }
           />
 
-          {/*  CLASSES  */}
+          {/* CLASSES */}
           <Route
             path="classes"
             element={
@@ -251,7 +283,7 @@ function App() {
             }
           />
 
-          {/*  SMS / ALERTS  */}
+          {/* SMS / ALERTS */}
           <Route
             path="sms"
             element={
@@ -261,7 +293,7 @@ function App() {
             }
           />
 
-          {/*  REPORTS  */}
+          {/* REPORTS */}
           <Route
             path="reports"
             element={
@@ -271,7 +303,7 @@ function App() {
             }
           />
 
-          {/*  SETTINGS  */}
+          {/* SETTINGS */}
           <Route
             path="settings"
             element={
@@ -281,7 +313,7 @@ function App() {
             }
           />
 
-          {/*  RESULTS  */}
+          {/* RESULTS */}
           <Route
             path="results"
             element={
@@ -291,7 +323,7 @@ function App() {
             }
           />
 
-          {/*  STAFF  */}
+          {/* STAFF */}
           <Route
             path="staff"
             element={
@@ -300,7 +332,8 @@ function App() {
               </PermissionGuard>
             }
           />
-          {/*  AUDIT TRAIL  */}
+
+          {/* AUDIT TRAIL */}
           <Route
             path="audit"
             element={
@@ -311,7 +344,7 @@ function App() {
           />
         </Route>
 
-        {/*  PLATFORM (owner portal) — mounted BEFORE catch-all  */}
+        {/* PLATFORM (owner portal) */}
         <Route path="/platform/login" element={<PlatformLogin />} />
         <Route
           path="/platform"
