@@ -58,12 +58,12 @@ export default function SubscriptionCard() {
           </p>
           <p className="text-xs text-gray-500 mt-1">
             {end && daysLeft > 0
-              ? `Expires on ${end.toLocaleDateString()} (${daysLeft} days left)`
+              ? `Expires on ${end.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })} (${daysLeft} days left)`
               : "Expired"}
           </p>
         </div>
 
-        {/* 🎯 CONDITIONAL RENDERING HERE */}
+        {/*  CONDITIONAL RENDERING HERE */}
         {showPayButton ? (
           <button
             onClick={() => setShowPayModal(true)}
