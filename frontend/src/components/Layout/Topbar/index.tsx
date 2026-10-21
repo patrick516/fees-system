@@ -27,7 +27,7 @@ const Topbar = () => {
   const title = pageTitles[location.pathname] || "SchoolPay";
   const greeting = new Date().getHours() < 12 ? "morning" : "afternoon";
 
-  // ==================== CALCULATE TRIAL DAYS ====================
+  //  CALCULATE TRIAL DAYS
   const school = staff?.school as any;
   let daysLeft = 0;
   let statusLabel = "";
@@ -49,13 +49,13 @@ const Topbar = () => {
     }
 
     if (school.subscriptionStatus === "TRIAL") {
-      statusLabel = `${daysLeft} days left`;
+      statusLabel = `Trial • ${daysLeft} days left`;
       badgeColor =
         daysLeft <= 7
           ? "bg-orange-100 text-orange-700"
           : "bg-blue-100 text-blue-700";
     } else if (school.subscriptionStatus === "ACTIVE") {
-      statusLabel = `Active: ${daysLeft} days left`;
+      statusLabel = `Paid • ${daysLeft} days left`;
       badgeColor = "bg-green-100 text-green-700";
     } else if (school.subscriptionStatus === "GRACE") {
       statusLabel = `Grace Period`;
@@ -69,13 +69,7 @@ const Topbar = () => {
     }
   }
 
-  // 🎯 Milestone Logic
-  // Show badge if it's a new trial (>= 28 days), halfway (15 days), or warning (<= 7 days)
-  const showBadge =
-    school &&
-    (school.subscriptionStatus === "TRIAL" ||
-      school.subscriptionStatus === "ACTIVE") &&
-    (daysLeft <= 7 || daysLeft === 15 || daysLeft >= 28);
+  const showBadge = !!school;
 
   // Show pay button if 5 days left, or already in grace/locked
   const showPayButton =

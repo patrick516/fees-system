@@ -1,37 +1,17 @@
 require("dotenv").config();
-
-// 🎯 Override DATABASE_URL to point to Neon production DB
-// This must be done AFTER dotenv.config() and BEFORE requiring prisma
-process.env.DATABASE_URL =
-  "postgresql://neondb_owner:npg_wdyo9WbHV7aT@ep-dawn-recipe-agnrmjbq.c-2.eu-central-1.aws.neon.tech:5432/neondb?sslmode=require";
-
 const axios = require("axios");
-const prisma = require("./src/config/db"); // Reuses your existing Prisma client
 
 const BASE_URL = "https://api.onekhusa.com/sandbox/v1";
 const MERCHANT = 75480583; // Platform account
 const EMAIL = "kulinjipatricks@gmail.com";
 
+// 🎯 HARDCODED FROM YOUR SCREENSHOT (TAN 15888480, MWK 250,000)
+const TAN = "15888480";
+const AMOUNT = 250000;
+
 async function simulate() {
   try {
-    console.log("🔍 Finding latest pending subscription payment in Neon DB...");
-
-    const payment = await prisma.subscriptionPayment.findFirst({
-      where: { status: "PENDING" },
-      orderBy: { createdAt: "desc" },
-    });
-
-    if (!payment || !payment.onekhusaTimedAccount) {
-      console.log("❌ No pending subscription payment found.");
-      console.log(
-        "👉 Please go to the deployed Chichiri School Portal and click 'Generate Account Number' first.",
-      );
-      process.exit(1);
-    }
-
-    console.log(
-      `✅ Found TAN: ${payment.onekhusaTimedAccount} for MWK ${payment.amount}`,
-    );
+    console.log("🚀 Bypassing database entirely. Getting token...");
 
     // Get OneKhusa token using PLATFORM merchant account
     const tokenRes = await axios.post(`${BASE_URL}/account/getAccessToken`, {
@@ -52,15 +32,15 @@ async function simulate() {
       throw new Error("No active connector found");
     }
 
-    // Simulate Payment
-    console.log("💸 Simulating payment on OneKhusa...");
+    // Simulate Payment directly against OneKhusa
+    console.log(`💸 Simulating payment for TAN ${TAN} (MWK ${AMOUNT})...`);
     await axios.post(
       `${BASE_URL}/collections/requestToPay/addFakeTransaction`,
       {
         merchantAccountNumber: MERCHANT,
-        transactionAmount: payment.amount,
+        transactionAmount: AMOUNT,
         connectorId: activeConnector.connectorId,
-        timedAccountNumber: payment.onekhusaTimedAccount,
+        timedAccountNumber: TAN,
         currencyCode: "MWK",
         capturedBy: EMAIL,
       },
@@ -80,8 +60,6 @@ async function simulate() {
     );
   } catch (err) {
     console.error("❌ Error:", err.response?.data || err.message);
-  } finally {
-    await prisma.$disconnect();
   }
 }
 
