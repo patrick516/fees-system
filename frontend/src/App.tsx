@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import axios from "axios";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
@@ -46,7 +46,6 @@ import { usePlatformAuthStore } from "./store/platformAuthStore";
 
 // ==================== GUARDS ====================
 
-// School Admin Protected Route
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const {
     isAuthenticated,
@@ -57,8 +56,12 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     setTokens,
   } = useAuthStore();
   const [isChecking, setIsChecking] = useState(true);
+  const hasValidated = useRef(false);
 
   useEffect(() => {
+    if (hasValidated.current) return;
+    hasValidated.current = true;
+
     const validate = async () => {
       if (!isAuthenticated || !refreshToken) {
         setIsChecking(false);
@@ -113,8 +116,12 @@ const PlatformProtectedRoute = ({
   const { isAuthenticated, refreshToken, logout, setTokens } =
     usePlatformAuthStore();
   const [isChecking, setIsChecking] = useState(true);
+  const hasValidated = useRef(false); // 🎯 Added ref
 
   useEffect(() => {
+    if (hasValidated.current) return;
+    hasValidated.current = true;
+
     const validate = async () => {
       if (!isAuthenticated || !refreshToken) {
         setIsChecking(false);
