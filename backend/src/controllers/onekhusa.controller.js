@@ -177,11 +177,9 @@ const initiatePayment = async (req, res) => {
 };
 
 //  SUBSCRIPTION WEBHOOK HANDLER
-// Called when the webhook's merchant account matches the platform's
-// subscriptionMerchantAccount (not any school's account).
 const handleSubscriptionWebhook = async (body, platform, eventType) => {
   const { transactionReferenceNumber, transactionStatusCode, metaData } = body;
-  const ref = metaData?.referenceNumber;
+  const ref = metaData?.ReferenceNumber || metaData?.referenceNumber;
   if (!ref) {
     console.warn("[onekhusa-sub] Missing referenceNumber");
     return;
@@ -377,10 +375,11 @@ const webhook = async (req, res) => {
     }
 
     // ============ STEP 3: Process ============
+    // ============ STEP 3: Process ============
     const { transactionReferenceNumber, transactionStatusCode, metaData } =
       req.body;
 
-    const merchantRef = metaData?.referenceNumber;
+    const merchantRef = metaData?.ReferenceNumber || metaData?.referenceNumber;
     if (!merchantRef) {
       console.warn("[onekhusa] Webhook missing referenceNumber");
       return;
