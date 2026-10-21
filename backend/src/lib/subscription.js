@@ -58,15 +58,25 @@ const computeAutoStatus = (school) => {
   return "LOCKED";
 };
 
-// Given a school currently within its paid term, compute the new end date
-// when extending by N days. Extends from existing end if still future,
-// otherwise starts from now.
+// Given a school currently within its paid term or trial, compute the new end date
+// when extending by N days. It will extend from the trial end date (if still in trial),
+// or from the current subscription end date (if active), or from today (if expired).
 const computeExtendedEnd = (school, daysToAdd = DEFAULT_TERM_DAYS) => {
   const now = new Date();
-  const current = school.subscriptionEndsAt
+
+  const sub = school.subscriptionEndsAt
     ? new Date(school.subscriptionEndsAt)
     : null;
-  const base = current && current > now ? current : now;
+  const trial = school.trialEndsAt ? new Date(school.trialEndsAt) : null;
+
+  // Find the latest valid future date to start counting from
+  let base = now;
+  if (sub && sub > now) {
+    base = sub; // Extend from current paid subscription
+  } else if (trial && trial > now) {
+    base = trial;
+  }
+
   return new Date(base.getTime() + daysToAdd * DAY_MS);
 };
 

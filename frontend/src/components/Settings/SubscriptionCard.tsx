@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { CreditCard } from "lucide-react";
+import { CreditCard, CheckCircle2 } from "lucide-react";
 import { useAuthStore } from "../../store/authStore";
 import SubscriptionPaymentModal from "../Subscription/SubscriptionPaymentModal";
 
@@ -15,10 +15,19 @@ export default function SubscriptionCard() {
   const sub = school.subscriptionEndsAt
     ? new Date(school.subscriptionEndsAt)
     : null;
+
   const end = sub && sub > now ? sub : trial;
   const daysLeft = end
     ? Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24))
     : 0;
+
+  // 🎯 The logic you requested: Only show the button if they are near expiration
+  // or already in Grace/ReadOnly/Locked status.
+  const showPayButton =
+    daysLeft <= 7 ||
+    school.subscriptionStatus === "GRACE" ||
+    school.subscriptionStatus === "READONLY" ||
+    school.subscriptionStatus === "LOCKED";
 
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -48,19 +57,26 @@ export default function SubscriptionCard() {
               : "Term Subscription"}
           </p>
           <p className="text-xs text-gray-500 mt-1">
-            {/* 🎯 Guard against null `end` here */}
             {end && daysLeft > 0
               ? `Expires on ${end.toLocaleDateString()} (${daysLeft} days left)`
               : "Expired"}
           </p>
         </div>
 
-        <button
-          onClick={() => setShowPayModal(true)}
-          className="rounded-lg bg-[var(--color-primary)] hover:opacity-90 text-white text-sm font-semibold px-4 py-2"
-        >
-          Pay Now
-        </button>
+        {/* 🎯 CONDITIONAL RENDERING HERE */}
+        {showPayButton ? (
+          <button
+            onClick={() => setShowPayModal(true)}
+            className="rounded-lg bg-[var(--color-primary)] hover:opacity-90 text-white text-sm font-semibold px-4 py-2 transition-opacity"
+          >
+            Pay Now
+          </button>
+        ) : (
+          <div className="flex items-center gap-1.5 text-sm font-medium text-green-600 bg-green-50 px-3 py-1.5 rounded-lg border border-green-100">
+            <CheckCircle2 size={16} />
+            Active
+          </div>
+        )}
       </div>
 
       <SubscriptionPaymentModal
