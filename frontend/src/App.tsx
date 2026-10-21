@@ -1,5 +1,4 @@
-import { useEffect, useState, useRef } from "react";
-import axios from "axios";
+import { useEffect } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
 import { applyTheme } from "./lib/theme";
@@ -47,53 +46,7 @@ import { usePlatformAuthStore } from "./store/platformAuthStore";
 // ==================== GUARDS ====================
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const {
-    isAuthenticated,
-    mustChangePassword,
-    staff,
-    refreshToken,
-    logout,
-    setTokens,
-  } = useAuthStore();
-  const [isChecking, setIsChecking] = useState(true);
-  const hasValidated = useRef(false);
-
-  useEffect(() => {
-    if (hasValidated.current) return;
-    hasValidated.current = true;
-
-    const validate = async () => {
-      if (!isAuthenticated || !refreshToken) {
-        setIsChecking(false);
-        return;
-      }
-
-      try {
-        const baseURL = import.meta.env.VITE_API_URL || "";
-        const res = await axios.post(`${baseURL}/auth/refresh`, {
-          refreshToken,
-        });
-        setTokens(res.data.data.token, res.data.data.refreshToken);
-      } catch {
-        logout();
-      } finally {
-        setIsChecking(false);
-      }
-    };
-
-    validate();
-  }, [isAuthenticated, refreshToken, logout, setTokens]);
-
-  if (isChecking) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-gray-200 border-t-[var(--color-primary)] animate-spin" />
-          <p className="text-xs text-gray-400">Verifying session...</p>
-        </div>
-      </div>
-    );
-  }
+  const { isAuthenticated, mustChangePassword, staff } = useAuthStore();
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (mustChangePassword)
@@ -107,59 +60,17 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// Platform Owner Protected Route
 const PlatformProtectedRoute = ({
   children,
 }: {
   children: React.ReactNode;
 }) => {
-  const { isAuthenticated, refreshToken, logout, setTokens } =
-    usePlatformAuthStore();
-  const [isChecking, setIsChecking] = useState(true);
-  const hasValidated = useRef(false); // 🎯 Added ref
-
-  useEffect(() => {
-    if (hasValidated.current) return;
-    hasValidated.current = true;
-
-    const validate = async () => {
-      if (!isAuthenticated || !refreshToken) {
-        setIsChecking(false);
-        return;
-      }
-
-      try {
-        const baseURL = import.meta.env.VITE_API_URL || "";
-        const res = await axios.post(`${baseURL}/platform/auth/refresh`, {
-          refreshToken,
-        });
-        setTokens(res.data.data.token, res.data.data.refreshToken);
-      } catch {
-        logout();
-      } finally {
-        setIsChecking(false);
-      }
-    };
-
-    validate();
-  }, [isAuthenticated, refreshToken, logout, setTokens]);
-
-  if (isChecking) {
-    return (
-      <div className="fixed inset-0 flex items-center justify-center bg-slate-50">
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 rounded-full border-2 border-slate-200 border-t-blue-700 animate-spin" />
-          <p className="text-xs text-slate-400">Verifying session...</p>
-        </div>
-      </div>
-    );
-  }
+  const { isAuthenticated } = usePlatformAuthStore();
 
   if (!isAuthenticated) return <Navigate to="/platform/login" replace />;
   return <>{children}</>;
 };
 
-// Force Password Change Route
 const ForcePasswordRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated, mustChangePassword } = useAuthStore();
 
@@ -212,7 +123,6 @@ function App() {
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
 
-          {/* STUDENTS */}
           <Route
             path="students"
             element={
@@ -254,7 +164,6 @@ function App() {
             }
           />
 
-          {/* PAYMENTS */}
           <Route
             path="payments"
             element={
@@ -280,7 +189,6 @@ function App() {
             }
           />
 
-          {/* CLASSES */}
           <Route
             path="classes"
             element={
@@ -289,8 +197,6 @@ function App() {
               </PermissionGuard>
             }
           />
-
-          {/* SMS / ALERTS */}
           <Route
             path="sms"
             element={
@@ -299,8 +205,6 @@ function App() {
               </PermissionGuard>
             }
           />
-
-          {/* REPORTS */}
           <Route
             path="reports"
             element={
@@ -309,8 +213,6 @@ function App() {
               </PermissionGuard>
             }
           />
-
-          {/* SETTINGS */}
           <Route
             path="settings"
             element={
@@ -319,8 +221,6 @@ function App() {
               </PermissionGuard>
             }
           />
-
-          {/* RESULTS */}
           <Route
             path="results"
             element={
@@ -329,8 +229,6 @@ function App() {
               </PermissionGuard>
             }
           />
-
-          {/* STAFF */}
           <Route
             path="staff"
             element={
@@ -339,8 +237,6 @@ function App() {
               </PermissionGuard>
             }
           />
-
-          {/* AUDIT TRAIL */}
           <Route
             path="audit"
             element={
