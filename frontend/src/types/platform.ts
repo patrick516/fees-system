@@ -11,6 +11,7 @@ export interface PlatformAdmin {
 export interface PlatformSchool {
   id: string;
   name: string;
+  logo: string | null;
   slug: string | null;
   email: string | null;
   isActive: boolean;

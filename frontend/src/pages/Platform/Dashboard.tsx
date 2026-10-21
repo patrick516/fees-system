@@ -334,7 +334,15 @@ export default function PlatformDashboard() {
                   >
                     <div className="flex flex-col items-center text-center mb-3">
                       <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-2 overflow-hidden">
-                        <Building2 className="text-slate-400" size={18} />
+                        {s.logo ? (
+                          <img
+                            src={s.logo}
+                            alt={s.name}
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <Building2 className="text-slate-400" size={18} />
+                        )}
                       </div>
                       <h3
                         className="text-sm font-semibold text-slate-900 line-clamp-1 w-full"

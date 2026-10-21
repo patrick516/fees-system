@@ -1,4 +1,3 @@
-// frontend/src/pages/Platform/SchoolDetail.tsx
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
@@ -9,12 +8,14 @@ import {
   Receipt,
   Pencil,
   CheckCircle2,
+  Building2,
 } from "lucide-react";
 import platformApi from "../../lib/platformApi";
 
 interface SchoolDetail {
   id: string;
   name: string;
+  logo: string | null;
   slug: string | null;
   email: string | null;
   address: string;
@@ -169,24 +170,41 @@ export default function PlatformSchoolDetail() {
       </button>
 
       <div className="flex items-start justify-between mb-8">
-        <div>
-          <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-3">
-            {school.name}
-            <span
-              className={`text-xs px-2.5 py-1 rounded-full font-medium ${
-                school.subscriptionStatus === "ACTIVE"
-                  ? "bg-green-100 text-green-700"
-                  : school.subscriptionStatus === "TRIAL"
-                    ? "bg-blue-100 text-blue-700"
-                    : "bg-red-100 text-red-700"
-              }`}
-            >
-              {school.subscriptionStatus}
-            </span>
-          </h1>
-          <p className="text-sm text-slate-500 mt-1">
-            {school.studentCount} students · {school.staffCount} staff
-          </p>
+        <div className="flex items-center gap-4">
+          {/* 🎯 Show School Logo */}
+          {school.logo ? (
+            <div className="w-16 h-16 rounded-xl border border-slate-200 bg-white flex items-center justify-center overflow-hidden shrink-0 shadow-sm">
+              <img
+                src={school.logo}
+                alt={school.name}
+                className="w-full h-full object-contain"
+              />
+            </div>
+          ) : (
+            <div className="w-16 h-16 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0">
+              <Building2 className="text-slate-400" size={28} />
+            </div>
+          )}
+
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900 flex items-center gap-3">
+              {school.name}
+              <span
+                className={`text-xs px-2.5 py-1 rounded-full font-medium ${
+                  school.subscriptionStatus === "ACTIVE"
+                    ? "bg-green-100 text-green-700"
+                    : school.subscriptionStatus === "TRIAL"
+                      ? "bg-blue-100 text-blue-700"
+                      : "bg-red-100 text-red-700"
+                }`}
+              >
+                {school.subscriptionStatus}
+              </span>
+            </h1>
+            <p className="text-sm text-slate-500 mt-1">
+              {school.studentCount} students · {school.staffCount} staff
+            </p>
+          </div>
         </div>
       </div>
 

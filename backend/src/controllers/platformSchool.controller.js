@@ -16,6 +16,7 @@ const listSchools = async (req, res) => {
       select: {
         id: true,
         name: true,
+        logo: true,
         slug: true,
         email: true,
         isActive: true,
