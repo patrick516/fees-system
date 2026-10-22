@@ -1,21 +1,13 @@
 import { useState, useEffect } from "react";
-import { useNavigate, useParams, Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { useAuthStore } from "../../store/authStore";
 import api from "../../lib/axios";
 import { applyTheme } from "../../lib/theme";
 import { Eye, EyeOff, Loader2, ShieldAlert } from "lucide-react";
 
-interface Branding {
-  name: string;
-  logo: string | null;
-  motto: string | null;
-  primaryColor?: string | null;
-}
-
 const Login = () => {
   const navigate = useNavigate();
   const { login } = useAuthStore();
-  const { slug } = useParams();
 
   const [lockedInfo, setLockedInfo] = useState<{
     message: string;
@@ -26,61 +18,11 @@ const Login = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [schoolBranding, setSchoolBranding] = useState<Branding | null>(null);
 
-  // ==================== LOAD BRANDING ====================
-  // Priority:
-  //   1. If URL has /login/:slug → fetch by slug
-  //   2. Otherwise → instant cache from localStorage, then refresh from API
+  // 🎯 Force SchoolPay branding on the login page
   useEffect(() => {
-    const loadBranding = async () => {
-      // --- Slug-based branding ---
-      if (slug) {
-        try {
-          const res = await api.get(`/schools/by-slug/${slug}`);
-          const data = res.data.data;
-          setSchoolBranding(data);
-          if (data.primaryColor) applyTheme(data.primaryColor);
-        } catch {
-          setSchoolBranding(null);
-        }
-        return;
-      }
-
-      // --- Instant cache (no flash) ---
-      const stored = localStorage.getItem("lastSchoolBranding");
-      if (stored) {
-        try {
-          const cached: Branding = JSON.parse(stored);
-          setSchoolBranding(cached);
-          if (cached.primaryColor) applyTheme(cached.primaryColor);
-        } catch {
-          /* ignore corrupt cache */
-        }
-      }
-
-      // --- Always refresh from API — overrides cache ---
-      try {
-        const res = await api.get("/schools/public");
-        const data = res.data.data;
-        if (data?.name) {
-          const branding: Branding = {
-            name: data.name,
-            logo: data.logo,
-            motto: data.motto,
-            primaryColor: data.primaryColor,
-          };
-          setSchoolBranding(branding);
-          localStorage.setItem("lastSchoolBranding", JSON.stringify(branding));
-          if (data.primaryColor) applyTheme(data.primaryColor);
-        }
-      } catch {
-        // API unreachable — keep whatever we showed from cache
-      }
-    };
-
-    loadBranding();
-  }, [slug]);
+    applyTheme("#1e3a8a"); // SchoolPay default blue
+  }, []);
 
   // ==================== LOGIN ====================
   const handleSubmit = async (e: React.FormEvent) => {
@@ -93,16 +35,14 @@ const Login = () => {
       const { token, refreshToken, staff, mustChangePassword } = res.data.data;
 
       login(token, refreshToken, staff, !!mustChangePassword);
-      // If the user must change their password, stash the current one in
-      // sessionStorage so ForceChangePassword can pre-fill the field and
-      // the user only needs to type the new one.
+
       if (mustChangePassword) {
         sessionStorage.setItem("pendingCurrentPassword", form.password);
       } else {
         sessionStorage.removeItem("pendingCurrentPassword");
       }
 
-      // Cache branding so the next visit renders instantly
+      // Cache branding ONLY for after they log in
       if (staff.school) {
         localStorage.setItem(
           "lastSchoolBranding",
@@ -124,13 +64,11 @@ const Login = () => {
       const data = err.response?.data;
       const status = err.response?.status;
 
-      // Unverified email → send them to the OTP page
       if (data?.code === "EMAIL_NOT_VERIFIED") {
         navigate(`/verify-email?email=${encodeURIComponent(form.email)}`);
         return;
       }
 
-      // Account locked → show the lockout message with countdown
       if (status === 423 && data?.code === "ACCOUNT_LOCKED") {
         setLockedInfo({
           message: data?.message || "Account is temporarily locked.",
@@ -151,31 +89,21 @@ const Login = () => {
       <div className="absolute inset-0 bg-black/40" />
 
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-10">
-        {/* Logo — school's own logo if set, otherwise SchoolPay fallback */}
+        {/* 🎯 Static SchoolPay Logo */}
         <div className="mb-6 flex items-center justify-center">
-          {schoolBranding?.logo ? (
-            <img
-              src={schoolBranding.logo}
-              alt={schoolBranding.name || "School"}
-              className="h-16 w-auto object-contain"
-            />
-          ) : (
-            <img
-              src="/images/SchoolPayLogo.jpg"
-              alt="SchoolPay"
-              className="h-20 w-20 object-contain rounded-2xl bg-white p-2 shadow-lg"
-            />
-          )}
+          <img
+            src="/images/SchoolPayLogo.jpg"
+            alt="SchoolPay"
+            className="h-20 w-20 object-contain rounded-2xl bg-white p-2 shadow-lg"
+          />
         </div>
 
-        {/* Heading */}
+        {/* Heading & Static Tagline */}
         <h1 className="text-3xl font-bold text-white text-center tracking-tight">
           Welcome back
         </h1>
         <p className="text-sm text-white/80 mt-2 mb-8 text-center">
-          {schoolBranding?.motto
-            ? `"${schoolBranding.motto}"`
-            : "Let's get your work done."}
+          Simple, secure school fee management
         </p>
 
         {/* Card */}
@@ -286,11 +214,7 @@ const Login = () => {
 
         {/* Footer */}
         <p className="text-xs text-white/70 mt-8 text-center">
-          © {new Date().getFullYear()}{" "}
-          {schoolBranding?.name && schoolBranding.name !== "Pending Setup"
-            ? schoolBranding.name
-            : "SchoolPay"}
-          . All rights reserved.
+          © {new Date().getFullYear()} SchoolPay. All rights reserved.
         </p>
       </div>
     </div>
