@@ -19,12 +19,11 @@ const Login = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // 🎯 Force SchoolPay branding on the login page
   useEffect(() => {
-    applyTheme("#1e3a8a"); // SchoolPay default blue
+    applyTheme("#1e3a8a");
   }, []);
 
-  // ==================== LOGIN ====================
+  //  LOGIN
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -89,7 +88,7 @@ const Login = () => {
       <div className="absolute inset-0 bg-black/40" />
 
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-10">
-        {/* 🎯 Static SchoolPay Logo */}
+        {/*  Static SchoolPay Logo */}
         <div className="mb-6 flex items-center justify-center">
           <img
             src="/images/SchoolPayLogo.jpg"
