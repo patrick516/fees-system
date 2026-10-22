@@ -201,7 +201,7 @@ const Login = () => {
           <span className="text-xs text-white/80 whitespace-nowrap">
             Contact{" "}
             <a
-              href="mailto:info@stpeters.mw"
+              href="mailto:info@schoolpay.mw"
               className="text-white font-semibold hover:underline transition-colors duration-300"
             >
               IT
