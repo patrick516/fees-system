@@ -1,4 +1,5 @@
-import { useEffect } from "react";
+import { useEffect, useState, useRef } from "react";
+import axios from "axios";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
 import { applyTheme } from "./lib/theme";
@@ -44,7 +45,60 @@ import { usePlatformAuthStore } from "./store/platformAuthStore";
 // ==================== GUARDS ====================
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, mustChangePassword, staff } = useAuthStore();
+  const {
+    isAuthenticated,
+    mustChangePassword,
+    staff,
+    refreshToken,
+    logout,
+    setTokens,
+    _hasHydrated,
+  } = useAuthStore();
+
+  const [isChecking, setIsChecking] = useState(true);
+  const hasValidated = useRef(false);
+
+  useEffect(() => {
+    // 1. Wait for Zustand to read from localStorage
+    if (!_hasHydrated) return;
+    // 2. Prevent infinite loops
+    if (hasValidated.current) return;
+    hasValidated.current = true;
+
+    const validate = async () => {
+      if (!isAuthenticated || !refreshToken) {
+        setIsChecking(false);
+        return;
+      }
+
+      try {
+        // 3. Verify the token is still valid before showing the dashboard
+        const baseURL = import.meta.env.VITE_API_URL || "";
+        const res = await axios.post(`${baseURL}/auth/refresh`, {
+          refreshToken,
+        });
+        setTokens(res.data.data.token, res.data.data.refreshToken);
+      } catch {
+        logout();
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    validate();
+  }, [_hasHydrated, isAuthenticated, refreshToken, logout, setTokens]);
+
+  // Keep spinner showing if checking OR if storage hasn't loaded yet
+  if (!_hasHydrated || isChecking) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-gray-200 border-t-[var(--color-primary)] animate-spin" />
+          <p className="text-xs text-gray-400">Verifying session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (mustChangePassword)
@@ -63,15 +117,62 @@ const PlatformProtectedRoute = ({
 }: {
   children: React.ReactNode;
 }) => {
-  const { isAuthenticated } = usePlatformAuthStore();
+  const { isAuthenticated, refreshToken, logout, setTokens, _hasHydrated } =
+    usePlatformAuthStore();
+
+  const [isChecking, setIsChecking] = useState(true);
+  const hasValidated = useRef(false);
+
+  useEffect(() => {
+    if (!_hasHydrated) return;
+    if (hasValidated.current) return;
+    hasValidated.current = true;
+
+    const validate = async () => {
+      if (!isAuthenticated || !refreshToken) {
+        setIsChecking(false);
+        return;
+      }
+
+      try {
+        const baseURL = import.meta.env.VITE_API_URL || "";
+        const res = await axios.post(`${baseURL}/platform/auth/refresh`, {
+          refreshToken,
+        });
+        setTokens(res.data.data.token, res.data.data.refreshToken);
+      } catch {
+        logout();
+      } finally {
+        setIsChecking(false);
+      }
+    };
+
+    validate();
+  }, [_hasHydrated, isAuthenticated, refreshToken, logout, setTokens]);
+
+  if (!_hasHydrated || isChecking) {
+    return (
+      <div className="fixed inset-0 flex items-center justify-center bg-slate-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 rounded-full border-2 border-slate-200 border-t-blue-700 animate-spin" />
+          <p className="text-xs text-slate-400">Verifying session...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (!isAuthenticated) return <Navigate to="/platform/login" replace />;
   return <>{children}</>;
 };
 
 const ForcePasswordRoute = ({ children }: { children: React.ReactNode }) => {
-  const { isAuthenticated, mustChangePassword } = useAuthStore();
+  const { isAuthenticated, mustChangePassword, _hasHydrated } = useAuthStore();
+
+  if (!_hasHydrated) return null;
+
   if (!isAuthenticated) return <Navigate to="/login" replace />;
   if (!mustChangePassword) return <Navigate to="/dashboard" replace />;
+
   return <>{children}</>;
 };
 

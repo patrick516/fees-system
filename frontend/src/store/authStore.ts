@@ -3,11 +3,14 @@ import { persist } from "zustand/middleware";
 import type { Staff } from "../types";
 
 interface AuthState {
-  token: string | null; // access token
-  refreshToken: string | null; // refresh token
+  token: string | null;
+  refreshToken: string | null;
   staff: Staff | null;
   isAuthenticated: boolean;
   mustChangePassword: boolean;
+  _hasHydrated: boolean; // 🎯 Added
+  setHasHydrated: (state: boolean) => void; // 🎯 Added
+
   login: (
     token: string,
     refreshToken: string,
@@ -28,6 +31,9 @@ export const useAuthStore = create<AuthState>()(
       staff: null,
       isAuthenticated: false,
       mustChangePassword: false,
+      _hasHydrated: false,
+
+      setHasHydrated: (state) => set({ _hasHydrated: state }),
 
       login: (token, refreshToken, staff, mustChangePassword = false) => {
         localStorage.setItem("token", token);
@@ -39,20 +45,12 @@ export const useAuthStore = create<AuthState>()(
           mustChangePassword,
         });
       },
-
       setTokens: (token, refreshToken) => {
         localStorage.setItem("token", token);
         set({ token, refreshToken });
       },
-
-      setStaff: (staff) => {
-        set({ staff });
-      },
-
-      clearMustChangePassword: () => {
-        set({ mustChangePassword: false });
-      },
-
+      setStaff: (staff) => set({ staff }),
+      clearMustChangePassword: () => set({ mustChangePassword: false }),
       logout: () => {
         localStorage.removeItem("token");
         localStorage.removeItem("staff");
@@ -67,6 +65,9 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: "auth-storage",
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     },
   ),
 );
