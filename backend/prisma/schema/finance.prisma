@@ -142,7 +142,7 @@ model NotificationLog {
   @@map("sms_logs")
 }
 
-// ==================== SUBSCRIPTION PAYMENT ====================
+//  SUBSCRIPTION PAYMENT 
 model SubscriptionPayment {
   id       String @id @default(uuid())
   schoolId String
@@ -175,4 +175,26 @@ model SubscriptionPayment {
   @@index([status])
   @@index([term, academicYear])
   @@map("subscription_payments")
+}
+
+//  STUDENT DISCOUNTS 
+// Allows schools to apply bursaries, scholarships, staff waivers, etc.
+model StudentDiscount {
+  id           String   @id @default(uuid())
+  schoolId     String
+  school       School   @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      Student  @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  term         Term
+  academicYear String
+  amount       Decimal  @db.Decimal(12, 2) 
+  reason       String?  
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Ensure a student only gets one discount per term
+  @@unique([studentId, term, academicYear])
+  @@map("student_discounts")
 }

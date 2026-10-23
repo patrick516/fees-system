@@ -2,6 +2,7 @@ const prisma = require("../config/db");
 const { uploadToCloudinary } = require("../lib/cloudinary");
 const { generateReceiptNumber, buildSchoolPrefix } = require("../lib/utils");
 const { sendNotifications } = require("../lib/notifier");
+const { reconcileVerifiedPayment } = require("../lib/paymentReconciliation");
 
 //  HELPER — Calculate debtor status
 const calculateDebtorStatus = async (
@@ -411,78 +412,8 @@ const verifyPayment = async (req, res) => {
         },
       });
 
-      const requiredAmount = payment.requiredAmount
-        ? Number(payment.requiredAmount)
-        : null;
-      let finalBalance = null;
-      let finalIsDebtor = false;
-      let deltaOverpay = 0;
-
-      if (requiredAmount !== null) {
-        const beforeAgg = await tx.feePayment.aggregate({
-          where: {
-            studentId: payment.studentId,
-            term: payment.term,
-            academicYear: payment.academicYear,
-            status: "VERIFIED",
-            id: { not: payment.id },
-          },
-          _sum: { amount: true },
-        });
-        const paidBefore = Number(beforeAgg._sum.amount) || 0;
-        const totalPaid = paidBefore + Number(payment.amount);
-        const overpayBefore = Math.max(0, paidBefore - requiredAmount);
-        const overpayAfter = Math.max(0, totalPaid - requiredAmount);
-        deltaOverpay = overpayAfter - overpayBefore;
-
-        finalBalance = Math.max(0, requiredAmount - totalPaid);
-        finalIsDebtor = finalBalance > 0;
-
-        if (deltaOverpay > 0) {
-          await tx.student.update({
-            where: { id: payment.studentId },
-            data: { creditBalance: { increment: deltaOverpay } },
-          });
-        }
-
-        await tx.feePayment.update({
-          where: { id },
-          data: { overpayment: deltaOverpay },
-        });
-
-        await tx.feePayment.updateMany({
-          where: {
-            studentId: payment.studentId,
-            term: payment.term,
-            academicYear: payment.academicYear,
-            status: "VERIFIED",
-          },
-          data: { balance: finalBalance, isDebtor: finalIsDebtor },
-        });
-      } else {
-        const debtorStatus = await calculateDebtorStatus(
-          tx,
-          payment.studentId,
-          payment.student.classId,
-          req.schoolId,
-          payment.term,
-          payment.academicYear,
-        );
-        await tx.feePayment.updateMany({
-          where: {
-            studentId: payment.studentId,
-            term: payment.term,
-            academicYear: payment.academicYear,
-            status: "VERIFIED",
-          },
-          data: {
-            balance: debtorStatus.balance,
-            isDebtor: debtorStatus.isDebtor,
-          },
-        });
-        finalBalance = debtorStatus.balance;
-        finalIsDebtor = debtorStatus.isDebtor;
-      }
+      // 🎯 Old inline balance/overpayment math replaced by the shared helper
+      const reconcile = await reconcileVerifiedPayment(tx, verified);
 
       await tx.auditLog.create({
         data: {
@@ -495,7 +426,13 @@ const verifyPayment = async (req, res) => {
         },
       });
 
-      return { verified, payment, finalBalance, finalIsDebtor, deltaOverpay };
+      return {
+        verified,
+        payment,
+        finalBalance: reconcile.balance,
+        finalIsDebtor: reconcile.isDebtor,
+        deltaOverpay: reconcile.overpayment,
+      };
     });
 
     const school = await prisma.school.findUnique({

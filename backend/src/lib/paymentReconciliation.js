@@ -1,8 +1,7 @@
-// backend/src/lib/paymentReconciliation.js
 const prisma = require("../config/db");
 
-//  DEBTOR STATUS HELPER
 const calculateDebtorStatus = async (
+  client,
   studentId,
   classId,
   schoolId,
@@ -10,37 +9,32 @@ const calculateDebtorStatus = async (
   academicYear,
 ) => {
   const [feeStructure, paymentsAggregate] = await Promise.all([
-    prisma.feeStructure.findFirst({
+    client.feeStructure.findFirst({
       where: { schoolId, classId, term, academicYear, isActive: true },
     }),
-    prisma.feePayment.aggregate({
+    client.feePayment.aggregate({
       where: { studentId, term, academicYear, status: "VERIFIED" },
       _sum: { amount: true },
     }),
   ]);
 
-  const requiredAmount = feeStructure?.totalAmount || null;
-  const totalPaid = paymentsAggregate._sum.amount || 0;
+  const requiredAmount = feeStructure?.totalAmount
+    ? Number(feeStructure.totalAmount)
+    : null;
+  const totalPaid = Number(paymentsAggregate._sum.amount) || 0;
   const balance = requiredAmount !== null ? requiredAmount - totalPaid : null;
   const isDebtor = balance !== null ? balance > 0 : false;
 
   return { requiredAmount, totalPaid, balance, isDebtor };
 };
 
-/**
- * Runs the overpayment/credit-balance reconciliation for a payment that
- * has just been verified. Called from:
- *   1. Bursar verifies a manual payment (payment.controller.verifyPayment)
- *   2. Malipo webhook confirms an online payment
- *
- * Returns the updated balance/isDebtor for the verified payment.
- */
-async function reconcileVerifiedPayment(payment) {
-  const requiredAmount = payment.requiredAmount;
+const reconcileVerifiedPayment = async (client, payment) => {
+  const requiredAmount = payment.requiredAmount
+    ? Number(payment.requiredAmount)
+    : null;
 
-  if (requiredAmount !== null && requiredAmount !== undefined) {
-    // Total verified for this student/term/year BEFORE this payment
-    const beforeAgg = await prisma.feePayment.aggregate({
+  if (requiredAmount !== null) {
+    const beforeAgg = await client.feePayment.aggregate({
       where: {
         studentId: payment.studentId,
         term: payment.term,
@@ -50,9 +44,8 @@ async function reconcileVerifiedPayment(payment) {
       },
       _sum: { amount: true },
     });
-    const paidBefore = beforeAgg._sum.amount || 0;
-
-    const totalPaid = paidBefore + payment.amount;
+    const paidBefore = Number(beforeAgg._sum.amount) || 0;
+    const totalPaid = paidBefore + Number(payment.amount);
     const overpayBefore = Math.max(0, paidBefore - requiredAmount);
     const overpayAfter = Math.max(0, totalPaid - requiredAmount);
     const deltaOverpay = overpayAfter - overpayBefore;
@@ -61,18 +54,18 @@ async function reconcileVerifiedPayment(payment) {
     const isDebtor = balanceAfter > 0;
 
     if (deltaOverpay > 0) {
-      await prisma.student.update({
+      await client.student.update({
         where: { id: payment.studentId },
         data: { creditBalance: { increment: deltaOverpay } },
       });
     }
 
-    await prisma.feePayment.update({
+    await client.feePayment.update({
       where: { id: payment.id },
       data: { overpayment: deltaOverpay },
     });
 
-    await prisma.feePayment.updateMany({
+    await client.feePayment.updateMany({
       where: {
         studentId: payment.studentId,
         term: payment.term,
@@ -86,12 +79,13 @@ async function reconcileVerifiedPayment(payment) {
   }
 
   // No fee structure set — just recalc debtor status
-  const student = await prisma.student.findUnique({
+  const student = await client.student.findUnique({
     where: { id: payment.studentId },
     select: { classId: true },
   });
 
   const debtorStatus = await calculateDebtorStatus(
+    client,
     payment.studentId,
     student.classId,
     payment.schoolId,
@@ -99,7 +93,7 @@ async function reconcileVerifiedPayment(payment) {
     payment.academicYear,
   );
 
-  await prisma.feePayment.updateMany({
+  await client.feePayment.updateMany({
     where: {
       studentId: payment.studentId,
       term: payment.term,
@@ -117,6 +111,6 @@ async function reconcileVerifiedPayment(payment) {
     isDebtor: debtorStatus.isDebtor,
     overpayment: 0,
   };
-}
+};
 
 module.exports = { reconcileVerifiedPayment, calculateDebtorStatus };
