@@ -249,7 +249,7 @@ const getPublicInfo = async (req, res) => {
       .json({ success: false, message: "Failed to get school info" });
   }
 };
-// ==================== ONEKHUSA STATUS (read-only) ====================
+//  ONEKHUSA STATUS (read-only)
 // GET /api/schools/settings/onekhusa-status
 // Returns whether the school is configured for online payments.
 // NEVER returns the raw webhook secrets — only booleans.
@@ -294,7 +294,7 @@ const getOneKhusaStatus = async (req, res) => {
   }
 };
 
-// ==================== SETTLEMENT ACCOUNT (read-only for school) ====================
+//  SETTLEMENT ACCOUNT (read-only for school)
 // GET /api/schools/settings/settlement-account
 // Returns current settlement + any pending change request.
 const getSettlementAccount = async (req, res) => {
@@ -418,7 +418,7 @@ const requestSettlementChange = async (req, res) => {
       .json({ success: false, message: "Failed to submit request" });
   }
 };
-// ==================== UPDATE NOTIFICATION DEFAULTS ====================
+//  UPDATE NOTIFICATION DEFAULTS
 
 const updateNotificationDefaults = async (req, res) => {
   try {
@@ -448,7 +448,7 @@ const updateNotificationDefaults = async (req, res) => {
   }
 };
 
-// ==================== INITIATE SUBSCRIPTION PAYMENT ====================
+//  INITIATE SUBSCRIPTION PAYMENT
 // POST /api/schools/subscription/pay
 const onekhusa = require("../lib/onekhusa"); // Make sure this is imported at top
 
@@ -549,7 +549,7 @@ const initiateSubscriptionPayment = async (req, res) => {
   }
 };
 
-// ==================== CHECK SUBSCRIPTION PAYMENT STATUS ====================
+//  CHECK SUBSCRIPTION PAYMENT STATUS
 // GET /api/schools/subscription/status/:paymentId
 const getSubscriptionPaymentStatus = async (req, res) => {
   try {
@@ -568,6 +568,53 @@ const getSubscriptionPaymentStatus = async (req, res) => {
   }
 };
 
+//  ONBOARDING STATUS
+// GET /api/schools/onboarding-status
+const getOnboardingStatus = async (req, res) => {
+  try {
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: { activeTerm: true, activeAcademicYear: true },
+    });
+
+    if (!school) {
+      return res
+        .status(404)
+        .json({ success: false, message: "School not found" });
+    }
+
+    const [classCount, feeCount, studentCount] = await Promise.all([
+      prisma.class.count({ where: { schoolId: req.schoolId } }),
+      prisma.feeStructure.count({ where: { schoolId: req.schoolId } }),
+      prisma.student.count({ where: { schoolId: req.schoolId } }),
+    ]);
+
+    const hasClasses = classCount > 0;
+    const hasFeeStructures = feeCount > 0;
+    const hasActiveTerm = !!(school.activeTerm && school.activeAcademicYear);
+    const hasStudents = studentCount > 0;
+
+    const isComplete =
+      hasClasses && hasFeeStructures && hasActiveTerm && hasStudents;
+
+    return res.json({
+      success: true,
+      data: {
+        hasClasses,
+        hasFeeStructures,
+        hasActiveTerm,
+        hasStudents,
+        isComplete,
+      },
+    });
+  } catch (err) {
+    console.error("getOnboardingStatus error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to check status" });
+  }
+};
+
 module.exports = {
   getSettings,
   updateSettings,
@@ -582,4 +629,5 @@ module.exports = {
   requestSettlementChange,
   initiateSubscriptionPayment,
   getSubscriptionPaymentStatus,
+  getOnboardingStatus,
 };

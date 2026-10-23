@@ -81,10 +81,10 @@ router.get(
 );
 
 router.post(
-  "/cash",
+  "/manual",
   verifyStaff,
   requirePermission("payments", "write"),
-  recordCashPayment,
+  paymentController.recordManualPayment,
 );
 
 router.patch(

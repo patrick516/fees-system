@@ -7,6 +7,8 @@ import {
   TrendingUp,
   AlertCircle,
   CheckCircle,
+  CheckCircle2,
+  Circle,
   XCircle,
   ArrowRight,
   BadgeAlert,
@@ -14,6 +16,9 @@ import {
   Star,
   Loader2,
   RefreshCw,
+  BookOpen,
+  CalendarDays,
+  PartyPopper,
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { PaymentSummary } from "../../types";
@@ -54,6 +59,7 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
   const [summary, setSummary] = useState<PaymentSummary | null>(null);
+  const [onboarding, setOnboarding] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -75,23 +81,29 @@ const Dashboard = () => {
       if (status === 429) {
         setError("Too many requests — please wait a moment before refreshing.");
       } else if (status === 401) {
-        // axios interceptor already redirects; nothing to show
         setError("Your session expired. Redirecting to login…");
       } else {
         setError(msg || "Couldn't load dashboard data. Please try again.");
       }
-      // Leave summary as-is (don't null it) so a transient error
-      // doesn't wipe out previously-loaded numbers
     } finally {
       setLoading(false);
     }
   }, [activeYear, currentTerm]);
 
+  const fetchOnboarding = async () => {
+    try {
+      const res = await api.get("/schools/onboarding-status");
+      setOnboarding(res.data.data);
+    } catch (err) {
+      console.error("Failed to load onboarding status");
+    }
+  };
+
   useEffect(() => {
     fetchSummary();
+    fetchOnboarding();
   }, [fetchSummary]);
 
-  // Show initial spinner only when there's nothing to show yet
   if (loading && !summary) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -100,7 +112,6 @@ const Dashboard = () => {
     );
   }
 
-  // Hard error — no data at all to show
   if (error && !summary) {
     return (
       <div className="max-w-md mx-auto mt-12 bg-white rounded-xl shadow-sm border border-red-100 p-8 text-center">
@@ -127,8 +138,122 @@ const Dashboard = () => {
     );
   }
 
+  //  Onboarding Checklist Component
+  const renderOnboarding = () => {
+    if (!onboarding || onboarding.isComplete) return null;
+
+    const steps = [
+      {
+        title: "Create Classes",
+        desc: "Add the classes or forms in your school (e.g. Form 1, Grade 5).",
+        done: onboarding.hasClasses,
+        path: "/classes",
+        icon: BookOpen,
+      },
+      {
+        title: "Set Fee Structures",
+        desc: "Define how much each class pays per term.",
+        done: onboarding.hasFeeStructures,
+        path: "/classes", // Adjust if you have a dedicated fee page
+        icon: CreditCard,
+      },
+      {
+        title: "Activate a Term",
+        desc: "Set the current term and academic year to start collecting fees.",
+        done: onboarding.hasActiveTerm,
+        path: "/settings", // Adjust if Term activation is elsewhere
+        icon: CalendarDays,
+      },
+      {
+        title: "Add Students",
+        desc: "Add students manually or import them via Excel.",
+        done: onboarding.hasStudents,
+        path: "/students/add",
+        icon: Users,
+      },
+    ];
+
+    const completedCount = steps.filter((s) => s.done).length;
+    const progress = Math.round((completedCount / steps.length) * 100);
+
+    return (
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-100 rounded-xl p-6 mb-8 shadow-sm">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h2 className="flex items-center gap-2 text-lg font-bold text-gray-900">
+              Welcome to SchoolPay!
+              <PartyPopper size={20} className="text-[var(--color-primary)]" />
+            </h2>
+            <p className="text-sm text-gray-600 mt-1">
+              Complete these steps to finish setting up your school.
+            </p>
+          </div>
+          <div className="text-right">
+            <span className="text-2xl font-bold text-[var(--color-primary)]">
+              {progress}%
+            </span>
+            <p className="text-xs text-gray-500 font-medium">Completed</p>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full bg-blue-200/50 rounded-full h-2 mb-6">
+          <div
+            className="bg-[var(--color-primary)] h-2 rounded-full transition-all duration-500"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+
+        {/* Checklist */}
+        <div className="space-y-3">
+          {steps.map((step, i) => (
+            <div
+              key={i}
+              className={`flex items-center gap-4 p-3 rounded-lg border ${
+                step.done
+                  ? "bg-white/60 border-green-200"
+                  : "bg-white border-blue-100 shadow-sm"
+              }`}
+            >
+              <div className="shrink-0">
+                {step.done ? (
+                  <CheckCircle2 size={24} className="text-green-500" />
+                ) : (
+                  <Circle size={24} className="text-gray-300" />
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p
+                  className={`text-sm font-semibold ${
+                    step.done ? "text-gray-500 line-through" : "text-gray-900"
+                  }`}
+                >
+                  {step.title}
+                </p>
+                {!step.done && (
+                  <p className="text-xs text-gray-500 mt-0.5">{step.desc}</p>
+                )}
+              </div>
+              {!step.done && (
+                <button
+                  onClick={() => navigate(step.path)}
+                  className="shrink-0 flex items-center gap-1 bg-[var(--color-primary)] text-white px-3 py-1.5 rounded-lg text-xs font-semibold hover:bg-[var(--color-primary-dark)] transition-colors"
+                >
+                  Start <ArrowRight size={12} />
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6">
+      {/*  Onboarding Wizard */}
+      {renderOnboarding()}
+
       {/* Non-blocking error banner — data is showing but stale */}
       {error && summary && (
         <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3">
@@ -171,7 +296,6 @@ const Dashboard = () => {
             {formatMWK(summary?.totalCollected || 0)}
           </p>
 
-          {/*  Fee Transparency Breakdown */}
           <div className="mt-3 pt-3 border-t border-gray-100 space-y-1">
             <div className="flex justify-between text-xs text-gray-500">
               <span>Processing Fees (OneKhusa):</span>
@@ -335,7 +459,7 @@ const Dashboard = () => {
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             {
-              label: "Record Cash Payment",
+              label: "Record Payment",
               path: "/payments/record",
               color: "bg-[var(--color-primary)]",
               icon: CreditCard,

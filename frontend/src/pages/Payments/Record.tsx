@@ -48,7 +48,6 @@ const RecordPayment = () => {
   const [termStatusLoading, setTermStatusLoading] = useState(false);
   const [overpaymentWarning, setOverpaymentWarning] = useState<number>(0);
 
-  // Active term — same source of truth as everything else
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
 
   const [form, setForm] = useState({
@@ -59,7 +58,6 @@ const RecordPayment = () => {
     notes: "",
   });
 
-  // Sync form.term and form.academicYear with the activated values
   useEffect(() => {
     setForm((prev) => ({
       ...prev,
@@ -68,7 +66,6 @@ const RecordPayment = () => {
     }));
   }, [activeYear, currentTerm]);
 
-  // Fetch term status when student or term changes
   useEffect(() => {
     if (!selectedStudent?.id || !form.term || !form.academicYear) {
       setTermStatus(null);
@@ -90,7 +87,6 @@ const RecordPayment = () => {
     fetch();
   }, [selectedStudent, form.term, form.academicYear]);
 
-  // Overpayment warning
   useEffect(() => {
     if (!termStatus || !form.amount) {
       setOverpaymentWarning(0);
@@ -105,34 +101,6 @@ const RecordPayment = () => {
     }
   }, [form.amount, termStatus]);
 
-  // const [feeStructure, setFeeStructure] = useState<any>(null);
-  // const [feeLoading, setFeeLoading] = useState(false);
-
-  // Lookup fee structure when student + term + year changes
-  // useEffect(() => {
-  //   if (!selectedStudent || !form.term || !form.academicYear) return;
-
-  //   const lookupFee = async () => {
-  //     setFeeLoading(true);
-  //     try {
-  //       const studentRes = await api.get(`/students/${selectedStudent.id}`);
-  //       const classId = studentRes.data.data.classId;
-
-  //       const res = await api.get(
-  //         `/schools/fee-structures/lookup?classId=${classId}&term=${form.term}&academicYear=${form.academicYear}`,
-  //       );
-  //       setFeeStructure(res.data.data);
-  //     } catch {
-  //       setFeeStructure(null);
-  //     } finally {
-  //       setFeeLoading(false);
-  //     }
-  //   };
-
-  //   lookupFee();
-  // }, [selectedStudent, form.term, form.academicYear]);
-
-  // If navigated from student detail
   useEffect(() => {
     if (location.state?.studentId) {
       setSelectedStudent({
@@ -142,7 +110,6 @@ const RecordPayment = () => {
     }
   }, [location.state]);
 
-  // Search students
   useEffect(() => {
     if (!searchQuery || searchQuery.length < 2) {
       setSearchResults([]);
@@ -169,12 +136,14 @@ const RecordPayment = () => {
     setLoading(true);
 
     try {
-      const res = await api.post("/payments/cash", {
+      // 🎯 FIXED: Added paymentMethod and changed endpoint to /manual
+      const res = await api.post("/payments/manual", {
         studentId: selectedStudent.id,
         amount: parseFloat(form.amount),
         term: form.term,
         academicYear: form.academicYear,
         notes: form.notes || undefined,
+        paymentMethod: form.paymentMethod,
       });
       setSuccess(res.data.data);
     } catch (err: any) {
@@ -184,7 +153,6 @@ const RecordPayment = () => {
     }
   };
 
-  // Success screen
   if (success) {
     return (
       <div className="max-w-md mx-auto text-center py-12">
@@ -212,7 +180,13 @@ const RecordPayment = () => {
           <div className="flex justify-between">
             <span className="text-gray-500">Amount</span>
             <span className="font-medium text-green-600">
-              MWK {success.amount?.toLocaleString()}
+              MWK {Number(success.amount).toLocaleString()}
+            </span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-gray-500">Method</span>
+            <span className="font-medium">
+              {success.paymentMethod?.replace("_", " ")}
             </span>
           </div>
           <div className="flex justify-between">
@@ -255,7 +229,7 @@ const RecordPayment = () => {
         </button>
         <div>
           <h2 className="text-lg font-semibold text-gray-800">
-            Record Cash Payment
+            Record Manual Payment
           </h2>
           <p className="text-sm text-gray-500">
             Search for student and record payment
@@ -263,7 +237,6 @@ const RecordPayment = () => {
         </div>
       </div>
 
-      {/* Student Search */}
       {!selectedStudent ? (
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h3 className="font-medium text-gray-800 mb-4">Find Student</h3>
@@ -350,13 +323,11 @@ const RecordPayment = () => {
         </div>
       )}
 
-      {/* Payment Form */}
       {selectedStudent && (
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100 space-y-4">
             <h3 className="font-medium text-gray-800">Payment Details</h3>
 
-            {/* Fee Status Panel */}
             {termStatusLoading && (
               <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
                 <p className="text-sm text-gray-500">
