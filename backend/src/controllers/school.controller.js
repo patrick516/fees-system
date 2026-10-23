@@ -669,4 +669,5 @@ module.exports = {
   initiateSubscriptionPayment,
   getSubscriptionPaymentStatus,
   getOnboardingStatus,
+  getTierStatus,
 };
