@@ -1,12 +1,11 @@
 const prisma = require("../config/db");
 const { uploadToCloudinary } = require("../lib/cloudinary");
-const { generateReceiptNumber } = require("../lib/utils");
+const { generateReceiptNumber, buildSchoolPrefix } = require("../lib/utils");
 const { sendNotifications } = require("../lib/notifier");
 
-// ==================== HELPER — Calculate debtor status ====================
-// Gets total verified payments for a student for a specific term
-// Compares against fee structure to determine if debtor
+//  HELPER — Calculate debtor status
 const calculateDebtorStatus = async (
+  tx,
   studentId,
   classId,
   schoolId,
@@ -14,17 +13,19 @@ const calculateDebtorStatus = async (
   academicYear,
 ) => {
   const [feeStructure, paymentsAggregate] = await Promise.all([
-    prisma.feeStructure.findFirst({
+    tx.feeStructure.findFirst({
       where: { schoolId, classId, term, academicYear, isActive: true },
     }),
-    prisma.feePayment.aggregate({
+    tx.feePayment.aggregate({
       where: { studentId, term, academicYear, status: "VERIFIED" },
       _sum: { amount: true },
     }),
   ]);
 
-  const requiredAmount = feeStructure?.totalAmount || null;
-  const totalPaid = paymentsAggregate._sum.amount || 0;
+  const requiredAmount = feeStructure?.totalAmount
+    ? Number(feeStructure.totalAmount)
+    : null;
+  const totalPaid = Number(paymentsAggregate._sum.amount) || 0;
   const balance = requiredAmount !== null ? requiredAmount - totalPaid : null;
   const isDebtor = balance !== null ? balance > 0 : false;
 
@@ -47,133 +48,143 @@ const recordCashPayment = async (req, res) => {
       include: { class: true, school: true },
     });
 
-    if (!student) {
+    if (!student)
       return res
         .status(404)
         .json({ success: false, message: "Student not found" });
-    }
 
     const year = academicYear || new Date().getFullYear().toString();
-    const parsedAmount = parseFloat(amount);
+    const parsedAmount = Number(amount);
 
-    // Get fee structure
-    const feeStructure = await prisma.feeStructure.findFirst({
-      where: {
-        schoolId: req.schoolId,
-        classId: student.classId,
-        term,
-        academicYear: year,
-        isActive: true,
-      },
-    });
+    //  Wrap in transaction for atomicity and receipt race-condition prevention
+    const result = await prisma.$transaction(async (tx) => {
+      const feeStructure = await tx.feeStructure.findFirst({
+        where: {
+          schoolId: req.schoolId,
+          classId: student.classId,
+          term,
+          academicYear: year,
+          isActive: true,
+        },
+      });
 
-    const requiredAmount = feeStructure?.totalAmount || null;
-
-    // Get already paid this term
-    const alreadyPaidAggregate = await prisma.feePayment.aggregate({
-      where: { studentId, term, academicYear: year, status: "VERIFIED" },
-      _sum: { amount: true },
-    });
-    const alreadyPaid = alreadyPaidAggregate._sum.amount || 0;
-
-    // Calculate balance before this payment
-    const balanceBefore =
-      requiredAmount !== null
-        ? Math.max(0, requiredAmount - alreadyPaid)
+      const requiredAmount = feeStructure?.totalAmount
+        ? Number(feeStructure.totalAmount)
         : null;
 
-    // Calculate overpayment
-    let amountToApply = parsedAmount;
-    let overpayment = 0;
-    let newCreditBalance = student.creditBalance;
+      const alreadyPaidAggregate = await tx.feePayment.aggregate({
+        where: { studentId, term, academicYear: year, status: "VERIFIED" },
+        _sum: { amount: true },
+      });
+      const alreadyPaid = Number(alreadyPaidAggregate._sum.amount) || 0;
 
-    if (balanceBefore !== null && parsedAmount > balanceBefore) {
-      overpayment = parsedAmount - balanceBefore;
-      amountToApply = balanceBefore;
-      newCreditBalance = student.creditBalance + overpayment;
-    }
+      const balanceBefore =
+        requiredAmount !== null
+          ? Math.max(0, requiredAmount - alreadyPaid)
+          : null;
 
-    // Generate receipt
-    const paymentCount = await prisma.feePayment.count({
-      where: { schoolId: req.schoolId },
-    });
-    const receiptNumber = generateReceiptNumber(year, paymentCount + 1);
+      let amountToApply = parsedAmount;
+      let overpayment = 0;
+      let newCreditBalance = Number(student.creditBalance) || 0;
 
-    // Calculate new balance after payment
-    const totalPaidAfter = alreadyPaid + amountToApply;
-    const balanceAfter =
-      requiredAmount !== null
-        ? Math.max(0, requiredAmount - totalPaidAfter)
-        : null;
-    const isDebtor = balanceAfter !== null ? balanceAfter > 0 : false;
+      if (balanceBefore !== null && parsedAmount > balanceBefore) {
+        overpayment = parsedAmount - balanceBefore;
+        amountToApply = balanceBefore;
+        newCreditBalance = Number(student.creditBalance) + overpayment;
+      }
 
-    // Create payment record
-    const payment = await prisma.feePayment.create({
-      data: {
-        schoolId: req.schoolId,
-        studentId,
-        amount: parsedAmount,
-        paymentMethod: "CASH",
-        term,
-        academicYear: year,
+      //  Fix receipt collision by using school prefix
+      const paymentCount = await tx.feePayment.count({
+        where: { schoolId: req.schoolId },
+      });
+      const schoolPrefix = buildSchoolPrefix(student.school.name);
+      const receiptNumber = generateReceiptNumber(
+        schoolPrefix,
+        year,
+        paymentCount + 1,
+      );
+
+      const totalPaidAfter = alreadyPaid + amountToApply;
+      const balanceAfter =
+        requiredAmount !== null
+          ? Math.max(0, requiredAmount - totalPaidAfter)
+          : null;
+      const isDebtor = balanceAfter !== null ? balanceAfter > 0 : false;
+
+      const payment = await tx.feePayment.create({
+        data: {
+          schoolId: req.schoolId,
+          studentId,
+          amount: parsedAmount,
+          paymentMethod: "CASH",
+          term,
+          academicYear: year,
+          receiptNumber,
+          submittedBy: "BURSAR",
+          status: "VERIFIED",
+          notes: notes || null,
+          recordedById: req.staff.id,
+          verifiedById: req.staff.id,
+          verifiedAt: new Date(),
+          requiredAmount,
+          balance: balanceAfter,
+          isDebtor,
+          overpayment,
+          creditApplied: 0,
+        },
+        include: {
+          student: {
+            select: {
+              fullName: true,
+              studentCode: true,
+              parentPhone: true,
+              parentEmail: true,
+              parentName: true,
+              class: { select: { name: true } },
+            },
+          },
+          recordedBy: { select: { fullName: true } },
+        },
+      });
+
+      if (overpayment > 0) {
+        await tx.student.update({
+          where: { id: studentId },
+          data: { creditBalance: newCreditBalance },
+        });
+      }
+
+      await tx.auditLog.create({
+        data: {
+          schoolId: req.schoolId,
+          staffId: req.staff.id,
+          action: "PAYMENT_RECORDED",
+          entity: "FeePayment",
+          entityId: payment.id,
+          changes: { amount, term, studentId, receiptNumber, overpayment },
+        },
+      });
+
+      return {
+        payment,
         receiptNumber,
-        submittedBy: "BURSAR",
-        status: "VERIFIED",
-        notes: notes || null,
-        recordedById: req.staff.id,
-        verifiedById: req.staff.id,
-        verifiedAt: new Date(),
         requiredAmount,
-        balance: balanceAfter,
+        alreadyPaid,
+        balanceAfter,
         isDebtor,
         overpayment,
-        creditApplied: 0,
-      },
-      include: {
-        student: {
-          select: {
-            fullName: true,
-            studentCode: true,
-            parentPhone: true,
-            parentEmail: true,
-            parentName: true,
-            class: { select: { name: true } },
-          },
-        },
-        recordedBy: { select: { fullName: true } },
-      },
+        newCreditBalance,
+      };
     });
 
-    // Update student credit balance if overpayment
-    if (overpayment > 0) {
-      await prisma.student.update({
-        where: { id: studentId },
-        data: { creditBalance: newCreditBalance },
-      });
-    }
-
-    // Audit log
-    await prisma.auditLog.create({
-      data: {
-        schoolId: req.schoolId,
-        staffId: req.staff.id,
-        action: "PAYMENT_RECORDED",
-        entity: "FeePayment",
-        entityId: payment.id,
-        changes: { amount, term, studentId, receiptNumber, overpayment },
-      },
-    });
-
-    // SMS log
-    // ============ SEND PAYMENT RECEIVED NOTIFICATION ============
+    // Send Notification (outside transaction to keep it fast)
     const smsMessage =
-      overpayment > 0
-        ? `Payment of MWK ${parsedAmount.toLocaleString()} received for ${payment.student.fullName}. Receipt: ${receiptNumber}. Fees fully paid! MWK ${overpayment.toLocaleString()} credit saved for next term.`
-        : balanceAfter && balanceAfter > 0
-          ? `Payment of MWK ${parsedAmount.toLocaleString()} received for ${payment.student.fullName}. Receipt: ${receiptNumber}. Balance remaining: MWK ${balanceAfter.toLocaleString()}`
-          : `Payment of MWK ${parsedAmount.toLocaleString()} received for ${payment.student.fullName}. Receipt: ${receiptNumber}. Fees fully paid!`;
+      result.overpayment > 0
+        ? `Payment of MWK ${parsedAmount.toLocaleString()} received for ${result.payment.student.fullName}. Receipt: ${result.receiptNumber}. Fees fully paid! MWK ${result.overpayment.toLocaleString()} credit saved for next term.`
+        : result.balanceAfter && result.balanceAfter > 0
+          ? `Payment of MWK ${parsedAmount.toLocaleString()} received for ${result.payment.student.fullName}. Receipt: ${result.receiptNumber}. Balance remaining: MWK ${result.balanceAfter.toLocaleString()}`
+          : `Payment of MWK ${parsedAmount.toLocaleString()} received for ${result.payment.student.fullName}. Receipt: ${result.receiptNumber}. Fees fully paid!`;
 
-    // Fire-and-forget — don't block the response
     const school = await prisma.school.findUnique({
       where: { id: req.schoolId },
       select: { name: true, notificationDefaults: true },
@@ -182,17 +193,17 @@ const recordCashPayment = async (req, res) => {
     sendNotifications({
       recipients: [
         {
-          phone: payment.student.parentPhone,
-          email: payment.student.parentEmail,
-          name: payment.student.parentName || "Parent",
+          phone: result.payment.student.parentPhone,
+          email: result.payment.student.parentEmail,
+          name: result.payment.student.parentName || "Parent",
           message: smsMessage,
           subject: `Payment Received — ${school.name}`,
           templateData: {
-            studentName: payment.student.fullName,
+            studentName: result.payment.student.fullName,
             amount: parsedAmount,
-            receiptNumber,
-            balanceAfter,
-            overpayment,
+            receiptNumber: result.receiptNumber,
+            balanceAfter: result.balanceAfter,
+            overpayment: result.overpayment,
           },
         },
       ],
@@ -208,15 +219,15 @@ const recordCashPayment = async (req, res) => {
       success: true,
       message: "Payment recorded successfully",
       data: {
-        ...payment,
+        ...result.payment,
         debtorStatus: {
-          requiredAmount,
-          alreadyPaid,
+          requiredAmount: result.requiredAmount,
+          alreadyPaid: result.alreadyPaid,
           amountPaidNow: parsedAmount,
-          balanceRemaining: balanceAfter,
-          isDebtor,
-          overpayment,
-          creditBalance: newCreditBalance,
+          balanceRemaining: result.balanceAfter,
+          isDebtor: result.isDebtor,
+          overpayment: result.overpayment,
+          creditBalance: result.newCreditBalance,
         },
       },
     });
@@ -246,16 +257,19 @@ const submitPayment = async (req, res) => {
       });
     }
 
-    if (req.student.id !== studentId) {
+    if (req.student.id !== studentId)
       return res.status(403).json({
         success: false,
         message: "You can only submit payments for your own child",
       });
-    }
 
     const year = academicYear || new Date().getFullYear().toString();
 
-    // Get fee structure so parent can see required amount
+    const student = await prisma.student.findUnique({
+      where: { id: studentId },
+      include: { school: { select: { name: true } }, class: true },
+    });
+
     const feeStructure = await prisma.feeStructure.findFirst({
       where: {
         schoolId: req.student.schoolId,
@@ -266,10 +280,7 @@ const submitPayment = async (req, res) => {
       },
     });
 
-    // Upload receipt to Cloudinary if provided
     let receiptImageUrl = null;
-    let receiptPublicId = null;
-
     if (req.file) {
       try {
         const uploadResult = await uploadToCloudinary(req.file.buffer, {
@@ -278,9 +289,7 @@ const submitPayment = async (req, res) => {
           resource_type: "auto",
         });
         receiptImageUrl = uploadResult.secure_url;
-        receiptPublicId = uploadResult.public_id;
       } catch (uploadErr) {
-        console.error("Cloudinary upload failed:", uploadErr);
         return res.status(500).json({
           success: false,
           message: "Failed to upload receipt. Please try again.",
@@ -288,7 +297,6 @@ const submitPayment = async (req, res) => {
       }
     }
 
-    // Require receipt for non-cash payments
     if (!receiptImageUrl && paymentMethod !== "CASH") {
       return res.status(400).json({
         success: false,
@@ -299,13 +307,18 @@ const submitPayment = async (req, res) => {
     const paymentCount = await prisma.feePayment.count({
       where: { schoolId: req.student.schoolId },
     });
-    const receiptNumber = generateReceiptNumber(year, paymentCount + 1);
+    const schoolPrefix = buildSchoolPrefix(student.school.name);
+    const receiptNumber = generateReceiptNumber(
+      schoolPrefix,
+      year,
+      paymentCount + 1,
+    );
 
     const payment = await prisma.feePayment.create({
       data: {
         schoolId: req.student.schoolId,
         studentId,
-        amount: parseFloat(amount),
+        amount: Number(amount),
         paymentMethod,
         term,
         academicYear: year,
@@ -329,10 +342,6 @@ const submitPayment = async (req, res) => {
       },
     });
 
-    console.log(
-      `📱 SMS to ${req.parentPhone}: Your payment of MWK ${amount} for ${payment.student.fullName} has been submitted. Receipt: ${receiptNumber}. The school will verify shortly.`,
-    );
-
     return res.status(201).json({
       success: true,
       message:
@@ -341,183 +350,167 @@ const submitPayment = async (req, res) => {
     });
   } catch (error) {
     console.error("Submit payment error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to submit payment",
-    });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to submit payment" });
   }
 };
-// ==================== BURSAR VERIFIES PAYMENT ====================
-// PATCH /api/payments/:id/verify
+
 const verifyPayment = async (req, res) => {
   try {
     const { id } = req.params;
 
-    const payment = await prisma.feePayment.findFirst({
-      where: { id, schoolId: req.schoolId },
-      include: {
-        student: {
-          select: {
-            fullName: true,
-            parentPhone: true,
-            parentEmail: true,
-            parentName: true,
-            classId: true,
-            class: { select: { name: true } },
+    //  Wrap in transaction
+    const result = await prisma.$transaction(async (tx) => {
+      const payment = await tx.feePayment.findFirst({
+        where: { id, schoolId: req.schoolId },
+        include: {
+          student: {
+            select: {
+              fullName: true,
+              parentPhone: true,
+              parentEmail: true,
+              parentName: true,
+              classId: true,
+              class: { select: { name: true } },
+            },
           },
         },
-      },
-    });
-
-    if (!payment) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Payment not found" });
-    }
-
-    if (payment.status !== "PENDING") {
-      return res.status(400).json({
-        success: false,
-        message: `Payment is already ${payment.status.toLowerCase()}`,
       });
-    }
 
-    const verified = await prisma.feePayment.update({
-      where: { id },
-      data: {
-        status: "VERIFIED",
-        verifiedById: req.staff.id,
-        verifiedAt: new Date(),
-      },
-      include: {
-        student: {
-          select: {
-            fullName: true,
-            studentCode: true,
-            parentPhone: true,
-            classId: true,
-            class: { select: { name: true } },
-          },
-        },
-        verifiedBy: { select: { fullName: true } },
-      },
-    });
+      if (!payment) throw new Error("NOT_FOUND");
+      if (payment.status !== "PENDING") throw new Error("ALREADY_PROCESSED");
 
-    // ============ RECONCILE OVERPAYMENT + BALANCE ============
-    const requiredAmount = payment.requiredAmount;
-
-    if (requiredAmount !== null) {
-      // Total verified for this student/term/year BEFORE this payment
-      const beforeAgg = await prisma.feePayment.aggregate({
-        where: {
-          studentId: payment.studentId,
-          term: payment.term,
-          academicYear: payment.academicYear,
+      const verified = await tx.feePayment.update({
+        where: { id },
+        data: {
           status: "VERIFIED",
-          id: { not: payment.id },
+          verifiedById: req.staff.id,
+          verifiedAt: new Date(),
         },
-        _sum: { amount: true },
+        include: {
+          student: {
+            select: {
+              fullName: true,
+              studentCode: true,
+              parentPhone: true,
+              classId: true,
+              class: { select: { name: true } },
+            },
+          },
+          verifiedBy: { select: { fullName: true } },
+        },
       });
-      const paidBefore = beforeAgg._sum.amount || 0;
 
-      const totalPaid = paidBefore + payment.amount;
-      const overpayBefore = Math.max(0, paidBefore - requiredAmount);
-      const overpayAfter = Math.max(0, totalPaid - requiredAmount);
-      const deltaOverpay = overpayAfter - overpayBefore;
+      const requiredAmount = payment.requiredAmount
+        ? Number(payment.requiredAmount)
+        : null;
+      let finalBalance = null;
+      let finalIsDebtor = false;
+      let deltaOverpay = 0;
 
-      const balanceAfter = Math.max(0, requiredAmount - totalPaid);
-      const isDebtor = balanceAfter > 0;
-
-      // Roll up the new overpayment into the student's credit balance
-      if (deltaOverpay > 0) {
-        await prisma.student.update({
-          where: { id: payment.studentId },
-          data: { creditBalance: { increment: deltaOverpay } },
+      if (requiredAmount !== null) {
+        const beforeAgg = await tx.feePayment.aggregate({
+          where: {
+            studentId: payment.studentId,
+            term: payment.term,
+            academicYear: payment.academicYear,
+            status: "VERIFIED",
+            id: { not: payment.id },
+          },
+          _sum: { amount: true },
         });
+        const paidBefore = Number(beforeAgg._sum.amount) || 0;
+        const totalPaid = paidBefore + Number(payment.amount);
+        const overpayBefore = Math.max(0, paidBefore - requiredAmount);
+        const overpayAfter = Math.max(0, totalPaid - requiredAmount);
+        deltaOverpay = overpayAfter - overpayBefore;
+
+        finalBalance = Math.max(0, requiredAmount - totalPaid);
+        finalIsDebtor = finalBalance > 0;
+
+        if (deltaOverpay > 0) {
+          await tx.student.update({
+            where: { id: payment.studentId },
+            data: { creditBalance: { increment: deltaOverpay } },
+          });
+        }
+
+        await tx.feePayment.update({
+          where: { id },
+          data: { overpayment: deltaOverpay },
+        });
+
+        await tx.feePayment.updateMany({
+          where: {
+            studentId: payment.studentId,
+            term: payment.term,
+            academicYear: payment.academicYear,
+            status: "VERIFIED",
+          },
+          data: { balance: finalBalance, isDebtor: finalIsDebtor },
+        });
+      } else {
+        const debtorStatus = await calculateDebtorStatus(
+          tx,
+          payment.studentId,
+          payment.student.classId,
+          req.schoolId,
+          payment.term,
+          payment.academicYear,
+        );
+        await tx.feePayment.updateMany({
+          where: {
+            studentId: payment.studentId,
+            term: payment.term,
+            academicYear: payment.academicYear,
+            status: "VERIFIED",
+          },
+          data: {
+            balance: debtorStatus.balance,
+            isDebtor: debtorStatus.isDebtor,
+          },
+        });
+        finalBalance = debtorStatus.balance;
+        finalIsDebtor = debtorStatus.isDebtor;
       }
 
-      // Tag the newly-verified payment with its own delta overpayment
-      await prisma.feePayment.update({
-        where: { id },
-        data: { overpayment: deltaOverpay },
-      });
-
-      // Refresh balance + debtor flags on every verified payment for the term
-      await prisma.feePayment.updateMany({
-        where: {
-          studentId: payment.studentId,
-          term: payment.term,
-          academicYear: payment.academicYear,
-          status: "VERIFIED",
-        },
-        data: { balance: balanceAfter, isDebtor },
-      });
-
-      verified.balance = balanceAfter;
-      verified.isDebtor = isDebtor;
-      verified.overpayment = deltaOverpay;
-    } else {
-      // No fee structure set — just recalc debtor status
-      const debtorStatus = await calculateDebtorStatus(
-        payment.studentId,
-        payment.student.classId,
-        req.schoolId,
-        payment.term,
-        payment.academicYear,
-      );
-
-      await prisma.feePayment.updateMany({
-        where: {
-          studentId: payment.studentId,
-          term: payment.term,
-          academicYear: payment.academicYear,
-          status: "VERIFIED",
-        },
+      await tx.auditLog.create({
         data: {
-          balance: debtorStatus.balance,
-          isDebtor: debtorStatus.isDebtor,
+          schoolId: req.schoolId,
+          staffId: req.staff.id,
+          action: "PAYMENT_VERIFIED",
+          entity: "FeePayment",
+          entityId: id,
+          changes: { verifiedBy: req.staff.fullName },
         },
       });
 
-      verified.balance = debtorStatus.balance;
-      verified.isDebtor = debtorStatus.isDebtor;
-    }
-
-    await prisma.auditLog.create({
-      data: {
-        schoolId: req.schoolId,
-        staffId: req.staff.id,
-        action: "PAYMENT_VERIFIED",
-        entity: "FeePayment",
-        entityId: id,
-        changes: { verifiedBy: req.staff.fullName },
-      },
+      return { verified, payment, finalBalance, finalIsDebtor, deltaOverpay };
     });
 
-    // ============ SEND PAYMENT VERIFIED NOTIFICATION ============
+    // Send Notification
     const school = await prisma.school.findUnique({
       where: { id: req.schoolId },
       select: { name: true, notificationDefaults: true },
     });
-
     sendNotifications({
       recipients: [
         {
-          phone: payment.student.parentPhone,
-          email: payment.student.parentEmail,
-          name: payment.student.parentName || "Parent",
+          phone: result.payment.student.parentPhone,
+          email: result.payment.student.parentEmail,
+          name: result.payment.student.parentName || "Parent",
           message:
-            `Payment of MWK ${payment.amount.toLocaleString()} for ${payment.student.fullName} has been confirmed. ` +
-            `Receipt: ${payment.receiptNumber}` +
-            (verified.balance && verified.balance > 0
-              ? `. Balance: MWK ${verified.balance.toLocaleString()}`
+            `Payment of MWK ${Number(result.payment.amount).toLocaleString()} for ${result.payment.student.fullName} has been confirmed. Receipt: ${result.payment.receiptNumber}` +
+            (result.finalBalance && result.finalBalance > 0
+              ? `. Balance: MWK ${result.finalBalance.toLocaleString()}`
               : ". Fully paid!"),
           subject: `Payment Confirmed — ${school.name}`,
           templateData: {
-            studentName: payment.student.fullName,
-            amount: payment.amount,
-            receiptNumber: payment.receiptNumber,
-            balanceAfter: verified.balance,
+            studentName: result.payment.student.fullName,
+            amount: Number(result.payment.amount),
+            receiptNumber: result.payment.receiptNumber,
+            balanceAfter: result.finalBalance,
           },
         },
       ],
@@ -532,73 +525,87 @@ const verifyPayment = async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Payment verified successfully",
-      data: verified,
+      data: result.verified,
     });
   } catch (error) {
+    if (error.message === "NOT_FOUND")
+      return res
+        .status(404)
+        .json({ success: false, message: "Payment not found" });
+    if (error.message === "ALREADY_PROCESSED")
+      return res
+        .status(400)
+        .json({ success: false, message: "Payment is already processed" });
     console.error("Verify payment error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to verify payment",
-    });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to verify payment" });
   }
 };
 
-// PATCH /api/payments/:id/reject
 const rejectPayment = async (req, res) => {
   try {
     const { id } = req.params;
     const { reason } = req.body;
 
-    if (!reason) {
-      return res.status(400).json({
-        success: false,
-        message: "Rejection reason is required",
-      });
-    }
+    if (!reason)
+      return res
+        .status(400)
+        .json({ success: false, message: "Rejection reason is required" });
 
     const payment = await prisma.feePayment.findFirst({
       where: { id, schoolId: req.schoolId },
     });
-
-    if (!payment) {
+    if (!payment)
       return res
         .status(404)
         .json({ success: false, message: "Payment not found" });
-    }
-
-    if (payment.status !== "PENDING") {
+    if (payment.status !== "PENDING")
       return res.status(400).json({
         success: false,
         message: `Payment is already ${payment.status.toLowerCase()}`,
       });
-    }
 
-    const rejected = await prisma.feePayment.update({
-      where: { id },
-      data: {
-        status: "REJECTED",
-        rejectionReason: reason,
-        verifiedById: req.staff.id,
-        verifiedAt: new Date(),
-      },
-      include: {
-        student: {
-          select: {
-            fullName: true,
-            parentPhone: true,
-            parentEmail: true,
-            parentName: true,
+    const rejected = await prisma.$transaction(async (tx) => {
+      const updated = await tx.feePayment.update({
+        where: { id },
+        data: {
+          status: "REJECTED",
+          rejectionReason: reason,
+          verifiedById: req.staff.id,
+          verifiedAt: new Date(),
+        },
+        include: {
+          student: {
+            select: {
+              fullName: true,
+              parentPhone: true,
+              parentEmail: true,
+              parentName: true,
+            },
           },
         },
-      },
+      });
+
+      //  ADDED: Audit log for rejections
+      await tx.auditLog.create({
+        data: {
+          schoolId: req.schoolId,
+          staffId: req.staff.id,
+          action: "PAYMENT_REJECTED",
+          entity: "FeePayment",
+          entityId: id,
+          changes: { reason },
+        },
+      });
+
+      return updated;
     });
 
-    // ============ SEND PAYMENT REJECTED NOTIFICATION ============
     const school = await prisma.school.findUnique({
       where: { id: req.schoolId },
       select: { name: true, notificationDefaults: true },
     });
-
     sendNotifications({
       recipients: [
         {
@@ -607,10 +614,7 @@ const rejectPayment = async (req, res) => {
           name: rejected.student.parentName || "Parent",
           message: `Payment for ${rejected.student.fullName} rejected. Reason: ${reason}. Please resubmit.`,
           subject: `Payment Rejected — ${school.name}`,
-          templateData: {
-            studentName: rejected.student.fullName,
-            reason,
-          },
+          templateData: { studentName: rejected.student.fullName, reason },
         },
       ],
       channel: school?.notificationDefaults?.defaultChannel || "BOTH",
@@ -621,22 +625,17 @@ const rejectPayment = async (req, res) => {
       schoolName: school.name,
     }).catch((e) => console.error("Reject notification error:", e));
 
-    return res.status(200).json({
-      success: true,
-      message: "Payment rejected",
-      data: rejected,
-    });
+    return res
+      .status(200)
+      .json({ success: true, message: "Payment rejected", data: rejected });
   } catch (error) {
     console.error("Reject payment error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to reject payment",
-    });
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to reject payment" });
   }
 };
 
-// ==================== GET ALL PAYMENTS ====================
-// GET /api/payments
 const getPayments = async (req, res) => {
   try {
     const {
@@ -649,17 +648,12 @@ const getPayments = async (req, res) => {
       limit = 20,
     } = req.query;
     const skip = (parseInt(page) - 1) * parseInt(limit);
-
     const where = { schoolId: req.schoolId };
     if (status) where.status = status;
     if (term) where.term = term;
     if (academicYear) where.academicYear = academicYear;
     if (studentId) where.studentId = studentId;
-
-    // Filter by class via student relation
-    if (classId) {
-      where.student = { classId };
-    }
+    if (classId) where.student = { classId };
 
     const [payments, total] = await Promise.all([
       prisma.feePayment.findMany({
@@ -700,8 +694,6 @@ const getPayments = async (req, res) => {
   }
 };
 
-// ==================== GET PENDING PAYMENTS ====================
-// GET /api/payments/pending
 const getPendingPayments = async (req, res) => {
   try {
     const payments = await prisma.feePayment.findMany({
@@ -719,12 +711,9 @@ const getPendingPayments = async (req, res) => {
       },
       orderBy: { createdAt: "asc" },
     });
-
-    return res.status(200).json({
-      success: true,
-      data: payments,
-      total: payments.length,
-    });
+    return res
+      .status(200)
+      .json({ success: true, data: payments, total: payments.length });
   } catch (error) {
     console.error("Get pending payments error:", error);
     return res
@@ -733,8 +722,6 @@ const getPendingPayments = async (req, res) => {
   }
 };
 
-// ==================== GET PARENT CHILD PAYMENTS ====================
-// GET /api/payments/my-child
 const getMyChildPayments = async (req, res) => {
   try {
     const payments = await prisma.feePayment.findMany({
@@ -763,11 +750,10 @@ const getMyChildPayments = async (req, res) => {
 
     const totalPaid = payments
       .filter((p) => p.status === "VERIFIED")
-      .reduce((sum, p) => sum + p.amount, 0);
-
+      .reduce((sum, p) => sum + Number(p.amount), 0);
     const pendingAmount = payments
       .filter((p) => p.status === "PENDING")
-      .reduce((sum, p) => sum + p.amount, 0);
+      .reduce((sum, p) => sum + Number(p.amount), 0);
 
     return res.status(200).json({
       success: true,
@@ -784,13 +770,9 @@ const getMyChildPayments = async (req, res) => {
   }
 };
 
-// ==================== DASHBOARD SUMMARY ====================
-// GET /api/payments/summary
 const getPaymentSummary = async (req, res) => {
   try {
     const { term, academicYear } = req.query;
-
-    // Resolve year + term — query param → school's active → calendar fallback
     const school = await prisma.school.findUnique({
       where: { id: req.schoolId },
       select: { activeTerm: true, activeAcademicYear: true },
@@ -801,9 +783,9 @@ const getPaymentSummary = async (req, res) => {
       school?.activeAcademicYear ||
       new Date().getFullYear().toString();
     const resolvedTerm = term || school?.activeTerm || null;
-
     const baseWhere = { schoolId: req.schoolId, academicYear: year };
     if (resolvedTerm) baseWhere.term = resolvedTerm;
+
     const [
       totalCashReceivedAgg,
       totalFeesAgg,
@@ -837,8 +819,6 @@ const getPaymentSummary = async (req, res) => {
       }),
     ]);
 
-    // ============ PER-STUDENT LEDGER ============
-    // Pull every active student + their class's fee structure for this term
     const students = await prisma.student.findMany({
       where: { schoolId: req.schoolId, isActive: true },
       include: {
@@ -854,73 +834,62 @@ const getPaymentSummary = async (req, res) => {
       },
     });
 
-    // Batched: sum of verified payments per student for this term/year
     const paymentGroups = await prisma.feePayment.groupBy({
       by: ["studentId"],
       where: { ...baseWhere, status: "VERIFIED" },
       _sum: { amount: true },
     });
     const paidByStudent = Object.fromEntries(
-      paymentGroups.map((p) => [p.studentId, p._sum.amount || 0]),
+      paymentGroups.map((p) => [p.studentId, Number(p._sum.amount) || 0]),
     );
 
-    let totalRequired = 0; // sum of every student's fee structure
-    let totalCollected = 0; // per-student MIN(paid, required), summed
-    let totalCredit = 0; // per-student MAX(0, paid − required), summed
-    let paidFullCount = 0; // students who've fully paid
-    let debtorCount = 0; // students with a balance owing
-    let noFeeCount = 0; // students whose class has no fee structure
+    let totalRequired = 0,
+      totalCollected = 0,
+      totalCredit = 0,
+      paidFullCount = 0,
+      debtorCount = 0,
+      noFeeCount = 0;
 
     for (const s of students) {
-      const fee = s.class.feeStructures[0]?.totalAmount || 0;
+      const fee = s.class.feeStructures[0]?.totalAmount
+        ? Number(s.class.feeStructures[0].totalAmount)
+        : 0;
       if (fee === 0) {
         noFeeCount++;
         continue;
       }
 
       const paid = paidByStudent[s.id] || 0;
-      const applied = Math.min(paid, fee);
-      const credit = Math.max(0, paid - fee);
-
       totalRequired += fee;
-      totalCollected += applied;
-      totalCredit += credit;
+      totalCollected += Math.min(paid, fee);
+      totalCredit += Math.max(0, paid - fee);
 
       if (paid >= fee) paidFullCount++;
       else debtorCount++;
     }
 
-    const outstandingBalance = Math.max(0, totalRequired - totalCollected);
-
     return res.status(200).json({
       success: true,
       data: {
-        // ===== Accounting (new) =====
         totalRequired,
-        totalCollected, // capped at required per student
-        outstandingBalance, // required − collected
-        totalCredit, // overpayments held for next term
-
-        // ===== Cash view (raw) =====
-        totalCashReceived: totalCashReceivedAgg._sum.amount || 0,
-        totalFees: totalFeesAgg._sum.platformFee || 0,
+        totalCollected,
+        outstandingBalance: Math.max(0, totalRequired - totalCollected),
+        totalCredit,
+        totalCashReceived: Number(totalCashReceivedAgg._sum.amount) || 0,
+        totalFees: Number(totalFeesAgg._sum.platformFee) || 0,
         totalNetCollected:
-          totalCashReceivedAgg._sum.netAmount ||
-          totalCashReceivedAgg._sum.amount ||
+          Number(totalCashReceivedAgg._sum.netAmount) ||
+          Number(totalCashReceivedAgg._sum.amount) ||
           0,
-        todayCollected: todayCollectedAgg._sum.amount || 0,
-
-        // ===== Counts =====
+        todayCollected: Number(todayCollectedAgg._sum.amount) || 0,
         pendingCount,
         verifiedCount,
         rejectedCount,
         totalStudents,
-        paidStudents: paidFullCount, // now means "paid in full"
-        unpaidStudents: debtorCount, // students with balance
+        paidStudents: paidFullCount,
+        unpaidStudents: debtorCount,
         debtorCount,
         noFeeCount,
-
-        // ===== Meta =====
         academicYear: year,
         term: resolvedTerm,
       },
@@ -933,18 +902,13 @@ const getPaymentSummary = async (req, res) => {
   }
 };
 
-// ==================== PAYMENT INSIGHTS ====================
-// GET /api/payments/insights
-// Breakdown of payments by channel — for the admin dashboard
 const getPaymentInsights = async (req, res) => {
   try {
     const { term, academicYear } = req.query;
-
     const school = await prisma.school.findUnique({
       where: { id: req.schoolId },
       select: { activeTerm: true, activeAcademicYear: true },
     });
-
     const year = academicYear || school?.activeAcademicYear;
     const resolvedTerm = term || school?.activeTerm;
 
@@ -952,7 +916,6 @@ const getPaymentInsights = async (req, res) => {
     if (year) baseWhere.academicYear = year;
     if (resolvedTerm) baseWhere.term = resolvedTerm;
 
-    // All verified payments for this term
     const payments = await prisma.feePayment.findMany({
       where: { ...baseWhere, status: "VERIFIED" },
       select: {
@@ -964,7 +927,6 @@ const getPaymentInsights = async (req, res) => {
       },
     });
 
-    // ============ Categorize by channel ============
     const BANK_METHODS = [
       "NATIONAL_BANK",
       "STANDARD_BANK",
@@ -975,10 +937,10 @@ const getPaymentInsights = async (req, res) => {
     const MOBILE_METHODS = ["AIRTEL_MONEY", "TNM_MPAMBA"];
 
     const channels = {
-      malipo_online: {
+      onekhusa_online: {
         count: 0,
         amount: 0,
-        label: "Malipo Online",
+        label: "OneKhusa Online",
         description: "Auto-verified via mobile money",
         color: "emerald",
       },
@@ -1006,18 +968,20 @@ const getPaymentInsights = async (req, res) => {
     };
 
     for (const p of payments) {
-      if (p.paymentChannel === "MALIPO") {
-        channels.malipo_online.count++;
-        channels.malipo_online.amount += p.amount;
+      const amt = Number(p.amount);
+      //  FIXED FROM MALIPO TO ONEKHUSA
+      if (p.paymentChannel === "ONEKHUSA") {
+        channels.onekhusa_online.count++;
+        channels.onekhusa_online.amount += amt;
       } else if (p.paymentMethod === "CASH") {
         channels.cash.count++;
-        channels.cash.amount += p.amount;
+        channels.cash.amount += amt;
       } else if (BANK_METHODS.includes(p.paymentMethod)) {
         channels.bank_manual.count++;
-        channels.bank_manual.amount += p.amount;
+        channels.bank_manual.amount += amt;
       } else if (MOBILE_METHODS.includes(p.paymentMethod)) {
         channels.mobile_manual.count++;
-        channels.mobile_manual.amount += p.amount;
+        channels.mobile_manual.amount += amt;
       }
     }
 
@@ -1026,44 +990,34 @@ const getPaymentInsights = async (req, res) => {
       0,
     );
     const totalCount = Object.values(channels).reduce((s, c) => s + c.count, 0);
+    const breakdown = Object.entries(channels)
+      .map(([key, c]) => ({
+        key,
+        ...c,
+        percent:
+          totalAmount > 0 ? Math.round((c.amount / totalAmount) * 100) : 0,
+      }))
+      .sort((a, b) => b.amount - a.amount);
 
-    const breakdown = Object.entries(channels).map(([key, c]) => ({
-      key,
-      ...c,
-      percent: totalAmount > 0 ? Math.round((c.amount / totalAmount) * 100) : 0,
-    }));
-
-    // Sort by amount descending — highest-performing channel first
-    breakdown.sort((a, b) => b.amount - a.amount);
-
-    // ============ Today's online payments ============
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
-
+    //  FIXED FROM MALIPO
     const todayOnlinePayments = payments.filter(
       (p) =>
-        p.paymentChannel === "MALIPO" && new Date(p.createdAt) >= todayStart,
+        p.paymentChannel === "ONEKHUSA" && new Date(p.createdAt) >= todayStart,
     );
     const todayOnlineAmount = todayOnlinePayments.reduce(
-      (s, p) => s + p.amount,
+      (s, p) => s + Number(p.amount),
       0,
     );
 
-    // ============ Pending / failed online payments ============
-    const [malipoPending, malipoFailed] = await Promise.all([
+    // FIXED FROM MALIPO
+    const [onekhusaPending, onekhusaFailed] = await Promise.all([
       prisma.feePayment.count({
-        where: {
-          ...baseWhere,
-          paymentChannel: "MALIPO",
-          status: "PENDING",
-        },
+        where: { ...baseWhere, paymentChannel: "ONEKHUSA", status: "PENDING" },
       }),
       prisma.feePayment.count({
-        where: {
-          ...baseWhere,
-          paymentChannel: "MALIPO",
-          status: "REJECTED",
-        },
+        where: { ...baseWhere, paymentChannel: "ONEKHUSA", status: "REJECTED" },
       }),
     ]);
 
@@ -1076,8 +1030,8 @@ const getPaymentInsights = async (req, res) => {
           amount: todayOnlineAmount,
           count: todayOnlinePayments.length,
         },
-        malipoPending,
-        malipoFailed,
+        onekhusaPending,
+        onekhusaFailed,
         channels: breakdown,
         academicYear: year,
         term: resolvedTerm,
@@ -1090,6 +1044,7 @@ const getPaymentInsights = async (req, res) => {
       .json({ success: false, message: "Failed to load insights" });
   }
 };
+
 module.exports = {
   recordCashPayment,
   submitPayment,

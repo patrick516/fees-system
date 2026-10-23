@@ -1,4 +1,4 @@
-// ==================== ENUMS ====================
+
 enum PaymentMethod {
   CASH
   AIRTEL_MONEY
@@ -21,7 +21,7 @@ enum SubmittedBy {
   PARENT
 }
 
-// ==================== FEE STRUCTURE ====================
+//  FEE STRUCTURE 
 model FeeStructure {
   id       String @id @default(uuid())
   schoolId String
@@ -31,15 +31,15 @@ model FeeStructure {
 
   academicYear String
   term         Term
-  totalAmount  Float
-  currency     String @default("MWK")
+  totalAmount  Decimal @db.Decimal(12, 2)
+  currency     String  @default("MWK")
 
-  tuitionFee           Float?
-  examFee              Float?
-  buildingLevy         Float?
-  uniformFee           Float?
-  bookFee              Float?
-  otherFees            Float?
+  tuitionFee           Decimal? @db.Decimal(12, 2)
+  examFee              Decimal? @db.Decimal(12, 2)
+  buildingLevy         Decimal? @db.Decimal(12, 2)
+  uniformFee           Decimal? @db.Decimal(12, 2)
+  bookFee              Decimal? @db.Decimal(12, 2)
+  otherFees            Decimal? @db.Decimal(12, 2)
   otherFeesDescription String?
 
   isActive  Boolean  @default(true)
@@ -50,7 +50,7 @@ model FeeStructure {
   @@map("fee_structures")
 }
 
-// ==================== FEE PAYMENT ====================
+//  FEE PAYMENT 
 model FeePayment {
   id        String  @id @default(uuid())
   schoolId  String
@@ -58,9 +58,9 @@ model FeePayment {
   studentId String
   student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
 
-  amount        Float
-  platformFee   Float?
-  netAmount     Float?
+  amount        Decimal @db.Decimal(12, 2)
+  platformFee   Decimal? @db.Decimal(12, 2)
+  netAmount     Decimal? @db.Decimal(12, 2)
   currency      String        @default("MWK")
   paymentMethod PaymentMethod
   term          Term
@@ -83,11 +83,11 @@ model FeePayment {
   verifiedAt      DateTime?
   rejectionReason String?
 
-  requiredAmount      Float?
-  balance             Float?
+  requiredAmount      Decimal? @db.Decimal(12, 2)
+  balance             Decimal? @db.Decimal(12, 2)
   isDebtor            Boolean @default(false)
-  creditApplied       Float   @default(0)
-  overpayment         Float   @default(0)
+  creditApplied       Decimal @default(0) @db.Decimal(12, 2)
+  overpayment         Decimal @default(0) @db.Decimal(12, 2)
   malipoTransactionId String?
   malipoStatus        String?
   malipoCustomerRef   String?
@@ -107,33 +107,27 @@ model FeePayment {
   @@map("fee_payments")
 }
 
-// ==================== NOTIFICATION LOG ====================
-// One row per message attempt (SMS OR Email).
-// Physical table stays as "sms_logs" for backwards compatibility.
+//  NOTIFICATION LOG 
 model NotificationLog {
   id       String @id @default(uuid())
   schoolId String
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  // Channel + recipient
-  channel       String // "SMS" | "EMAIL"
+  channel       String
   phone         String?
   email         String?
   recipientName String?
 
-  // Content
   message  String
   subject  String?
   type     String
   template String?
 
-  // Result
   status       String
   messageId    String?
   cost         String?
   errorMessage String?
 
-  // Relations
   paymentId String?
   payment   FeePayment? @relation(fields: [paymentId], references: [id], onDelete: SetNull)
   sentById  String?
@@ -149,32 +143,26 @@ model NotificationLog {
 }
 
 // ==================== SUBSCRIPTION PAYMENT ====================
-// Every subscription payment a school makes to the platform.
-// Separate from FeePayment — this is PLATFORM revenue, not school fees.
 model SubscriptionPayment {
   id       String @id @default(uuid())
   schoolId String
   school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
-  amount       Float
-  currency     String @default("MWK")
+  amount       Decimal @db.Decimal(12, 2)
+  currency     String  @default("MWK")
   term         Term
   academicYear String
 
-  // How it was paid
   method String // "ONEKHUSA" | "MANUAL"
 
-  // ---------- Online payments (via OneKhusa) ----------
   onekhusaTransactionRef String? @unique
   onekhusaTimedAccount   String?
-  onekhusaStatus         String? // "Processing" | "Completed" | "Failed"
+  onekhusaStatus         String?
   onekhusaRawResponse    Json?
 
-  // ---------- Status ----------
   status PaymentStatus @default(PENDING)
   paidAt DateTime?
 
-  // ---------- Manual marking by owner ----------
   markedById String?
   markedBy   PlatformAdmin? @relation(fields: [markedById], references: [id], onDelete: SetNull)
 
