@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -20,14 +20,12 @@ import PayOnlineModal from "../../components/PayOnlineModal";
 
 type PayMode = "online" | "receipt";
 
-const paymentMethods = [
-  { value: "AIRTEL_MONEY", label: "Airtel Money", emoji: "🔴" },
-  { value: "TNM_MPAMBA", label: "TNM Mpamba", emoji: "🟡" },
-  { value: "NATIONAL_BANK", label: "National Bank", emoji: "🏦" },
-  { value: "STANDARD_BANK", label: "Standard Bank", emoji: "🏦" },
-  { value: "FDH_BANK", label: "FDH Bank", emoji: "🏦" },
-  { value: "NBS_BANK", label: "NBS Bank", emoji: "🏦" },
-  { value: "OTHER_BANK", label: "Other Bank", emoji: "🏦" },
+const BANK_METHODS = [
+  "NATIONAL_BANK",
+  "STANDARD_BANK",
+  "FDH_BANK",
+  "NBS_BANK",
+  "OTHER_BANK",
 ];
 
 export default function PayPage() {
@@ -63,10 +61,58 @@ export default function PayPage() {
   // Active term
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
 
+  // 🎯 DYNAMIC PAYMENT METHODS based on what the school actually set up
+  const availablePaymentMethods = useMemo(() => {
+    if (!paymentInfo) return [];
+    const methods = [];
+
+    if (paymentInfo.airtelMoneyNumber) {
+      methods.push({
+        value: "AIRTEL_MONEY",
+        label: "Airtel Money",
+        emoji: "🔴",
+      });
+    }
+    if (paymentInfo.mpambaNumber) {
+      methods.push({ value: "TNM_MPAMBA", label: "TNM Mpamba", emoji: "🟡" });
+    }
+
+    if (paymentInfo.bankAccounts && paymentInfo.bankAccounts.length > 0) {
+      const seenBanks = new Set();
+      paymentInfo.bankAccounts.forEach((bank: any) => {
+        // Convert "National Bank" -> "NATIONAL_BANK" for the database enum
+        let enumVal = bank.bankName.toUpperCase().replace(/\s+/g, "_");
+        if (!BANK_METHODS.includes(enumVal)) enumVal = "OTHER_BANK";
+
+        if (!seenBanks.has(enumVal)) {
+          seenBanks.add(enumVal);
+          methods.push({ value: enumVal, label: bank.bankName, emoji: "🏦" });
+        }
+      });
+    }
+
+    // If nothing is set, fallback to Cash/Other
+    if (methods.length === 0) {
+      methods.push({
+        value: "OTHER_BANK",
+        label: "Bank Transfer",
+        emoji: "🏦",
+      });
+    }
+    return methods;
+  }, [paymentInfo]);
+
+  // Set default selected method when available methods load
+  useEffect(() => {
+    if (availablePaymentMethods.length > 0) {
+      setReceiptMethod(availablePaymentMethods[0].value);
+    }
+  }, [availablePaymentMethods]);
+
   // ---------- Effects ----------
   useEffect(() => {
     if (!_hasHydrated) return;
-    if (!isAuthenticated) router.push("/");
+    if (!isAuthenticated) router.push("/login"); // 🎯 Updated route
   }, [_hasHydrated, isAuthenticated]);
 
   useEffect(() => {
@@ -156,7 +202,6 @@ export default function PayPage() {
   };
 
   const openOnlineModal = () => {
-    // We won't reach here since button is disabled, but keep for safety
     if (mode === "online") {
       setError("");
       const amount = parseFloat(form.amount);
@@ -170,7 +215,7 @@ export default function PayPage() {
 
   // ---------- Derived ----------
   const amountNum = parseFloat(form.amount) || 0;
-  const canPayOnline = amountNum > 0 && mode === "online"; // Ensure it's always false if mode isn't online
+  const canPayOnline = amountNum > 0 && mode === "online";
   const canSubmitReceipt = amountNum > 0 && !!receiptFile;
 
   // ---------- Guards ----------
@@ -218,7 +263,7 @@ export default function PayPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 pb-32">
-      {/* ============ HEADER ============ */}
+      {/* HEADER */}
       <div className="bg-[var(--color-primary)] text-white sticky top-0 z-20 shadow-md">
         <div className="max-w-lg mx-auto px-4 py-3">
           <div className="flex items-center gap-3">
@@ -235,7 +280,7 @@ export default function PayPage() {
       </div>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
-        {/* ============ STUDENT INFO ============ */}
+        {/* STUDENT INFO */}
         <div className="bg-white rounded-2xl p-3.5 shadow-sm border border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 bg-[var(--color-primary-light)] rounded-xl flex items-center justify-center text-[var(--color-primary)] font-bold text-lg">
@@ -252,7 +297,7 @@ export default function PayPage() {
           </div>
         </div>
 
-        {/* ============ FEE SUMMARY ============ */}
+        {/* FEE SUMMARY */}
         {termStatusLoading && (
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 text-center">
             <Loader2
@@ -291,21 +336,13 @@ export default function PayPage() {
                   </p>
                 </div>
                 <div
-                  className={`rounded-xl p-3 text-center border ${
-                    termStatus.termStatus.balanceRemaining === 0
-                      ? "bg-emerald-50 border-emerald-100"
-                      : "bg-red-50 border-red-100"
-                  }`}
+                  className={`rounded-xl p-3 text-center border ${termStatus.termStatus.balanceRemaining === 0 ? "bg-emerald-50 border-emerald-100" : "bg-red-50 border-red-100"}`}
                 >
                   <p className="text-[10px] text-slate-500 font-medium uppercase tracking-wide">
                     Balance
                   </p>
                   <p
-                    className={`text-sm font-bold mt-1 ${
-                      termStatus.termStatus.balanceRemaining === 0
-                        ? "text-emerald-700"
-                        : "text-red-600"
-                    }`}
+                    className={`text-sm font-bold mt-1 ${termStatus.termStatus.balanceRemaining === 0 ? "text-emerald-700" : "text-red-600"}`}
                   >
                     {termStatus.termStatus.balanceRemaining === 0
                       ? "✓ Clear"
@@ -325,7 +362,7 @@ export default function PayPage() {
             </div>
           )}
 
-        {/* ============ AMOUNT INPUT ============ */}
+        {/* AMOUNT INPUT */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <label className="block text-xs font-medium text-gray-600 mb-2">
             How much are you paying?
@@ -351,38 +388,25 @@ export default function PayPage() {
           )}
         </div>
 
-        {/* ============ PAYMENT MODE SWITCHER ============ */}
+        {/* PAYMENT MODE SWITCHER */}
         <div className="bg-white rounded-2xl p-1.5 shadow-sm border border-gray-100 flex gap-1.5">
-          {/* Upload Receipt (Left / Default) */}
           <button
             type="button"
             onClick={() => setMode("receipt")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
-              mode === "receipt"
-                ? "bg-[var(--color-primary)] text-white shadow-sm"
-                : "text-gray-600 hover:bg-gray-50"
-            }`}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${mode === "receipt" ? "bg-[var(--color-primary)] text-white shadow-sm" : "text-gray-600 hover:bg-gray-50"}`}
           >
-            <FileImage size={15} />
-            Upload Receipt
+            <FileImage size={15} /> Upload Receipt
           </button>
-
-          {/* Pay Online (Right / Active) */}
           <button
             type="button"
             onClick={() => setMode("online")}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${
-              mode === "online"
-                ? "bg-gradient-to-br from-emerald-600 to-emerald-500 text-white shadow-sm"
-                : "text-gray-600 hover:bg-gray-50"
-            }`}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-semibold transition-all ${mode === "online" ? "bg-gradient-to-br from-emerald-600 to-emerald-500 text-white shadow-sm" : "text-gray-600 hover:bg-gray-50"}`}
           >
-            <Zap size={15} />
-            Pay Online
+            <Zap size={15} /> Pay Online
           </button>
         </div>
 
-        {/* ============ ERROR ============ */}
+        {/* ERROR */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm flex items-start gap-2">
             <AlertCircle size={16} className="shrink-0 mt-0.5" />
@@ -390,7 +414,7 @@ export default function PayPage() {
           </div>
         )}
 
-        {/* ============ ONLINE MODE (Hidden because disabled) ============ */}
+        {/* ONLINE MODE */}
         {mode === "online" && (
           <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
             <div className="flex items-start gap-3">
@@ -407,7 +431,6 @@ export default function PayPage() {
                 </p>
               </div>
             </div>
-
             <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-3 space-y-2">
               <div className="flex items-center gap-2 text-xs text-emerald-800">
                 <CheckCircle size={12} className="shrink-0" />
@@ -425,25 +448,20 @@ export default function PayPage() {
           </div>
         )}
 
-        {/* ============ RECEIPT MODE ============ */}
+        {/* RECEIPT MODE */}
         {mode === "receipt" && (
           <div className="space-y-3">
-            {/* Payment Method */}
             <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 space-y-3">
               <h2 className="text-sm font-bold text-gray-800">
                 How did you pay?
               </h2>
               <div className="grid grid-cols-2 gap-2">
-                {paymentMethods.map((m) => (
+                {availablePaymentMethods.map((m) => (
                   <button
                     key={m.value}
                     type="button"
                     onClick={() => setReceiptMethod(m.value)}
-                    className={`py-2.5 px-3 rounded-xl text-xs font-medium border-2 transition-all flex items-center gap-2 justify-center ${
-                      receiptMethod === m.value
-                        ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]"
-                        : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"
-                    }`}
+                    className={`py-2.5 px-3 rounded-xl text-xs font-medium border-2 transition-all flex items-center gap-2 justify-center ${receiptMethod === m.value ? "border-[var(--color-primary)] bg-[var(--color-primary-light)] text-[var(--color-primary)]" : "border-gray-200 bg-white text-gray-600 hover:border-gray-300"}`}
                   >
                     <span>{m.emoji}</span>
                     <span className="truncate">{m.label}</span>
@@ -575,7 +593,7 @@ export default function PayPage() {
         )}
       </div>
 
-      {/* ============ STICKY SUBMIT BAR ============ */}
+      {/* STICKY SUBMIT BAR */}
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.05)]">
         <div className="max-w-lg mx-auto">
           {mode === "receipt" ? (
@@ -616,7 +634,6 @@ export default function PayPage() {
         </div>
       </div>
 
-      {/* ============ PAY ONLINE MODAL (Disabled but kept for future) ============ */}
       <PayOnlineModal
         open={showOnlineModal}
         onClose={() => setShowOnlineModal(false)}

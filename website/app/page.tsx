@@ -1,434 +1,193 @@
 "use client";
-import { useState, useRef } from "react";
-import { useRouter } from "next/navigation";
-import { Loader2, ChevronRight } from "lucide-react";
-import api from "../lib/axios";
-import { useAuthStore } from "../store/authStore";
+import Link from "next/link";
+import {
+  CheckCircle,
+  ArrowRight,
+  ShieldCheck,
+  Smartphone,
+  BarChart3,
+  Users,
+} from "lucide-react";
 
-type LoginMethod = "student-id" | "phone";
-
-export default function LoginPage() {
-  const router = useRouter();
-  const { login } = useAuthStore();
-  const [method, setMethod] = useState<LoginMethod>("student-id");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState("");
-
-  // Student ID login
-  const [studentCode, setStudentCode] = useState("");
-  const [dobDay, setDobDay] = useState("");
-  const [dobMonth, setDobMonth] = useState("");
-  const [dobYear, setDobYear] = useState("");
-  const dayRef = useRef<HTMLInputElement>(null);
-  const monthRef = useRef<HTMLInputElement>(null);
-  const yearRef = useRef<HTMLInputElement>(null);
-
-  const onlyDigits = (v: string) => v.replace(/\D/g, "");
-
-  const handleDobDay = (raw: string) => {
-    let v = onlyDigits(raw).slice(0, 2);
-    if (v.length === 1 && Number(v) > 3) v = "0" + v;
-    if (v.length === 2 && Number(v) > 31) v = "31";
-    if (v === "00") v = "01";
-    setDobDay(v);
-    if (v.length === 2) monthRef.current?.focus();
-  };
-
-  const handleDobMonth = (raw: string) => {
-    let v = onlyDigits(raw).slice(0, 2);
-    if (v.length === 1 && Number(v) > 1) v = "0" + v;
-    if (v.length === 2 && Number(v) > 12) v = "12";
-    if (v === "00") v = "01";
-    setDobMonth(v);
-    if (v.length === 2) yearRef.current?.focus();
-  };
-
-  const handleDobYear = (raw: string) => {
-    setDobYear(onlyDigits(raw).slice(0, 4));
-  };
-
-  const dobBackspace = (
-    e: React.KeyboardEvent<HTMLInputElement>,
-    current: string,
-    prev?: React.RefObject<HTMLInputElement | null>,
-  ) => {
-    if (e.key === "Backspace" && current === "") prev?.current?.focus();
-  };
-
-  // Phone OTP login
-  const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otpLoading, setOtpLoading] = useState(false);
-
-  const handleStudentIdLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-
-    const d = Number(dobDay);
-    const m = Number(dobMonth);
-    const y = Number(dobYear);
-    const dobDate = new Date(y, m - 1, d);
-    const dobValid =
-      dobDay.length === 2 &&
-      dobMonth.length === 2 &&
-      dobYear.length === 4 &&
-      y >= 1950 &&
-      dobDate.getFullYear() === y &&
-      dobDate.getMonth() === m - 1 &&
-      dobDate.getDate() === d &&
-      dobDate <= new Date();
-
-    if (!dobValid) {
-      setError("Please enter a valid date of birth (DD-MM-YYYY)");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const res = await api.post("/auth/parent/login-student-id", {
-        studentCode: studentCode.toUpperCase().trim(),
-        dateOfBirth: `${dobYear}-${dobMonth}-${dobDay}`,
-      });
-      const { token, student } = res.data.data;
-      login(token, student);
-      router.push("/dashboard");
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message ||
-          "Login failed. Please check your details.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleRequestOTP = async () => {
-    if (!phone.trim()) return;
-    setError("");
-    setOtpLoading(true);
-    try {
-      await api.post("/auth/parent/request-otp", { phone: `+265${phone}` });
-      setOtpSent(true);
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message ||
-          "Failed to send code. Check your number.",
-      );
-    } finally {
-      setOtpLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-    try {
-      const res = await api.post("/auth/parent/verify-otp", {
-        phone: `+265${phone}`,
-        otp,
-      });
-      const { token, student } = res.data.data;
-      login(token, student);
-      router.push("/dashboard");
-    } catch (err: any) {
-      setError(
-        err.response?.data?.message || "Invalid code. Please try again.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
+export default function HomePage() {
   return (
-    <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
-      {/* 🎯 Static SchoolPay Logo & Name */}
-      <div className="mb-6 flex flex-col items-center animate-fade-in">
-        <img
-          src="/images/SchoolPayLogo.jpg"
-          alt="SchoolPay"
-          className="h-20 w-20 object-contain rounded-2xl bg-white p-2 shadow-lg mb-4"
-        />
-        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
-          SchoolPay
-        </h1>
-        <p className="text-sm text-gray-400 mt-1">
-          Parent &amp; Guardian Portal
-        </p>
-      </div>
-
-      {/* Card */}
-      <div className="w-full max-w-sm bg-white border border-gray-200 rounded-2xl p-6 animate-fade-in-up">
-        {/* Method Toggle */}
-        <div className="relative flex bg-gray-100 rounded-xl p-1 mb-6">
-          <span
-            className={`absolute top-1 bottom-1 w-[calc(50%-0.25rem)] rounded-lg bg-white shadow-sm transition-transform duration-300 ease-out ${
-              method === "student-id"
-                ? "translate-x-0"
-                : "translate-x-[calc(100%+0.5rem)]"
-            }`}
-            aria-hidden
+    <div className="min-h-screen bg-gray-50 font-sans">
+      {/* Navbar */}
+      <nav className="bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+        <div className="flex items-center gap-3">
+          <img
+            src="/images/SchoolPayLogo.jpg"
+            alt="SchoolPay"
+            className="h-10 w-10 object-contain rounded-lg"
           />
-          <button
-            type="button"
-            onClick={() => {
-              setMethod("student-id");
-              setError("");
-            }}
-            className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
-              method === "student-id"
-                ? "text-[var(--color-primary)]"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Student ID
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setMethod("phone");
-              setError("");
-            }}
-            className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
-              method === "phone"
-                ? "text-[var(--color-primary)]"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-          >
-            Phone Number
-          </button>
+          <span className="text-xl font-bold text-gray-900 tracking-tight">
+            SchoolPay
+          </span>
         </div>
-
-        {/* Error */}
-        <div
-          className={`overflow-hidden transition-all duration-300 ease-out ${
-            error ? "max-h-40 opacity-100 mb-4" : "max-h-0 opacity-0 mb-0"
-          }`}
-        >
-          <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
-            {error}
-          </div>
-        </div>
-
-        {/* Student ID Form */}
-        {method === "student-id" && (
-          <form
-            onSubmit={handleStudentIdLogin}
-            className="space-y-4 animate-fade-in"
-            key="student-id"
+        <div className="flex items-center gap-6">
+          <Link
+            href="#features"
+            className="text-sm font-medium text-gray-600 hover:text-gray-900 hidden md:block"
           >
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Student ID
-              </label>
-              <input
-                type="text"
-                value={studentCode}
-                onChange={(e) => setStudentCode(e.target.value.toUpperCase())}
-                placeholder="eg. SPP-F3-2026-001"
-                required
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm font-mono text-gray-900 placeholder-gray-400 outline-none transition-all duration-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-              />
-              <p className="text-xs text-gray-400 mt-1.5">
-                Found on your child&apos;s admission letter
-              </p>
-            </div>
+            Features
+          </Link>
+          <Link
+            href="#pricing"
+            className="text-sm font-medium text-gray-600 hover:text-gray-900 hidden md:block"
+          >
+            Pricing
+          </Link>
+          <Link
+            href="/login"
+            className="text-sm font-semibold text-[var(--color-primary)] bg-[var(--color-primary-light)] px-5 py-2.5 rounded-full hover:bg-[var(--color-primary)] hover:text-white transition-all"
+          >
+            Parent Login
+          </Link>
+        </div>
+      </nav>
 
-            {/* Child's DOB */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Child&apos;s Date of Birth
-              </label>
-              <div className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-xl text-sm transition-all duration-300 focus-within:ring-2 focus-within:ring-[var(--color-primary)] focus-within:border-transparent">
-                <input
-                  ref={dayRef}
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="DD"
-                  value={dobDay}
-                  onChange={(e) => handleDobDay(e.target.value)}
-                  maxLength={2}
-                  autoComplete="off"
-                  className="w-14 py-1 text-center text-base bg-transparent border-0 outline-none ring-0 focus:ring-0 text-gray-900 placeholder-gray-400"
-                />
-                <span className="text-gray-400">-</span>
-                <input
-                  ref={monthRef}
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="MM"
-                  value={dobMonth}
-                  onChange={(e) => handleDobMonth(e.target.value)}
-                  onKeyDown={(e) => dobBackspace(e, dobMonth, dayRef)}
-                  maxLength={2}
-                  autoComplete="off"
-                  className="w-14 py-1 text-center text-base bg-transparent border-0 outline-none ring-0 focus:ring-0 text-gray-900 placeholder-gray-400"
-                />
-                <span className="text-gray-400">-</span>
-                <input
-                  ref={yearRef}
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="YYYY"
-                  value={dobYear}
-                  onChange={(e) => handleDobYear(e.target.value)}
-                  onKeyDown={(e) => dobBackspace(e, dobYear, monthRef)}
-                  maxLength={4}
-                  autoComplete="off"
-                  className="w-20 py-1 text-center text-base bg-transparent border-0 outline-none ring-0 focus:ring-0 text-gray-900 placeholder-gray-400"
-                />
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="group w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-3 rounded-xl font-medium text-sm transition-all duration-300 hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <>
-                  <Loader2 size={16} className="animate-spin" /> Signing in...
-                </>
-              ) : (
-                <>
-                  View My Child&apos;s Account
-                  <ChevronRight
-                    size={16}
-                    className="transition-transform duration-300 group-hover:translate-x-0.5"
-                  />
-                </>
-              )}
-            </button>
-          </form>
-        )}
-
-        {/* Phone OTP Form */}
-        {method === "phone" && (
-          <div className="space-y-4 animate-fade-in" key="phone">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                Phone Number
-              </label>
-              <div className="flex gap-2">
-                <div
-                  className={`flex-1 flex items-stretch border rounded-xl overflow-hidden transition-all duration-200 ${
-                    otpSent
-                      ? "bg-gray-50 border-gray-200"
-                      : "bg-white border-gray-300 focus-within:border-[var(--color-primary)] focus-within:shadow-[0_0_0_3px_var(--color-primary-ring)]"
-                  }`}
-                >
-                  <span
-                    className={`flex items-center pl-4 pr-1 text-sm font-medium select-none ${
-                      otpSent ? "text-gray-500" : "text-gray-700"
-                    }`}
-                  >
-                    +265
-                  </span>
-                  <input
-                    type="tel"
-                    inputMode="numeric"
-                    value={phone}
-                    onChange={(e) =>
-                      setPhone(e.target.value.replace(/\D/g, "").slice(0, 9))
-                    }
-                    placeholder="991234567"
-                    disabled={otpSent}
-                    className={`flex-1 pr-4 py-3 bg-transparent text-sm outline-none ring-0 focus:ring-0 focus:outline-none rounded-none ${
-                      otpSent
-                        ? "text-gray-500 cursor-not-allowed"
-                        : "text-gray-900 placeholder-gray-300"
-                    }`}
-                  />
-                </div>
-                {!otpSent && (
-                  <button
-                    type="button"
-                    onClick={handleRequestOTP}
-                    disabled={otpLoading || phone.length < 9}
-                    className="px-4 py-3 bg-[var(--color-primary)] text-white rounded-xl text-sm font-medium transition-all duration-300 hover:bg-[var(--color-primary-dark)] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap flex items-center justify-center min-w-[92px]"
-                  >
-                    {otpLoading ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      "Send Code"
-                    )}
-                  </button>
-                )}
-              </div>
-              <p className="text-xs text-gray-400 mt-1.5">
-                Use the phone number registered with the school
-              </p>
-            </div>
-
-            <div
-              className={`overflow-hidden transition-all duration-500 ease-out ${
-                otpSent ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
-              }`}
-            >
-              <form onSubmit={handleVerifyOTP} className="space-y-4 pt-2">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                    Verification Code
-                  </label>
-                  <input
-                    type="text"
-                    value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, ""))}
-                    placeholder="Enter 6-digit code"
-                    maxLength={6}
-                    required
-                    autoFocus
-                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-center text-lg font-mono tracking-[0.5em] text-gray-900 placeholder-gray-300 outline-none transition-all duration-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
-                  />
-                  <p className="text-xs text-gray-400 mt-1.5 text-center">
-                    Code sent to +265{phone}
-                  </p>
-                </div>
-                <button
-                  type="submit"
-                  disabled={loading || otp.length < 6}
-                  className="group w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-3 rounded-xl font-medium text-sm transition-all duration-300 hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {loading ? (
-                    <>
-                      <Loader2 size={16} className="animate-spin" />{" "}
-                      Verifying...
-                    </>
-                  ) : (
-                    <>
-                      Verify &amp; Continue
-                      <ChevronRight
-                        size={16}
-                        className="transition-transform duration-300 group-hover:translate-x-0.5"
-                      />
-                    </>
-                  )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOtpSent(false);
-                    setOtp("");
-                    setPhone("");
-                  }}
-                  className="w-full text-sm text-gray-500 hover:text-gray-800 transition-colors duration-300"
-                >
-                  Use a different number
-                </button>
-              </form>
-            </div>
-          </div>
-        )}
-
-        <p className="text-center text-xs text-gray-400 mt-6">
-          Having trouble? Contact your school office.
+      {/* Hero Section */}
+      <header className="max-w-6xl mx-auto px-6 py-20 text-center">
+        <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 tracking-tight leading-tight mb-6">
+          Simple, secure{" "}
+          <span className="text-[var(--color-primary)]">
+            school fee management
+          </span>
+        </h1>
+        <p className="text-lg text-gray-600 max-w-2xl mx-auto mb-10">
+          Collect fees online, track debtors, and generate financial reports
+          instantly. Built for Malawian schools.
         </p>
-      </div>
+        <div className="flex flex-col sm:flex-row justify-center gap-4">
+          <Link
+            href="/platform/login"
+            className="flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-[var(--color-primary-dark)] transition-all shadow-lg hover:shadow-xl"
+          >
+            School Admin Login <ArrowRight size={18} />
+          </Link>
+          <Link
+            href="#demo"
+            className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-300 px-8 py-4 rounded-xl text-lg font-semibold hover:bg-gray-50 transition-all"
+          >
+            Book a Demo
+          </Link>
+        </div>
+      </header>
 
-      <p className="text-xs text-gray-400 mt-6">
-        SchoolPay Malawi © {new Date().getFullYear()}
-      </p>
+      {/* Features Section */}
+      <section
+        id="features"
+        className="bg-white py-20 border-t border-gray-100"
+      >
+        <div className="max-w-6xl mx-auto px-6">
+          <h2 className="text-3xl font-bold text-center text-gray-900 mb-16">
+            Everything your school needs
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[
+              {
+                icon: Smartphone,
+                title: "OneKhusa Integration",
+                desc: "Parents pay with Airtel Money or TNM Mpamba instantly.",
+              },
+              {
+                icon: BarChart3,
+                title: "Financial Reports",
+                desc: "Track collections, debtor ageing, and daily cash-ups automatically.",
+              },
+              {
+                icon: ShieldCheck,
+                title: "Secure & Verified",
+                desc: "Every payment is verified, receipted, and audit-logged.",
+              },
+              {
+                icon: Users,
+                title: "Multi-Tenant",
+                desc: "Manage multiple schools under one platform effortlessly.",
+              },
+              {
+                icon: CheckCircle,
+                title: "Discounts & Bursaries",
+                desc: "Apply scholarships and staff child discounts with ease.",
+              },
+              {
+                icon: CheckCircle,
+                title: "Parent Portal",
+                desc: "Parents view balances, pay online, and download receipts.",
+              },
+            ].map((feat, i) => (
+              <div
+                key={i}
+                className="p-6 rounded-2xl bg-gray-50 border border-gray-100 hover:border-[var(--color-primary)] hover:shadow-md transition-all"
+              >
+                <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center text-[var(--color-primary)] mb-4 shadow-sm">
+                  <feat.icon size={24} />
+                </div>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">
+                  {feat.title}
+                </h3>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  {feat.desc}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section id="pricing" className="py-20 bg-gray-50">
+        <div className="max-w-4xl mx-auto px-6 text-center">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            Simple, transparent pricing
+          </h2>
+          <p className="text-gray-600 mb-12">
+            No hidden fees. Only pay per term.
+          </p>
+          <div className="bg-white rounded-3xl shadow-xl border border-gray-100 p-10 max-w-lg mx-auto">
+            <h3 className="text-xl font-semibold text-gray-800 mb-2">
+              Term Subscription
+            </h3>
+            <p className="text-5xl font-extrabold text-[var(--color-primary)] mb-6">
+              MWK 250,000{" "}
+              <span className="text-base font-medium text-gray-400">
+                / term
+              </span>
+            </p>
+            <ul className="space-y-4 mb-8 text-left">
+              {[
+                "Unlimited students",
+                "Unlimited staff accounts",
+                "OneKhusa integration",
+                "Automated receipts & SMS alerts",
+                "Financial reporting suite",
+              ].map((item, i) => (
+                <li key={i} className="flex items-center gap-3 text-gray-700">
+                  <CheckCircle
+                    size={18}
+                    className="text-[var(--color-primary)] shrink-0"
+                  />{" "}
+                  {item}
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/platform/login"
+              className="block w-full bg-[var(--color-primary)] text-white py-4 rounded-xl font-bold text-lg hover:bg-[var(--color-primary-dark)] transition-colors"
+            >
+              Start Free Trial
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-gray-900 text-gray-400 py-12 text-center text-sm">
+        <p>
+          © {new Date().getFullYear()} Tranptech Group. All rights reserved.
+        </p>
+        <p className="mt-2">SchoolPay is a product of Tranptech Systems.</p>
+      </footer>
     </div>
   );
 }
