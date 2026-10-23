@@ -28,10 +28,8 @@ import BulkImport from "./pages/Students/BulkImport";
 import StaffPage from "./pages/Staff/index";
 import AuditPage from "./pages/Audit/index";
 import RateLimitModal from "./components/shared/RateLimitModal";
-
 import MainLayout from "./components/Layout/MainLayout";
 import PermissionGuard from "./components/shared/PermissionGuard";
-
 import PlatformLogin from "./pages/Platform/Login";
 import PlatformLayout from "./pages/Platform/Layout";
 import PlatformDashboard from "./pages/Platform/Dashboard";
@@ -41,6 +39,7 @@ import PlatformSubscriptions from "./pages/Platform/Subscriptions";
 import PlatformAnalytics from "./pages/Platform/Analytics";
 import PlatformOneKhusaMerchants from "./pages/Platform/OneKhusaMerchants";
 import { usePlatformAuthStore } from "./store/platformAuthStore";
+import PlatformRequestsPage from "./pages/Platform/Requests";
 
 // ==================== GUARDS ====================
 
@@ -360,6 +359,7 @@ function App() {
             path="schools/new"
             element={<Navigate to="/platform/dashboard" replace />}
           />
+          <Route path="requests" element={<PlatformRequestsPage />} />
           <Route path="schools/:id" element={<PlatformSchoolDetail />} />
           <Route path="subscriptions" element={<PlatformSubscriptions />} />
           <Route path="analytics" element={<PlatformAnalytics />} />

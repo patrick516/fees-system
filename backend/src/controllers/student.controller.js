@@ -218,17 +218,30 @@ const addStudent = async (req, res) => {
       },
     });
     if (existingStudent)
-      return res
-        .status(409)
-        .json({
-          success: false,
-          message: "A student with this name and parent phone already exists",
-        });
+      return res.status(409).json({
+        success: false,
+        message: "A student with this name and parent phone already exists",
+      });
 
     const year = academicYear || new Date().getFullYear().toString();
+
+    // 🎯 TIER LIMIT ENFORCEMENT (Moved up to check before generating code)
     const school = await prisma.school.findUnique({
       where: { id: req.schoolId },
     });
+
+    const currentStudents = await prisma.student.count({
+      where: { schoolId: req.schoolId, isActive: true },
+    });
+
+    if (school.maxStudents && currentStudents >= school.maxStudents) {
+      return res.status(403).json({
+        success: false,
+        message: `Student limit reached! Your ${school.tier} plan allows up to ${school.maxStudents} students. You currently have ${currentStudents} active students. Please upgrade your subscription.`,
+        code: "TIER_LIMIT_REACHED",
+      });
+    }
+
     const classCount = await prisma.student.count({
       where: { schoolId: req.schoolId, classId },
     });
@@ -274,13 +287,11 @@ const addStudent = async (req, res) => {
       },
     });
 
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message: `Student ${student.fullName} added successfully`,
-        data: student,
-      });
+    return res.status(201).json({
+      success: true,
+      message: `Student ${student.fullName} added successfully`,
+      data: student,
+    });
   } catch (error) {
     console.error("Add student error:", error);
     return res
@@ -396,7 +407,7 @@ const getStudents = async (req, res) => {
       return {
         ...student,
         totalPaid,
-        requiredAmount: netRequired, // 🎯 Return the NET amount after discount
+        requiredAmount: netRequired,
         isDebtor: isDebtorStudent,
         outstandingBalance,
         creditBalance: Number(student.creditBalance) || 0,
@@ -457,7 +468,7 @@ const getStudent = async (req, res) => {
             verifiedBy: { select: { fullName: true } },
           },
         },
-        discounts: { orderBy: { createdAt: "desc" } }, // 🎯 Include discounts
+        discounts: { orderBy: { createdAt: "desc" } },
       },
     });
 
@@ -554,19 +565,16 @@ const getStudent = async (req, res) => {
 };
 
 // ==================== APPLY DISCOUNT ====================
-// POST /api/students/:id/discounts
 const applyDiscount = async (req, res) => {
   try {
     const { id } = req.params;
     const { amount, term, academicYear, reason } = req.body;
 
     if (!amount || !term || !academicYear) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Amount, term, and academicYear are required",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Amount, term, and academicYear are required",
+      });
     }
 
     const student = await prisma.student.findFirst({
@@ -577,7 +585,6 @@ const applyDiscount = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Student not found" });
 
-    // Upsert prevents duplicate discounts for the same term
     const discount = await prisma.studentDiscount.upsert({
       where: {
         studentId_term_academicYear: { studentId: id, term, academicYear },
@@ -604,13 +611,11 @@ const applyDiscount = async (req, res) => {
       },
     });
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Discount applied successfully",
-        data: discount,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Discount applied successfully",
+      data: discount,
+    });
   } catch (error) {
     console.error("Apply discount error:", error);
     return res
@@ -620,7 +625,6 @@ const applyDiscount = async (req, res) => {
 };
 
 // ==================== REMOVE DISCOUNT ====================
-// DELETE /api/students/:id/discounts/:discountId
 const removeDiscount = async (req, res) => {
   try {
     const { discountId } = req.params;
@@ -636,7 +640,6 @@ const removeDiscount = async (req, res) => {
 
 // ==================== UPDATE STUDENT ====================
 const updateStudent = async (req, res) => {
-  // ... (Keep exactly as it was in your original file) ...
   try {
     const { id } = req.params;
     const {
@@ -711,13 +714,11 @@ const updateStudent = async (req, res) => {
       },
     });
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Student updated successfully",
-        data: updated,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Student updated successfully",
+      data: updated,
+    });
   } catch (error) {
     console.error("Update student error:", error);
     return res
@@ -728,16 +729,13 @@ const updateStudent = async (req, res) => {
 
 // ==================== SEARCH STUDENTS ====================
 const searchStudents = async (req, res) => {
-  // ... (Keep exactly as it was) ...
   try {
     const { q } = req.query;
     if (!q || q.length < 2)
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Search query must be at least 2 characters",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Search query must be at least 2 characters",
+      });
 
     const students = await prisma.student.findMany({
       where: {
@@ -788,7 +786,6 @@ const searchStudents = async (req, res) => {
 
 // ==================== GET STUDENT BY CODE ====================
 const getStudentByCode = async (req, res) => {
-  // ... (Keep exactly as it was) ...
   try {
     const { code } = req.params;
     const student = await prisma.student.findUnique({
@@ -834,7 +831,6 @@ const getStudentByCode = async (req, res) => {
 
 // ==================== BULK IMPORT ====================
 const bulkImportPreview = async (req, res) => {
-  // ... (Keep exactly as it was) ...
   try {
     if (!req.file)
       return res
@@ -860,7 +856,6 @@ const bulkImportPreview = async (req, res) => {
 };
 
 const bulkImport = async (req, res) => {
-  // ... (Keep exactly as it was) ...
   try {
     if (!req.file)
       return res
@@ -873,18 +868,33 @@ const bulkImport = async (req, res) => {
     const invalidRows = results.filter((r) => !r.valid);
 
     if (invalidRows.length > 0) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: `${invalidRows.length} row(s) have errors.`,
-          data: {
-            totalRows: results.length,
-            validCount: results.length - invalidRows.length,
-            errorCount: invalidRows.length,
-            rows: results,
-          },
-        });
+      return res.status(400).json({
+        success: false,
+        message: `${invalidRows.length} row(s) have errors.`,
+        data: {
+          totalRows: results.length,
+          validCount: results.length - invalidRows.length,
+          errorCount: invalidRows.length,
+          rows: results,
+        },
+      });
+    }
+
+    // 🎯 TIER LIMIT ENFORCEMENT FOR BULK IMPORT
+    const currentStudents = await prisma.student.count({
+      where: { schoolId: req.schoolId, isActive: true },
+    });
+    const validRowsCount = results.length - invalidRows.length;
+
+    if (
+      school.maxStudents &&
+      currentStudents + validRowsCount > school.maxStudents
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: `Import denied! Your ${school.tier} plan allows up to ${school.maxStudents} students. You currently have ${currentStudents} active students. Importing ${validRowsCount} more would exceed your limit. Please upgrade your subscription.`,
+        code: "TIER_LIMIT_REACHED",
+      });
     }
 
     const created = [];
@@ -952,21 +962,17 @@ const bulkImport = async (req, res) => {
       },
     });
 
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message: `Imported ${created.length} student(s)${failed.length ? `, ${failed.length} failed` : ""}`,
-        data: { created, failed },
-      });
+    return res.status(201).json({
+      success: true,
+      message: `Imported ${created.length} student(s)${failed.length ? `, ${failed.length} failed` : ""}`,
+      data: { created, failed },
+    });
   } catch (err) {
     console.error("Bulk import error:", err);
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: err.message || "Failed to import students",
-      });
+    return res.status(400).json({
+      success: false,
+      message: err.message || "Failed to import students",
+    });
   }
 };
 

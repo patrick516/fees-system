@@ -1,16 +1,29 @@
-// backend/src/routes/platformSchool.routes.js
 const express = require("express");
 const router = express.Router();
 const controller = require("../controllers/platformSchool.controller");
+const requestController = require("../controllers/schoolRequest.controller");
 const {
   verifyPlatformAdmin,
   requireOwner,
 } = require("../middleware/platformAuth");
 
-// Every route here requires a valid platform-admin token
 router.use(verifyPlatformAdmin);
 
-// List + view — any platform admin (OWNER or SUPPORT)
+// 🎯 SCHOOL REQUESTS (must be before /:id)
+router.get("/requests", requireOwner, requestController.listRequests);
+router.get("/requests/pending-count", requestController.getPendingCount);
+router.post(
+  "/requests/:id/approve",
+  requireOwner,
+  requestController.approveRequest,
+);
+router.post(
+  "/requests/:id/reject",
+  requireOwner,
+  requestController.rejectRequest,
+);
+
+// Schools
 router.get("/", controller.listSchools);
 router.get("/:id", controller.getSchool);
 

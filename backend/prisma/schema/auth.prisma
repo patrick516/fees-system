@@ -99,7 +99,9 @@ model School {
   subscriptionPaid Boolean   @default(false)
   subscriptionDate DateTime?
   nextPaymentDate  DateTime?
-
+ 
+  tier        String @default("SMALL") 
+  maxStudents Int    @default(150)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -371,4 +373,20 @@ model Notification {
   @@index([platformId, status])
   @@index([schoolId])
   @@map("notifications")
+}
+
+//  SCHOOL REQUESTS 
+model SchoolRequest {
+  id         String   @id @default(uuid())
+  name       String
+  email      String
+  phone      String
+  schoolName String
+  tier       String   
+  status     String   @default("PENDING") 
+  
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("school_requests")
 }

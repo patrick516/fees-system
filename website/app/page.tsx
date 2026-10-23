@@ -17,10 +17,13 @@ import StatsTicker from "../components/marketing/StatsTicker";
 import FeaturesGrid from "../components/marketing/FeaturesGrid";
 import PricingCard from "../components/marketing/PricingCard";
 
+type Tier = "SMALL" | "MEDIUM" | "LARGE";
+
 export default function HomePage() {
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [selectedTier, setSelectedTier] = useState<Tier>("SMALL");
 
   const [form, setForm] = useState({
     name: "",
@@ -29,17 +32,34 @@ export default function HomePage() {
     phone: "",
   });
 
+  // 🎯 Opens modal AND sets the correct tier
+  const openModalWithTier = (tier: Tier) => {
+    setSelectedTier(tier);
+    setSuccess(false);
+    setShowDemoModal(true);
+  };
+
   const handleBookDemo = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      await api.post("/schools/request-demo", form);
+      // 🎯 Sends to the new /school-requests endpoint WITH the tier
+      await api.post("/school-requests", {
+        ...form,
+        tier: selectedTier,
+      });
       setSuccess(true);
     } catch (err) {
       alert("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const tierLabel = {
+    SMALL: "Small School (Up to 150 students)",
+    MEDIUM: "Medium School (151–400 students)",
+    LARGE: "Large School (400+ students)",
   };
 
   return (
@@ -78,7 +98,7 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Hero Section - Tightened Spacing */}
+      {/* Hero Section */}
       <header className="max-w-6xl mx-auto px-6 pt-16 pb-8 text-center relative z-10">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 font-medium text-xs mb-5 border border-blue-100 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
@@ -96,7 +116,7 @@ export default function HomePage() {
         </p>
         <div className="flex flex-col sm:flex-row justify-center gap-3">
           <button
-            onClick={() => setShowDemoModal(true)}
+            onClick={() => openModalWithTier("MEDIUM")}
             className="flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-[var(--color-primary-dark)] transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
             Book a Free Demo <ArrowRight size={18} />
@@ -110,15 +130,13 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Dashboard Preview - Moved closer to hero */}
       <div className="relative z-10 pb-16 px-4">
         <DashboardPreview />
       </div>
 
-      {/* Stats Ticker */}
       <StatsTicker />
 
-      {/* 🎯 FREE PILOT BANNER (From PDF) */}
+      {/* Free Pilot Banner */}
       <section className="bg-[var(--color-primary-light)] border-b border-[var(--color-primary)]/20 py-10">
         <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
@@ -132,7 +150,7 @@ export default function HomePage() {
             </p>
           </div>
           <button
-            onClick={() => setShowDemoModal(true)}
+            onClick={() => openModalWithTier("MEDIUM")}
             className="shrink-0 bg-white text-[var(--color-primary)] px-6 py-3 rounded-xl font-bold shadow-sm hover:shadow-md transition-all border border-gray-200"
           >
             Claim Your Pilot
@@ -140,10 +158,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Features Section */}
       <FeaturesGrid />
 
-      {/* 🎯 HOW IT WORKS (From PDF) */}
+      {/* How it works */}
       <section className="py-16 bg-gray-50 border-t border-gray-100">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-12">
@@ -202,8 +219,8 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <PricingCard />
+      {/* 🎯 Pricing Section now receives the tier-selector */}
+      <PricingCard onSelectTier={openModalWithTier} />
 
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-10 text-center text-sm border-t border-gray-800">
@@ -235,7 +252,7 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* BOOK DEMO MODAL */}
+      {/* 🎯 BOOK DEMO / REQUEST ACCOUNT MODAL */}
       {showDemoModal && (
         <div
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
@@ -251,16 +268,19 @@ export default function HomePage() {
                   <CheckCircle size={32} className="text-green-600" />
                 </div>
                 <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  Request Sent!
+                  Request Received!
                 </h3>
                 <p className="text-sm text-gray-500 mb-6">
-                  Our team will contact you within 24 hours to schedule your
-                  demo.
+                  We&apos;ve got your details for the{" "}
+                  <strong>{selectedTier}</strong> plan. Our team will review it
+                  and email your school login link
+                  <strong> within 24 hours</strong>.
                 </p>
                 <button
                   onClick={() => {
                     setShowDemoModal(false);
                     setSuccess(false);
+                    setForm({ name: "", email: "", schoolName: "", phone: "" });
                   }}
                   className="w-full bg-[var(--color-primary)] text-white py-3 rounded-xl font-semibold"
                 >
@@ -271,7 +291,7 @@ export default function HomePage() {
               <>
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-lg font-bold text-gray-900">
-                    Book a Free Demo
+                    Request Your School Account
                   </h3>
                   <button
                     onClick={() => setShowDemoModal(false)}
@@ -280,11 +300,24 @@ export default function HomePage() {
                     <X size={20} />
                   </button>
                 </div>
-                <p className="text-sm text-gray-500 mb-6">
-                  See how SchoolPay can transform your bursary. Fill in your
-                  details below.
+
+                {/* 🎯 Selected tier banner */}
+                <div className="bg-[var(--color-primary-light)] border border-[var(--color-primary)]/20 p-3 rounded-xl mb-4">
+                  <p className="text-[10px] font-semibold text-[var(--color-primary-dark)] uppercase tracking-wide mb-0.5">
+                    Selected Plan
+                  </p>
+                  <p className="text-sm font-bold text-[var(--color-primary)]">
+                    {tierLabel[selectedTier]}
+                  </p>
+                </div>
+
+                <p className="text-xs text-gray-500 mb-4">
+                  Fill in your details below. Once submitted, our team will
+                  review your request and email your login link{" "}
+                  <strong>within 24 hours</strong>.
                 </p>
-                <form onSubmit={handleBookDemo} className="space-y-4">
+
+                <form onSubmit={handleBookDemo} className="space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-gray-700 mb-1">
                       Your Name *
@@ -344,7 +377,7 @@ export default function HomePage() {
                     disabled={loading}
                     className="w-full bg-[var(--color-primary)] text-white py-3 rounded-xl font-semibold mt-2 disabled:opacity-50"
                   >
-                    {loading ? "Sending Request..." : "Request Demo"}
+                    {loading ? "Sending Request..." : "Submit Request"}
                   </button>
                 </form>
               </>

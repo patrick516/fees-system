@@ -1,6 +1,10 @@
 import { CheckCircle } from "lucide-react";
 
-export default function PricingCard() {
+interface PricingCardProps {
+  onSelectTier: (tier: "SMALL" | "MEDIUM" | "LARGE") => void;
+}
+
+export default function PricingCard({ onSelectTier }: PricingCardProps) {
   return (
     <section id="pricing" className="py-16 bg-gray-50 border-t border-gray-100">
       <div className="max-w-7xl mx-auto px-6">
@@ -42,12 +46,12 @@ export default function PricingCard() {
                 </li>
               ))}
             </ul>
-            <a
-              href="https://fees-system-one.vercel.app/signup"
+            <button
+              onClick={() => onSelectTier("SMALL")}
               className="block w-full text-center border-2 border-[var(--color-primary)] text-[var(--color-primary)] py-3 rounded-xl font-bold hover:bg-[var(--color-primary-light)] transition-colors"
             >
               Start Free Trial
-            </a>
+            </button>
           </div>
 
           {/* Medium School (Popular) */}
@@ -80,12 +84,12 @@ export default function PricingCard() {
                 </li>
               ))}
             </ul>
-            <a
-              href="https://fees-system-one.vercel.app/signup"
+            <button
+              onClick={() => onSelectTier("MEDIUM")}
               className="block w-full text-center bg-[var(--color-primary)] text-white py-3 rounded-xl font-bold hover:bg-[var(--color-primary-dark)] transition-colors shadow-md"
             >
               Start Free Trial
-            </a>
+            </button>
           </div>
 
           {/* Large School */}
@@ -115,12 +119,12 @@ export default function PricingCard() {
                 </li>
               ))}
             </ul>
-            <a
-              href="https://fees-system-one.vercel.app/signup"
+            <button
+              onClick={() => onSelectTier("LARGE")}
               className="block w-full text-center border-2 border-[var(--color-primary)] text-[var(--color-primary)] py-3 rounded-xl font-bold hover:bg-[var(--color-primary-light)] transition-colors"
             >
               Start Free Trial
-            </a>
+            </button>
           </div>
         </div>
 
