@@ -2,15 +2,20 @@
 import { useState } from "react";
 import Link from "next/link";
 import {
-  CheckCircle,
   ArrowRight,
-  ShieldCheck,
-  Smartphone,
-  BarChart3,
-  Users,
+  CheckCircle,
   X,
+  PlayCircle,
+  Settings,
+  Rocket,
+  School,
 } from "lucide-react";
 import api from "../lib/axios";
+
+import DashboardPreview from "../components/marketing/DashboardPreview";
+import StatsTicker from "../components/marketing/StatsTicker";
+import FeaturesGrid from "../components/marketing/FeaturesGrid";
+import PricingCard from "../components/marketing/PricingCard";
 
 export default function HomePage() {
   const [showDemoModal, setShowDemoModal] = useState(false);
@@ -31,21 +36,21 @@ export default function HomePage() {
       await api.post("/schools/request-demo", form);
       setSuccess(true);
     } catch (err) {
-      alert("Something went wrong. Please try again or email us directly.");
+      alert("Something went wrong. Please try again.");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans">
+    <div className="min-h-screen bg-white font-sans overflow-x-hidden">
       {/* Navbar */}
-      <nav className="bg-white border-b border-gray-100 px-6 py-4 flex justify-between items-center sticky top-0 z-50">
+      <nav className="bg-white/90 backdrop-blur-md border-b border-gray-100 px-6 py-3 flex justify-between items-center sticky top-0 z-50">
         <div className="flex items-center gap-3">
           <img
             src="/images/SchoolPayLogo.jpg"
             alt="SchoolPay"
-            className="h-10 w-10 object-contain rounded-lg"
+            className="h-10 w-10 object-contain rounded-lg shadow-sm"
           />
           <span className="text-xl font-bold text-gray-900 tracking-tight">
             SchoolPay
@@ -64,110 +69,132 @@ export default function HomePage() {
           >
             Pricing
           </Link>
-          {/* 🎯 Parent Login stays relative (points to website/app/login) */}
           <Link
             href="/login"
-            className="text-sm font-semibold text-[var(--color-primary)] bg-[var(--color-primary-light)] px-5 py-2.5 rounded-full hover:bg-[var(--color-primary)] hover:text-white transition-all"
+            className="text-sm font-semibold text-[var(--color-primary)] bg-[var(--color-primary-light)] px-5 py-2 rounded-full hover:bg-[var(--color-primary)] hover:text-white transition-all"
           >
             Parent Login
           </Link>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <header className="max-w-6xl mx-auto px-6 py-24 text-center">
-        <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-blue-50 text-blue-700 font-medium text-sm mb-6 border border-blue-100">
+      {/* Hero Section - Tightened Spacing */}
+      <header className="max-w-6xl mx-auto px-6 pt-16 pb-8 text-center relative z-10">
+        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 font-medium text-xs mb-5 border border-blue-100 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
           Trusted by schools across Malawi
         </div>
-        <h1 className="text-5xl md:text-7xl font-extrabold text-gray-900 tracking-tight leading-[1.1] mb-6">
+        <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight leading-[1.1] mb-5">
           Simple, secure <br />
           <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] to-blue-500">
             school fee management
           </span>
         </h1>
-        <p className="text-lg md:text-xl text-gray-600 max-w-2xl mx-auto mb-10 leading-relaxed">
+        <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto mb-8 leading-relaxed">
           Collect fees online, track debtors instantly, and generate financial
           reports with one click. Built specifically for Malawian schools.
         </p>
-        <div className="flex flex-col sm:flex-row justify-center gap-4">
+        <div className="flex flex-col sm:flex-row justify-center gap-3">
           <button
             onClick={() => setShowDemoModal(true)}
-            className="flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-[var(--color-primary-dark)] transition-all shadow-lg hover:shadow-xl"
+            className="flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-[var(--color-primary-dark)] transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
             Book a Free Demo <ArrowRight size={18} />
           </button>
-          {/* 🎯 School Admin Login points to your separate Vercel URL */}
           <a
             href="https://fees-system-one.vercel.app/login"
-            className="flex items-center justify-center gap-2 bg-gray-50 text-gray-700 border border-gray-200 px-8 py-4 rounded-xl text-lg font-semibold hover:bg-gray-100 transition-all"
+            className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-gray-50 transition-all shadow-sm"
           >
             School Admin Login
           </a>
         </div>
       </header>
 
-      {/* Features Section */}
-      <section
-        id="features"
-        className="bg-gray-50 py-24 border-t border-gray-100"
-      >
-        <div className="max-w-6xl mx-auto px-6">
-          <div className="text-center mb-16">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-              Everything your school needs
+      {/* Dashboard Preview - Moved closer to hero */}
+      <div className="relative z-10 pb-16 px-4">
+        <DashboardPreview />
+      </div>
+
+      {/* Stats Ticker */}
+      <StatsTicker />
+
+      {/* 🎯 FREE PILOT BANNER (From PDF) */}
+      <section className="bg-[var(--color-primary-light)] border-b border-[var(--color-primary)]/20 py-10">
+        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
+          <div>
+            <h2 className="text-2xl font-bold text-[var(--color-primary-dark)] mb-2">
+              Try SchoolPay free for one full term.
             </h2>
-            <p className="text-gray-600 max-w-xl mx-auto">
-              Stop using manual ledgers and messy Excel sheets. Move your
-              bursary to the cloud.
+            <p className="text-sm text-[var(--color-primary)] max-w-xl">
+              We'll set up your classes, fees, and students. Training is
+              included. At the end of the term, decide if you want to continue.
+              If not, we hand over your data.
             </p>
           </div>
+          <button
+            onClick={() => setShowDemoModal(true)}
+            className="shrink-0 bg-white text-[var(--color-primary)] px-6 py-3 rounded-xl font-bold shadow-sm hover:shadow-md transition-all border border-gray-200"
+          >
+            Claim Your Pilot
+          </button>
+        </div>
+      </section>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      {/* Features Section */}
+      <FeaturesGrid />
+
+      {/* 🎯 HOW IT WORKS (From PDF) */}
+      <section className="py-16 bg-gray-50 border-t border-gray-100">
+        <div className="max-w-7xl mx-auto px-6">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-900 mb-3">
+              How it works
+            </h2>
+            <p className="text-gray-600">
+              From demo to live in a few simple steps.
+            </p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[
               {
-                icon: Smartphone,
-                title: "OneKhusa Integration",
-                desc: "Parents pay with Airtel Money or TNM Mpamba. Payments confirm automatically in seconds.",
+                step: "1",
+                title: "30-Minute Demo",
+                desc: "We visit your school (or do a video call) to show you how it works.",
+                icon: PlayCircle,
               },
               {
-                icon: BarChart3,
-                title: "Financial Reports",
-                desc: "Track daily collections, debtor ageing, and termly financial statements automatically.",
+                step: "2",
+                title: "Setup & Training",
+                desc: "We set up your classes, fees, and student list. We train your bursar.",
+                icon: Settings,
               },
               {
-                icon: ShieldCheck,
-                title: "Secure & Verified",
-                desc: "Every payment is verified, receipted, and audit-logged. No more lost receipt books.",
+                step: "3",
+                title: "Free Pilot Term",
+                desc: "Use the full system free for one full term. No commitment.",
+                icon: School,
               },
               {
-                icon: Users,
-                title: "Multi-Tenant",
-                desc: "Manage multiple schools under one platform effortlessly. Perfect for school groups.",
+                step: "4",
+                title: "Go Live",
+                desc: "If you love it, you continue on the termly plan. We handle the rest.",
+                icon: Rocket,
               },
-              {
-                icon: CheckCircle,
-                title: "Discounts & Bursaries",
-                desc: "Apply OVC scholarships, staff child discounts, and sibling waivers with a single click.",
-              },
-              {
-                icon: CheckCircle,
-                title: "Parent Portal",
-                desc: "Parents view balances, pay online, and download official PDF receipts anytime.",
-              },
-            ].map((feat, i) => (
+            ].map((item, i) => (
               <div
                 key={i}
-                className="p-8 rounded-2xl bg-white border border-gray-100 hover:border-[var(--color-primary)]/30 hover:shadow-xl transition-all duration-300"
+                className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm relative"
               >
-                <div className="w-14 h-14 bg-[var(--color-primary-light)] rounded-xl flex items-center justify-center text-[var(--color-primary)] mb-6">
-                  <feat.icon size={28} />
+                <div className="absolute -top-3 -left-3 w-8 h-8 bg-[var(--color-primary)] text-white rounded-full flex items-center justify-center font-bold text-sm border-4 border-white shadow-sm">
+                  {item.step}
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-3">
-                  {feat.title}
-                </h3>
-                <p className="text-sm text-gray-600 leading-relaxed">
-                  {feat.desc}
+                <item.icon
+                  size={24}
+                  className="text-[var(--color-primary)] mb-4 mt-2"
+                />
+                <h3 className="font-bold text-gray-900 mb-2">{item.title}</h3>
+                <p className="text-xs text-gray-600 leading-relaxed">
+                  {item.desc}
                 </p>
               </div>
             ))}
@@ -176,64 +203,11 @@ export default function HomePage() {
       </section>
 
       {/* Pricing Section */}
-      <section id="pricing" className="py-24 bg-white">
-        <div className="max-w-4xl mx-auto px-6 text-center">
-          <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-4">
-            Simple, transparent pricing
-          </h2>
-          <p className="text-gray-600 mb-16">
-            No setup fees. No hidden costs. Only pay per term.
-          </p>
-
-          <div className="bg-white rounded-3xl shadow-2xl border border-gray-100 p-10 max-w-lg mx-auto relative overflow-hidden">
-            <div className="absolute top-0 right-0 bg-[var(--color-primary)] text-white text-xs font-bold px-4 py-1 rounded-bl-lg">
-              POPULAR
-            </div>
-            <h3 className="text-xl font-semibold text-gray-800 mb-2">
-              Term Subscription
-            </h3>
-            <p className="text-5xl font-extrabold text-gray-900 mb-2">
-              MWK 250,000{" "}
-              <span className="text-base font-medium text-gray-400">
-                / term
-              </span>
-            </p>
-            <p className="text-sm text-gray-500 mb-8">
-              Everything included. No per-student fees.
-            </p>
-
-            <ul className="space-y-4 mb-8 text-left">
-              {[
-                "Unlimited students",
-                "Unlimited staff accounts",
-                "OneKhusa integration",
-                "Automated SMS & Email alerts",
-                "Financial reporting suite",
-                "Printable PDF receipts",
-              ].map((item, i) => (
-                <li key={i} className="flex items-center gap-3 text-gray-700">
-                  <CheckCircle
-                    size={20}
-                    className="text-[var(--color-primary)] shrink-0"
-                  />{" "}
-                  {item}
-                </li>
-              ))}
-            </ul>
-            {/* 🎯 Start Free Trial also points to Admin Vercel URL */}
-            <a
-              href="https://fees-system-one.vercel.app/signup"
-              className="block w-full bg-[var(--color-primary)] text-white py-4 rounded-xl font-bold text-lg hover:bg-[var(--color-primary-dark)] transition-colors"
-            >
-              Start Free Trial
-            </a>
-          </div>
-        </div>
-      </section>
+      <PricingCard />
 
       {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-12 text-center text-sm border-t border-gray-800">
-        <div className="flex justify-center items-center gap-3 mb-4">
+      <footer className="bg-gray-900 text-gray-400 py-10 text-center text-sm border-t border-gray-800">
+        <div className="flex justify-center items-center gap-3 mb-3">
           <img
             src="/images/SchoolPayLogo.jpg"
             alt="SchoolPay"
@@ -244,8 +218,8 @@ export default function HomePage() {
         <p>
           © {new Date().getFullYear()} Tranptech Group. All rights reserved.
         </p>
-        <p className="mt-2">A product of Tranptech Systems. Built in Malawi.</p>
-        <div className="flex justify-center gap-4 mt-6">
+        <p className="mt-1">A product of Tranptech Systems. Built in Malawi.</p>
+        <div className="flex justify-center gap-4 mt-4 text-xs">
           <a href="#" className="hover:text-white transition-colors">
             Privacy Policy
           </a>
