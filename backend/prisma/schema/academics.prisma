@@ -55,14 +55,15 @@ model Student {
   parentPhone2 String?
   parentEmail  String?
 
-  academicYear  String @default("2025")
-  creditBalance Float  @default(0)
+    academicYear  String @default("2025")
+  creditBalance Decimal @default(0) @db.Decimal(12, 2) 
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   payments    FeePayment[]
   examResults ExamResult[]
+  discounts   StudentDiscount[] 
 
   @@map("students")
 }

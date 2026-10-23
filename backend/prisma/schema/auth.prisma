@@ -103,7 +103,7 @@ model School {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relations
+    // Relations
   staff                Staff[]
   departments          Department[]
   roles                Role[]
@@ -120,6 +120,7 @@ model School {
   termActivations      TermActivation[]
   subscriptionPayments SubscriptionPayment[]
   notifications        Notification[]
+  studentDiscounts     StudentDiscount[] 
 
   @@map("schools")
 }

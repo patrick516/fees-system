@@ -15,6 +15,12 @@ const {
   previewPromotion,
   promoteStudents,
 } = require("../controllers/promotion.controller");
+router.post("/:id/discounts", verifyStaff, studentController.applyDiscount);
+router.delete(
+  "/:id/discounts/:discountId",
+  verifyStaff,
+  studentController.removeDiscount,
+);
 
 const { verifyStaff } = require("../middleware/auth");
 const { requirePermission } = require("../middleware/role");

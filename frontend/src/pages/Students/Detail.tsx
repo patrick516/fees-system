@@ -17,6 +17,9 @@ import {
   BadgeAlert,
   Cake,
   Printer,
+  Percent,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import api from "../../lib/axios";
 import { usePermission } from "../../hooks/usePermission";
@@ -52,15 +55,37 @@ const StudentDetail = () => {
   // State for printing
   const [receiptToPrint, setReceiptToPrint] = useState<any>(null);
 
-  useEffect(() => {
+  // Discount Modal State
+  const [showDiscountModal, setShowDiscountModal] = useState(false);
+  const [discountForm, setDiscountForm] = useState({
+    amount: "",
+    reason: "",
+    term: "TERM_1",
+    academicYear: "",
+  });
+  const [applyingDiscount, setApplyingDiscount] = useState(false);
+
+  const fetchStudent = () => {
+    setLoading(true);
     api
       .get(`/students/${id}`)
-      .then((res) => setStudent(res.data.data))
+      .then((res) => {
+        setStudent(res.data.data);
+        // Pre-fill academic year for discount form
+        setDiscountForm((prev) => ({
+          ...prev,
+          academicYear: res.data.data.academicYear || "",
+        }));
+      })
       .catch(() => navigate("/students"))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    fetchStudent();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  //  Print function
   const handlePrint = (payment: any) => {
     setReceiptToPrint(payment);
     setTimeout(() => {
@@ -69,31 +94,48 @@ const StudentDetail = () => {
     }, 150);
   };
 
-  if (loading)
+  const handleApplyDiscount = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setApplyingDiscount(true);
+    try {
+      await api.post(`/students/${id}/discounts`, discountForm);
+      setShowDiscountModal(false);
+      setDiscountForm({ ...discountForm, amount: "", reason: "" }); // Reset
+      fetchStudent(); // Refresh data to show new discount
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to apply discount");
+    } finally {
+      setApplyingDiscount(false);
+    }
+  };
+
+  const handleRemoveDiscount = async (discountId: string) => {
+    if (!confirm("Are you sure you want to remove this discount?")) return;
+    try {
+      await api.delete(`/students/${id}/discounts/${discountId}`);
+      fetchStudent();
+    } catch (err: any) {
+      alert(err.response?.data?.message || "Failed to remove discount");
+    }
+  };
+
+  if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]" />
       </div>
     );
+  }
 
   if (!student) return null;
 
-  const { summary, feeStructures, payments } = student;
+  const { summary, feeStructures, payments, discounts } = student;
   const verifiedPayments = payments.filter((p: any) => p.status === "VERIFIED");
   const pendingPayments = payments.filter((p: any) => p.status === "PENDING");
   const rejectedPayments = payments.filter((p: any) => p.status === "REJECTED");
-  const creditBalance = student.creditBalance || 0;
+  const creditBalance = Number(student.creditBalance) || 0;
   const isDebtor = summary?.isDebtor && creditBalance === 0;
 
-  // Group payments by term
-  const paymentsByTerm: Record<string, any[]> = {};
-  payments.forEach((p: any) => {
-    const key = `${p.term}-${p.academicYear}`;
-    if (!paymentsByTerm[key]) paymentsByTerm[key] = [];
-    paymentsByTerm[key].push(p);
-  });
-
-  // Status badge
   const getStatusBadge = () => {
     if (creditBalance > 0)
       return (
@@ -125,7 +167,6 @@ const StudentDetail = () => {
 
   return (
     <>
-      {/* CSS to hide everything except the receipt when printing */}
       <style>{`
         @media print {
           body * { visibility: hidden; }
@@ -154,7 +195,7 @@ const StudentDetail = () => {
           </div>
         </div>
 
-        {/* Top Section — Identity + Status + Quick Stats */}
+        {/* Top Section */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Identity Card */}
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
@@ -258,7 +299,7 @@ const StudentDetail = () => {
             )}
           </div>
 
-          {/* Right — Stats + Credit + Fee Structures */}
+          {/* Right — Stats + Fee Structures + Discounts */}
           <div className="lg:col-span-2 space-y-4">
             {/* Quick Stats Row */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -370,17 +411,30 @@ const StudentDetail = () => {
                       (sum: number, p: any) => sum + Number(p.amount),
                       0,
                     );
-                    const balance = Math.max(
-                      0,
-                      Number(fee.totalAmount) - paidForTerm,
+
+                    // 🎯 Check if there's a discount for this term
+                    const termDiscount = discounts?.find(
+                      (d: any) =>
+                        d.term === fee.term &&
+                        d.academicYear === fee.academicYear,
                     );
+                    const discountAmount = termDiscount
+                      ? Number(termDiscount.amount)
+                      : 0;
+
+                    const baseRequired = Number(fee.totalAmount);
+                    const netRequired = Math.max(
+                      0,
+                      baseRequired - discountAmount,
+                    );
+                    const balance = Math.max(0, netRequired - paidForTerm);
                     const isTermPaid = balance === 0;
                     const isTermDebtor = paidForTerm > 0 && balance > 0;
 
                     return (
                       <div key={fee.id} className="px-5 py-4">
                         <div className="flex items-center justify-between mb-3">
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span className="text-sm font-semibold text-gray-700">
                               {termLabel(fee.term)} {fee.academicYear}
                             </span>
@@ -397,10 +451,23 @@ const StudentDetail = () => {
                                 Not paid
                               </span>
                             ) : null}
+                            {discountAmount > 0 && (
+                              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full font-medium">
+                                <Percent size={10} className="inline mr-1" />
+                                Discount Applied
+                              </span>
+                            )}
                           </div>
-                          <span className="text-sm font-bold text-gray-800">
-                            MWK {Number(fee.totalAmount).toLocaleString()}
-                          </span>
+                          <div className="text-right">
+                            {discountAmount > 0 && (
+                              <p className="text-xs text-gray-400 line-through">
+                                MWK {baseRequired.toLocaleString()}
+                              </p>
+                            )}
+                            <span className="text-sm font-bold text-gray-800">
+                              MWK {netRequired.toLocaleString()}
+                            </span>
+                          </div>
                         </div>
 
                         {/* Progress bar */}
@@ -408,16 +475,18 @@ const StudentDetail = () => {
                           <div
                             className={`h-2 rounded-full transition-all ${isTermPaid ? "bg-green-500" : "bg-[var(--color-primary)]"}`}
                             style={{
-                              width: `${Math.min(100, (paidForTerm / Number(fee.totalAmount)) * 100)}%`,
+                              width: `${Math.min(100, (paidForTerm / (netRequired || 1)) * 100)}%`,
                             }}
                           />
                         </div>
 
                         <div className="grid grid-cols-3 gap-3 text-center">
                           <div>
-                            <p className="text-xs text-gray-400">Required</p>
+                            <p className="text-xs text-gray-400">
+                              Net Required
+                            </p>
                             <p className="text-sm font-semibold text-gray-700">
-                              MWK {Number(fee.totalAmount).toLocaleString()}
+                              MWK {netRequired.toLocaleString()}
                             </p>
                           </div>
                           <div>
@@ -443,6 +512,64 @@ const StudentDetail = () => {
                 </div>
               </div>
             )}
+
+            {/* 🎯 DISCOUNTS / BURSARIES CARD */}
+            <div className="bg-white rounded-xl border border-purple-100 shadow-sm overflow-hidden">
+              <div className="px-5 py-4 border-b border-purple-50 bg-purple-50/30 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Percent size={16} className="text-purple-600" />
+                  <h3 className="font-medium text-gray-800">
+                    Financial Aid & Discounts
+                  </h3>
+                </div>
+                {can("payments", "write") && (
+                  <button
+                    onClick={() => setShowDiscountModal(true)}
+                    className="text-xs flex items-center gap-1 font-semibold text-purple-700 bg-purple-100 hover:bg-purple-200 px-2.5 py-1.5 rounded-lg transition-colors"
+                  >
+                    <Plus size={12} /> Apply Discount
+                  </button>
+                )}
+              </div>
+              <div className="p-5">
+                {!discounts || discounts.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-2">
+                    No discounts or bursaries applied to this student.
+                  </p>
+                ) : (
+                  <div className="space-y-3">
+                    {discounts.map((d: any) => (
+                      <div
+                        key={d.id}
+                        className="flex items-center justify-between p-3 bg-purple-50 border border-purple-100 rounded-lg"
+                      >
+                        <div>
+                          <p className="text-sm font-semibold text-purple-900">
+                            {termLabel(d.term)} {d.academicYear}
+                          </p>
+                          <p className="text-xs text-purple-700 mt-0.5">
+                            {d.reason || "Scholarship / Waiver"}
+                          </p>
+                        </div>
+                        <div className="text-right flex items-center gap-3">
+                          <p className="text-sm font-bold text-purple-800">
+                            - MWK {Number(d.amount).toLocaleString()}
+                          </p>
+                          {can("payments", "write") && (
+                            <button
+                              onClick={() => handleRemoveDiscount(d.id)}
+                              className="p-1.5 text-purple-400 hover:text-red-500 hover:bg-white rounded transition-colors"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -482,8 +609,8 @@ const StudentDetail = () => {
                 const config =
                   statusConfig[payment.status as keyof typeof statusConfig];
                 const Icon = config.icon;
-                const isCredit = payment.creditApplied > 0;
-                const hasOverpayment = payment.overpayment > 0;
+                const isCredit = Number(payment.creditApplied) > 0;
+                const hasOverpayment = Number(payment.overpayment) > 0;
 
                 return (
                   <div key={payment.id} className="px-6 py-4">
@@ -599,7 +726,6 @@ const StudentDetail = () => {
                           </p>
                         )}
 
-                        {/*  PRINT BUTTON */}
                         {payment.status === "VERIFIED" && (
                           <button
                             onClick={() => handlePrint(payment)}
@@ -618,11 +744,94 @@ const StudentDetail = () => {
         </div>
       </div>
 
-      {/*  HIDDEN RECEIPT PRINT LAYOUT */}
+      {/* 🎯 APPLY DISCOUNT MODAL */}
+      {showDiscountModal && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowDiscountModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl w-full max-w-md p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-gray-900 mb-1">
+              Apply Financial Aid
+            </h3>
+            <p className="text-xs text-gray-500 mb-4">
+              Deduct this amount from the student's required fees for this term.
+            </p>
+            <form onSubmit={handleApplyDiscount} className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Term
+                </label>
+                <select
+                  value={discountForm.term}
+                  onChange={(e) =>
+                    setDiscountForm({ ...discountForm, term: e.target.value })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                  required
+                >
+                  <option value="TERM_1">Term 1</option>
+                  <option value="TERM_2">Term 2</option>
+                  <option value="TERM_3">Term 3</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Discount Amount (MWK)
+                </label>
+                <input
+                  type="number"
+                  value={discountForm.amount}
+                  onChange={(e) =>
+                    setDiscountForm({ ...discountForm, amount: e.target.value })
+                  }
+                  placeholder="e.g. 50000"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-purple-500 outline-none"
+                  required
+                  min="1"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">
+                  Reason (Optional)
+                </label>
+                <input
+                  value={discountForm.reason}
+                  onChange={(e) =>
+                    setDiscountForm({ ...discountForm, reason: e.target.value })
+                  }
+                  placeholder="e.g. OVC Bursary, Staff Child"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
+                />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowDiscountModal(false)}
+                  className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={applyingDiscount}
+                  className="px-4 py-2 text-sm bg-purple-600 hover:bg-purple-700 text-white font-medium rounded-lg disabled:opacity-50 transition-colors"
+                >
+                  {applyingDiscount ? "Applying..." : "Apply Discount"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* HIDDEN RECEIPT PRINT LAYOUT */}
       {receiptToPrint && (
         <div className="print-receipt hidden">
           <div className="max-w-3xl mx-auto p-8 bg-white">
-            {/* Header */}
             <div className="text-center border-b-2 border-gray-300 pb-6 mb-6">
               <h1 className="text-3xl font-bold text-gray-900 mb-1">
                 {student.school?.name || "SchoolPay"}
@@ -638,7 +847,6 @@ const StudentDetail = () => {
               </h2>
             </div>
 
-            {/* Details */}
             <div className="grid grid-cols-2 gap-8 mb-8 text-sm">
               <div>
                 <p className="text-gray-500 mb-1">Receipt Number</p>
@@ -672,7 +880,6 @@ const StudentDetail = () => {
               </div>
             </div>
 
-            {/* Table */}
             <table className="w-full text-sm mb-8">
               <thead>
                 <tr className="border-b-2 border-gray-300">
@@ -713,7 +920,6 @@ const StudentDetail = () => {
               </tfoot>
             </table>
 
-            {/* Balance Info */}
             <div className="bg-gray-50 rounded-lg p-4 mb-12">
               <div className="grid grid-cols-3 gap-4 text-center">
                 <div>
@@ -747,7 +953,6 @@ const StudentDetail = () => {
               </div>
             </div>
 
-            {/* Footer */}
             <div className="text-center text-xs text-gray-400 mt-16 pt-4 border-t border-gray-200">
               <p>
                 This is a computer-generated receipt. No signature is required.
