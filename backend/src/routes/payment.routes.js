@@ -5,7 +5,7 @@ const path = require("path");
 
 const onekhusaController = require("../controllers/onekhusa.controller");
 const {
-  recordCashPayment,
+  recordManualPayment, // 🎯 Renamed (was recordCashPayment)
   submitPayment,
   verifyPayment,
   rejectPayment,
@@ -80,11 +80,12 @@ router.get(
   getPayments,
 );
 
+// 🎯 Fixed: uses the bare function name, not paymentController.xxx
 router.post(
   "/manual",
   verifyStaff,
   requirePermission("payments", "write"),
-  paymentController.recordManualPayment,
+  recordManualPayment,
 );
 
 router.patch(
@@ -101,7 +102,7 @@ router.patch(
   rejectPayment,
 );
 
-//  PARENT ROUTES
+// ==================== PARENT ROUTES ====================
 router.get("/my-child", verifyParent, getMyChildPayments);
 router.post("/submit", verifyParent, upload.single("receipt"), submitPayment);
 

@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
+
+// ==================== IMPORTS (all at the top) ====================
 const {
   addStudent,
   getStudents,
@@ -10,17 +12,14 @@ const {
   getStudentByCode,
   bulkImportPreview,
   bulkImport,
+  applyDiscount, // 🎯 Added
+  removeDiscount, // 🎯 Added
 } = require("../controllers/student.controller");
+
 const {
   previewPromotion,
   promoteStudents,
 } = require("../controllers/promotion.controller");
-router.post("/:id/discounts", verifyStaff, studentController.applyDiscount);
-router.delete(
-  "/:id/discounts/:discountId",
-  verifyStaff,
-  studentController.removeDiscount,
-);
 
 const { verifyStaff } = require("../middleware/auth");
 const { requirePermission } = require("../middleware/role");
@@ -33,6 +32,21 @@ const upload = multer({
 // ==================== PUBLIC ====================
 // Parent login page — no auth
 router.get("/by-code/:code", getStudentByCode);
+
+// ==================== DISCOUNTS ====================
+// 🎯 Moved below imports, using the direct function names
+router.post(
+  "/:id/discounts",
+  verifyStaff,
+  requirePermission("payments", "write"),
+  applyDiscount,
+);
+router.delete(
+  "/:id/discounts/:discountId",
+  verifyStaff,
+  requirePermission("payments", "write"),
+  removeDiscount,
+);
 
 // ==================== BULK IMPORT ====================
 // Must come before /:id — otherwise "bulk" is treated as an ID
