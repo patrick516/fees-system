@@ -614,7 +614,46 @@ const getOnboardingStatus = async (req, res) => {
       .json({ success: false, message: "Failed to check status" });
   }
 };
+// ==================== GET TIER STATUS ====================
+// GET /api/schools/tier-status
+const getTierStatus = async (req, res) => {
+  try {
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: { tier: true, maxStudents: true },
+    });
 
+    if (!school) {
+      return res
+        .status(404)
+        .json({ success: false, message: "School not found" });
+    }
+
+    const activeStudents = await prisma.student.count({
+      where: { schoolId: req.schoolId, isActive: true },
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        tier: school.tier,
+        maxStudents: school.maxStudents,
+        activeStudents,
+        percentUsed: school.maxStudents
+          ? Math.min(
+              100,
+              Math.round((activeStudents / school.maxStudents) * 100),
+            )
+          : 0,
+      },
+    });
+  } catch (err) {
+    console.error("Get tier status error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load tier status" });
+  }
+};
 module.exports = {
   getSettings,
   updateSettings,

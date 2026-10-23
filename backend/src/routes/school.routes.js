@@ -12,7 +12,7 @@ const schoolController = require("../controllers/school.controller");
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ==================== CLASSES ====================
+//  CLASSES
 
 // GET /api/schools/classes
 router.get(
@@ -975,6 +975,7 @@ router.get("/public", schoolController.getPublicSchool);
 router.get("/public/:schoolId", schoolController.getPublicInfo);
 router.get("/lookup-by-email", schoolController.lookupByEmail);
 router.get("/by-slug/:slug", schoolController.getBySlug);
+router.get("/tier-status", verifyStaff, schoolController.getTierStatus);
 router.get(
   "/subscription/status/:paymentId",
   verifyStaff,

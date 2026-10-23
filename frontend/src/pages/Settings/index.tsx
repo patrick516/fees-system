@@ -18,6 +18,7 @@ import NotificationPreferencesCard from "../../components/Settings/NotificationP
 import SettlementAccountCard from "../../components/Settings/SettlementAccountCard";
 import OneKhusaStatusCard from "../../components/Settings/OneKhusaStatusCard";
 import SubscriptionCard from "../../components/Settings/SubscriptionCard";
+import TierStatusCard from "../../components/Settings/TierStatusCard";
 
 const SettingsPage = () => {
   const { settings, loading } = useSchoolSettings();
@@ -149,6 +150,7 @@ const SettingsPage = () => {
       </div>
 
       <SubscriptionCard />
+      <TierStatusCard />
       <SettlementAccountCard />
       <OneKhusaStatusCard />
       <DepartmentsCard />
