@@ -2,48 +2,21 @@ const prisma = require("../config/db");
 const { uploadToCloudinary } = require("../lib/cloudinary");
 const { generateReceiptNumber, buildSchoolPrefix } = require("../lib/utils");
 const { sendNotifications } = require("../lib/notifier");
-const { reconcileVerifiedPayment } = require("../lib/paymentReconciliation");
+const { reconcileVerifiedPayment } = require("../lib/paymentReconciliation"); // 🎯 Centralized logic
 
-//  HELPER — Calculate debtor status
-const calculateDebtorStatus = async (
-  tx,
-  studentId,
-  classId,
-  schoolId,
-  term,
-  academicYear,
-) => {
-  const [feeStructure, paymentsAggregate] = await Promise.all([
-    tx.feeStructure.findFirst({
-      where: { schoolId, classId, term, academicYear, isActive: true },
-    }),
-    tx.feePayment.aggregate({
-      where: { studentId, term, academicYear, status: "VERIFIED" },
-      _sum: { amount: true },
-    }),
-  ]);
-
-  const requiredAmount = feeStructure?.totalAmount
-    ? Number(feeStructure.totalAmount)
-    : null;
-  const totalPaid = Number(paymentsAggregate._sum.amount) || 0;
-  const balance = requiredAmount !== null ? requiredAmount - totalPaid : null;
-  const isDebtor = balance !== null ? balance > 0 : false;
-
-  return { requiredAmount, totalPaid, balance, isDebtor };
-};
-
-// 🎯 RENAMED & FIXED: Accepts any manual payment method (CASH, BANK, MOBILE)
+// 🎯 RENAMED & FIXED: Accepts any manual payment method (CASH, BANK, MOBILE) and respects discounts
 const recordManualPayment = async (req, res) => {
   try {
     const { studentId, amount, term, academicYear, notes, paymentMethod } =
       req.body;
 
     if (!studentId || !amount || !term) {
-      return res.status(400).json({
-        success: false,
-        message: "studentId, amount and term are required",
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "studentId, amount and term are required",
+        });
     }
 
     const student = await prisma.student.findFirst({
@@ -58,9 +31,8 @@ const recordManualPayment = async (req, res) => {
 
     const year = academicYear || new Date().getFullYear().toString();
     const parsedAmount = Number(amount);
-    const resolvedMethod = paymentMethod || "CASH"; // Fallback to CASH if not provided
+    const resolvedMethod = paymentMethod || "CASH";
 
-    //  Wrap in transaction for atomicity and receipt race-condition prevention
     const result = await prisma.$transaction(async (tx) => {
       const feeStructure = await tx.feeStructure.findFirst({
         where: {
@@ -72,9 +44,28 @@ const recordManualPayment = async (req, res) => {
         },
       });
 
-      const requiredAmount = feeStructure?.totalAmount
+      let requiredAmount = feeStructure?.totalAmount
         ? Number(feeStructure.totalAmount)
         : null;
+
+      // 🎯 FIX: Deduct the student's discount from the required amount
+      if (requiredAmount) {
+        const discount = await tx.studentDiscount.findUnique({
+          where: {
+            studentId_term_academicYear: {
+              studentId,
+              term,
+              academicYear: year,
+            },
+          },
+        });
+        if (discount) {
+          requiredAmount = Math.max(
+            0,
+            requiredAmount - Number(discount.amount),
+          );
+        }
+      }
 
       const alreadyPaidAggregate = await tx.feePayment.aggregate({
         where: { studentId, term, academicYear: year, status: "VERIFIED" },
@@ -86,7 +77,6 @@ const recordManualPayment = async (req, res) => {
         requiredAmount !== null
           ? Math.max(0, requiredAmount - alreadyPaid)
           : null;
-
       let amountToApply = parsedAmount;
       let overpayment = 0;
       let newCreditBalance = Number(student.creditBalance) || 0;
@@ -119,7 +109,7 @@ const recordManualPayment = async (req, res) => {
           schoolId: req.schoolId,
           studentId,
           amount: parsedAmount,
-          paymentMethod: resolvedMethod, // 🎯 FIXED: Uses the selected method
+          paymentMethod: resolvedMethod,
           term,
           academicYear: year,
           receiptNumber,
@@ -187,7 +177,6 @@ const recordManualPayment = async (req, res) => {
       };
     });
 
-    // Send Notification
     const smsMessage =
       result.overpayment > 0
         ? `Payment of MWK ${parsedAmount.toLocaleString()} received for ${result.payment.student.fullName}. Receipt: ${result.receiptNumber}. Fees fully paid! MWK ${result.overpayment.toLocaleString()} credit saved for next term.`
@@ -250,7 +239,6 @@ const recordManualPayment = async (req, res) => {
 };
 
 const submitPayment = async (req, res) => {
-  // ... (Keep exactly as it is - no changes needed here)
   try {
     const {
       studentId,
@@ -262,20 +250,22 @@ const submitPayment = async (req, res) => {
     } = req.body;
 
     if (!studentId || !amount || !paymentMethod || !term) {
-      return res.status(400).json({
-        success: false,
-        message: "studentId, amount, paymentMethod and term are required",
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "studentId, amount, paymentMethod and term are required",
+        });
     }
-
     if (req.student.id !== studentId)
-      return res.status(403).json({
-        success: false,
-        message: "You can only submit payments for your own child",
-      });
+      return res
+        .status(403)
+        .json({
+          success: false,
+          message: "You can only submit payments for your own child",
+        });
 
     const year = academicYear || new Date().getFullYear().toString();
-
     const student = await prisma.student.findUnique({
       where: { id: studentId },
       include: { school: { select: { name: true } }, class: true },
@@ -291,6 +281,22 @@ const submitPayment = async (req, res) => {
       },
     });
 
+    let requiredAmount = feeStructure?.totalAmount
+      ? Number(feeStructure.totalAmount)
+      : null;
+
+    // 🎯 FIX: Deduct discount for parent-submitted payments too
+    if (requiredAmount) {
+      const discount = await prisma.studentDiscount.findUnique({
+        where: {
+          studentId_term_academicYear: { studentId, term, academicYear: year },
+        },
+      });
+      if (discount) {
+        requiredAmount = Math.max(0, requiredAmount - Number(discount.amount));
+      }
+    }
+
     let receiptImageUrl = null;
     if (req.file) {
       try {
@@ -301,19 +307,22 @@ const submitPayment = async (req, res) => {
         });
         receiptImageUrl = uploadResult.secure_url;
       } catch (uploadErr) {
-        return res.status(500).json({
-          success: false,
-          message: "Failed to upload receipt. Please try again.",
-        });
+        return res
+          .status(500)
+          .json({
+            success: false,
+            message: "Failed to upload receipt. Please try again.",
+          });
       }
     }
 
-    if (!receiptImageUrl && paymentMethod !== "CASH") {
-      return res.status(400).json({
-        success: false,
-        message: "Please upload your payment receipt",
-      });
-    }
+    if (!receiptImageUrl && paymentMethod !== "CASH")
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: "Please upload your payment receipt",
+        });
 
     const paymentCount = await prisma.feePayment.count({
       where: { schoolId: req.student.schoolId },
@@ -339,7 +348,7 @@ const submitPayment = async (req, res) => {
         submittedBy: "PARENT",
         status: "PENDING",
         parentPhone: req.parentPhone,
-        requiredAmount: feeStructure?.totalAmount || null,
+        requiredAmount, // 🎯 Saves the NET required amount
       },
       include: {
         student: {
@@ -353,12 +362,14 @@ const submitPayment = async (req, res) => {
       },
     });
 
-    return res.status(201).json({
-      success: true,
-      message:
-        "Payment submitted successfully. The school will verify it shortly.",
-      data: payment,
-    });
+    return res
+      .status(201)
+      .json({
+        success: true,
+        message:
+          "Payment submitted successfully. The school will verify it shortly.",
+        data: payment,
+      });
   } catch (error) {
     console.error("Submit payment error:", error);
     return res
@@ -368,7 +379,6 @@ const submitPayment = async (req, res) => {
 };
 
 const verifyPayment = async (req, res) => {
-  // ... (Keep exactly as it is)
   try {
     const { id } = req.params;
     const result = await prisma.$transaction(async (tx) => {
@@ -412,7 +422,7 @@ const verifyPayment = async (req, res) => {
         },
       });
 
-      // 🎯 Old inline balance/overpayment math replaced by the shared helper
+      // 🎯 Uses the centralized helper from paymentReconciliation.js
       const reconcile = await reconcileVerifiedPayment(tx, verified);
 
       await tx.auditLog.create({
@@ -467,11 +477,13 @@ const verifyPayment = async (req, res) => {
       schoolName: school.name,
     }).catch((e) => console.error("Verify notification error:", e));
 
-    return res.status(200).json({
-      success: true,
-      message: "Payment verified successfully",
-      data: result.verified,
-    });
+    return res
+      .status(200)
+      .json({
+        success: true,
+        message: "Payment verified successfully",
+        data: result.verified,
+      });
   } catch (error) {
     if (error.message === "NOT_FOUND")
       return res
@@ -489,7 +501,6 @@ const verifyPayment = async (req, res) => {
 };
 
 const rejectPayment = async (req, res) => {
-  // ... (Keep exactly as it is)
   try {
     const { id } = req.params;
     const { reason } = req.body;
@@ -506,10 +517,12 @@ const rejectPayment = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Payment not found" });
     if (payment.status !== "PENDING")
-      return res.status(400).json({
-        success: false,
-        message: `Payment is already ${payment.status.toLowerCase()}`,
-      });
+      return res
+        .status(400)
+        .json({
+          success: false,
+          message: `Payment is already ${payment.status.toLowerCase()}`,
+        });
 
     const rejected = await prisma.$transaction(async (tx) => {
       const updated = await tx.feePayment.update({
@@ -531,7 +544,6 @@ const rejectPayment = async (req, res) => {
           },
         },
       });
-
       await tx.auditLog.create({
         data: {
           schoolId: req.schoolId,
@@ -542,7 +554,6 @@ const rejectPayment = async (req, res) => {
           changes: { reason },
         },
       });
-
       return updated;
     });
 
@@ -581,7 +592,6 @@ const rejectPayment = async (req, res) => {
 };
 
 const getPayments = async (req, res) => {
-  // ... (Keep exactly as it is)
   try {
     const {
       status,
@@ -621,16 +631,18 @@ const getPayments = async (req, res) => {
       prisma.feePayment.count({ where }),
     ]);
 
-    return res.status(200).json({
-      success: true,
-      data: payments,
-      pagination: {
-        total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(total / parseInt(limit)),
-      },
-    });
+    return res
+      .status(200)
+      .json({
+        success: true,
+        data: payments,
+        pagination: {
+          total,
+          page: parseInt(page),
+          limit: parseInt(limit),
+          totalPages: Math.ceil(total / parseInt(limit)),
+        },
+      });
   } catch (error) {
     console.error("Get payments error:", error);
     return res
@@ -640,7 +652,6 @@ const getPayments = async (req, res) => {
 };
 
 const getPendingPayments = async (req, res) => {
-  // ... (Keep exactly as it is)
   try {
     const payments = await prisma.feePayment.findMany({
       where: { schoolId: req.schoolId, status: "PENDING" },
@@ -669,7 +680,6 @@ const getPendingPayments = async (req, res) => {
 };
 
 const getMyChildPayments = async (req, res) => {
-  // ... (Keep exactly as it is)
   try {
     const payments = await prisma.feePayment.findMany({
       where: { studentId: req.student.id },
@@ -702,13 +712,15 @@ const getMyChildPayments = async (req, res) => {
       .filter((p) => p.status === "PENDING")
       .reduce((sum, p) => sum + Number(p.amount), 0);
 
-    return res.status(200).json({
-      success: true,
-      data: {
-        payments,
-        summary: { totalPaid, pendingAmount, totalPayments: payments.length },
-      },
-    });
+    return res
+      .status(200)
+      .json({
+        success: true,
+        data: {
+          payments,
+          summary: { totalPaid, pendingAmount, totalPayments: payments.length },
+        },
+      });
   } catch (error) {
     console.error("Get my child payments error:", error);
     return res
@@ -718,7 +730,6 @@ const getMyChildPayments = async (req, res) => {
 };
 
 const getPaymentSummary = async (req, res) => {
-  // ... (Keep exactly as it is)
   try {
     const { term, academicYear } = req.query;
     const school = await prisma.school.findUnique({
@@ -767,6 +778,7 @@ const getPaymentSummary = async (req, res) => {
       }),
     ]);
 
+    // 🎯 FIX: Fetch discounts along with fee structures for accurate dashboard totals
     const students = await prisma.student.findMany({
       where: { schoolId: req.schoolId, isActive: true },
       include: {
@@ -778,6 +790,11 @@ const getPaymentSummary = async (req, res) => {
                 : { academicYear: year, isActive: true },
             },
           },
+        },
+        discounts: {
+          where: resolvedTerm
+            ? { term: resolvedTerm, academicYear: year }
+            : { academicYear: year },
         },
       },
     });
@@ -799,18 +816,25 @@ const getPaymentSummary = async (req, res) => {
       noFeeCount = 0;
 
     for (const s of students) {
-      const fee = s.class.feeStructures[0]?.totalAmount
+      const baseFee = s.class.feeStructures[0]?.totalAmount
         ? Number(s.class.feeStructures[0].totalAmount)
         : 0;
-      if (fee === 0) {
+      if (baseFee === 0) {
         noFeeCount++;
         continue;
       }
+
+      const discountAmt = s.discounts[0]?.amount
+        ? Number(s.discounts[0].amount)
+        : 0;
+      const netFee = Math.max(0, baseFee - discountAmt);
+
       const paid = paidByStudent[s.id] || 0;
-      totalRequired += fee;
-      totalCollected += Math.min(paid, fee);
-      totalCredit += Math.max(0, paid - fee);
-      if (paid >= fee) paidFullCount++;
+      totalRequired += netFee;
+      totalCollected += Math.min(paid, netFee);
+      totalCredit += Math.max(0, paid - netFee);
+
+      if (paid >= netFee) paidFullCount++;
       else debtorCount++;
     }
 
@@ -849,7 +873,6 @@ const getPaymentSummary = async (req, res) => {
 };
 
 const getPaymentInsights = async (req, res) => {
-  // ... (Keep exactly as it is)
   try {
     const { term, academicYear } = req.query;
     const school = await prisma.school.findUnique({
