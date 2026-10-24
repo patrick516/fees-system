@@ -6,33 +6,55 @@ const { sendPlatformSchoolInviteEmail } = require("../lib/mailer");
 
 const INVITE_TTL_DAYS = 7;
 
-// 🎯 Tier limits — matches your pricing PDF
-const TIER_CONFIG = {
-  SMALL: { maxStudents: 150, price: 150000 },
-  MEDIUM: { maxStudents: 400, price: 250000 },
-  LARGE: { maxStudents: 99999, price: 400000 },
-};
+// 🎯 Fallback tiers if the platform hasn't configured any yet
+const FALLBACK_TIERS = [
+  { id: "SMALL", name: "Small School", maxStudents: 150, price: 150000 },
+  { id: "MEDIUM", name: "Medium School", maxStudents: 400, price: 250000 },
+  { id: "LARGE", name: "Large School", maxStudents: 99999, price: 400000 },
+];
 
-// ==================== SUBMIT (Public — from marketing site) ====================
+// ==================== SUBMIT (Public) ====================
 const submitRequest = async (req, res) => {
   try {
     const { name, email, phone, schoolName, tier } = req.body;
     if (!name || !email || !schoolName) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Name, email and school name are required",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Name, email and school name are required",
+      });
     }
 
     const cleanEmail = String(email).toLowerCase().trim();
 
-    // Block duplicate pending requests for the same email
-    const existing = await prisma.schoolRequest.findFirst({
+    // 1. Check if the email is already a Staff member
+    const existingStaff = await prisma.staff.findUnique({
+      where: { email: cleanEmail },
+    });
+    if (existingStaff) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This email is already registered as a School Admin on another school.",
+      });
+    }
+
+    // 2. Check if the email is already a Platform Admin (Super Admin)
+    const existingPlatformAdmin = await prisma.platformAdmin.findUnique({
+      where: { email: cleanEmail },
+    });
+    if (existingPlatformAdmin) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This email is registered as a Platform Owner. Please use a different email for the school admin.",
+      });
+    }
+
+    // 3. Block duplicate pending requests
+    const existingRequest = await prisma.schoolRequest.findFirst({
       where: { email: cleanEmail, status: "PENDING" },
     });
-    if (existing) {
+    if (existingRequest) {
       return res.status(409).json({
         success: false,
         message:
@@ -40,13 +62,19 @@ const submitRequest = async (req, res) => {
       });
     }
 
+    // 4. Validate tier against dynamic database tiers
+    const platform = await prisma.platform.findFirst();
+    const availableTiers = platform?.tiers || FALLBACK_TIERS;
+    const isValidTier = availableTiers.some((t) => t.id === tier);
+    const finalTier = isValidTier ? tier : availableTiers[0].id; // Default to first tier
+
     const request = await prisma.schoolRequest.create({
       data: {
         name: name.trim(),
         email: cleanEmail,
         phone: (phone || "").trim(),
         schoolName: schoolName.trim(),
-        tier: TIER_CONFIG[tier] ? tier : "SMALL",
+        tier: finalTier,
       },
     });
 
@@ -64,7 +92,7 @@ const submitRequest = async (req, res) => {
   }
 };
 
-// ==================== LIST (Platform Admin) ====================
+// ==================== LIST ====================
 const listRequests = async (req, res) => {
   try {
     const { status } = req.query;
@@ -82,7 +110,7 @@ const listRequests = async (req, res) => {
   }
 };
 
-// ==================== PENDING COUNT (for sidebar badge) ====================
+// ==================== PENDING COUNT ====================
 const getPendingCount = async (req, res) => {
   try {
     const count = await prisma.schoolRequest.count({
@@ -94,7 +122,7 @@ const getPendingCount = async (req, res) => {
   }
 };
 
-// ==================== APPROVE (Platform Admin) ====================
+// ==================== APPROVE ====================
 const approveRequest = async (req, res) => {
   try {
     const { id } = req.params;
@@ -111,20 +139,31 @@ const approveRequest = async (req, res) => {
       });
     }
 
-    // Email must not already be a staff member
+    // 1. Check Staff collision
     const existingStaff = await prisma.staff.findUnique({
       where: { email: request.email },
     });
     if (existingStaff) {
       return res.status(409).json({
         success: false,
-        message: "This email is already registered on the platform.",
+        message:
+          "This email is already registered as a school admin. Cannot create a duplicate.",
       });
     }
 
-    const tierData = TIER_CONFIG[request.tier] || TIER_CONFIG.SMALL;
+    // 2. Check Platform Admin collision
+    const existingPlatformAdmin = await prisma.platformAdmin.findUnique({
+      where: { email: request.email },
+    });
+    if (existingPlatformAdmin) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "This email is registered as a Platform Owner. Cannot create a school admin with this email.",
+      });
+    }
 
-    // Ensure a Platform record exists
+    // 3. Fetch Platform and Dynamic Tiers
     let platform = await prisma.platform.findFirst();
     if (!platform) {
       platform = await prisma.platform.create({
@@ -135,7 +174,12 @@ const approveRequest = async (req, res) => {
       });
     }
 
-    // Slug + trial window
+    const availableTiers = platform.tiers || FALLBACK_TIERS;
+    const selectedTier =
+      availableTiers.find((t) => t.id === request.tier) || availableTiers[0];
+    const maxStudentsLimit = selectedTier.maxStudents;
+
+    // 4. Setup School Details
     const slugBase =
       request.schoolName
         .toLowerCase()
@@ -145,20 +189,19 @@ const approveRequest = async (req, res) => {
     const trialDays = platform.defaultTrialDays;
     const trialEndsAt = new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000);
 
-    // Temp password: SP-xxxx-xxxx-xxxx
+    // 5. Generate Credentials
     const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
     const pick = () => chars[crypto.randomInt(0, chars.length)];
     const block = () => Array.from({ length: 4 }, pick).join("");
     const tempPassword = `SP-${block()}-${block()}-${block()}`;
     const passwordHash = await bcrypt.hash(tempPassword, 12);
 
-    // Invitation token
     const inviteToken = crypto.randomBytes(32).toString("hex");
     const inviteExpires = new Date(
       Date.now() + INVITE_TTL_DAYS * 24 * 60 * 60 * 1000,
     );
 
-    // Create school + admin + update request in one transaction
+    // 6. Create Everything in a Transaction
     const result = await prisma.$transaction(async (tx) => {
       const school = await tx.school.create({
         data: {
@@ -172,8 +215,8 @@ const approveRequest = async (req, res) => {
           setupCompleted: false,
           subscriptionStatus: "TRIAL",
           trialEndsAt,
-          tier: request.tier,
-          maxStudents: tierData.maxStudents,
+          tier: selectedTier.id,
+          maxStudents: maxStudentsLimit, // 🎯 Dynamic Limit from DB
         },
       });
 
@@ -209,7 +252,7 @@ const approveRequest = async (req, res) => {
       return { school, admin };
     });
 
-    // Send invitation email (non-blocking — we already created the school)
+    // 7. Send Invitation Email
     let emailSent = true;
     try {
       const emailRes = await sendPlatformSchoolInviteEmail({

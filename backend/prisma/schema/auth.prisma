@@ -26,12 +26,10 @@ model Platform {
   phone String
 
   // ============ Subscription Defaults (per new school) ============
-  defaultTermPrice Float  @default(0)
-  defaultTrialDays Int    @default(30)
-  currency         String @default("MWK")
-
-  // ============ Your own OneKhusa merchant (subscription revenue) ============
-  // This is where SCHOOLS' subscription payments land — not parents' fees.
+  defaultTermPrice                  Float   @default(0)
+  defaultTrialDays                  Int     @default(30)
+  currency                          String  @default("MWK")
+  tiers                             Json?
   subscriptionMerchantAccount       String?
   subscriptionWebhookSecretSuccess  String?
   subscriptionWebhookSecretReversed String?
@@ -99,13 +97,13 @@ model School {
   subscriptionPaid Boolean   @default(false)
   subscriptionDate DateTime?
   nextPaymentDate  DateTime?
- 
-  tier        String @default("SMALL") 
-  maxStudents Int    @default(150)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
 
-    // Relations
+  tier        String   @default("SMALL")
+  maxStudents Int      @default(150)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
   staff                Staff[]
   departments          Department[]
   roles                Role[]
@@ -122,7 +120,7 @@ model School {
   termActivations      TermActivation[]
   subscriptionPayments SubscriptionPayment[]
   notifications        Notification[]
-  studentDiscounts     StudentDiscount[] 
+  studentDiscounts     StudentDiscount[]
 
   @@map("schools")
 }
@@ -377,16 +375,16 @@ model Notification {
 
 //  SCHOOL REQUESTS 
 model SchoolRequest {
-  id         String   @id @default(uuid())
+  id         String @id @default(uuid())
   name       String
   email      String
   phone      String
   schoolName String
-  tier       String   
-  status     String   @default("PENDING") 
-  
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  tier       String
+  status     String @default("PENDING")
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   @@map("school_requests")
 }

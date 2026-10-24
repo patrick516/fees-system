@@ -971,6 +971,7 @@ router.post(
   requirePermission("settings", "write"),
   schoolController.initiateSubscriptionPayment,
 );
+router.get("/tiers", schoolController.getPublicTiers);
 router.get("/public", schoolController.getPublicSchool);
 router.get("/public/:schoolId", schoolController.getPublicInfo);
 router.get("/lookup-by-email", schoolController.lookupByEmail);

@@ -466,14 +466,21 @@ const initiateSubscriptionPayment = async (req, res) => {
       });
     }
 
-    const amount = platform.defaultTermPrice;
+    //  DYNAMIC: Use the price from the school's assigned tier
+    const tiers = platform.tiers || [
+      { id: "SMALL", price: 150000 },
+      { id: "MEDIUM", price: 250000 },
+      { id: "LARGE", price: 400000 },
+    ];
+    const schoolTier = tiers.find((t) => t.id === school.tier) || tiers[0];
+    const amount = schoolTier.price;
+
     if (!amount || amount <= 0) {
       return res.status(400).json({
         success: false,
-        message: "Subscription price is not set.",
+        message: `Subscription price is not set for your ${schoolTier.id} tier.`,
       });
     }
-
     const term = school.activeTerm || "TERM_1";
     const academicYear = school.activeAcademicYear || "2026-2027";
 
@@ -654,6 +661,66 @@ const getTierStatus = async (req, res) => {
       .json({ success: false, message: "Failed to load tier status" });
   }
 };
+
+// ==================== GET PUBLIC TIERS ====================
+// GET /api/schools/tiers (Public)
+const getPublicTiers = async (req, res) => {
+  try {
+    const platform = await prisma.platform.findFirst({
+      select: { tiers: true },
+    });
+
+    // Fallback if no tiers are set yet
+    const defaultTiers = [
+      {
+        id: "SMALL",
+        name: "Small School",
+        maxStudents: 150,
+        price: 150000,
+        description: "Up to 150 students",
+        features: [
+          "Unlimited staff accounts",
+          "OneKhusa online payments",
+          "Bulk SMS & Email alerts",
+          "Financial reports & PDF receipts",
+        ],
+      },
+      {
+        id: "MEDIUM",
+        name: "Medium School",
+        maxStudents: 400,
+        price: 250000,
+        description: "151 to 400 students",
+        features: [
+          "Everything in Small",
+          "Exam results & ranking",
+          "Student promotion",
+          "Audit trail & advanced reports",
+        ],
+      },
+      {
+        id: "LARGE",
+        name: "Large School",
+        maxStudents: 99999,
+        price: 400000,
+        description: "Over 400 students",
+        features: [
+          "Everything in Medium",
+          "Priority WhatsApp support",
+          "Dedicated onboarding",
+          "Custom report templates",
+        ],
+      },
+    ];
+
+    return res.json({ success: true, data: platform?.tiers || defaultTiers });
+  } catch (err) {
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load tiers" });
+  }
+};
+// Add getPublicTiers to module.exports
 module.exports = {
   getSettings,
   updateSettings,
@@ -670,4 +737,5 @@ module.exports = {
   getSubscriptionPaymentStatus,
   getOnboardingStatus,
   getTierStatus,
+  getPublicTiers,
 };

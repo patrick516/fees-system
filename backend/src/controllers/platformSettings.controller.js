@@ -18,6 +18,7 @@ const getSettings = async (req, res) => {
         subscriptionMerchantAccount: true,
         subscriptionWebhookSecretSuccess: true,
         subscriptionWebhookSecretReversed: true,
+        tiers: true, // 🎯 BUG 1 FIX: must select tiers to return them
       },
     });
 
@@ -39,6 +40,7 @@ const getSettings = async (req, res) => {
         defaultTermPrice: platform.defaultTermPrice,
         defaultTrialDays: platform.defaultTrialDays,
         subscriptionMerchantAccount: platform.subscriptionMerchantAccount,
+        tiers: platform.tiers || [],
         subscriptionWebhookSecretSuccess:
           platform.subscriptionWebhookSecretSuccess || "",
         subscriptionWebhookSecretReversed:
@@ -71,6 +73,7 @@ const updateSettings = async (req, res) => {
       subscriptionMerchantAccount,
       subscriptionWebhookSecretSuccess,
       subscriptionWebhookSecretReversed,
+      tiers, // 🎯 BUG 2 FIX: must destructure tiers
     } = req.body;
 
     const data = {};
@@ -87,7 +90,6 @@ const updateSettings = async (req, res) => {
         subscriptionMerchantAccount?.toString().trim() || null;
 
     // Secrets: only overwrite if a non-empty value was sent.
-    // Empty string means "leave as-is" (so the UI can show masked dots)
     if (
       subscriptionWebhookSecretSuccess &&
       subscriptionWebhookSecretSuccess.trim()
@@ -101,6 +103,17 @@ const updateSettings = async (req, res) => {
     ) {
       data.subscriptionWebhookSecretReversed =
         subscriptionWebhookSecretReversed.trim();
+    }
+
+    // 🎯 Tiers: must be an array
+    if (tiers !== undefined) {
+      if (!Array.isArray(tiers)) {
+        return res.status(400).json({
+          success: false,
+          message: "Tiers must be an array of tier objects",
+        });
+      }
+      data.tiers = tiers;
     }
 
     const updated = await prisma.platform.update({
@@ -120,6 +133,7 @@ const updateSettings = async (req, res) => {
         defaultTermPrice: updated.defaultTermPrice,
         defaultTrialDays: updated.defaultTrialDays,
         subscriptionMerchantAccount: updated.subscriptionMerchantAccount,
+        tiers: updated.tiers || [],
         hasSubscriptionSecretSuccess:
           !!updated.subscriptionWebhookSecretSuccess,
         hasSubscriptionSecretReversed:

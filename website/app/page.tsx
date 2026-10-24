@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import {
   ArrowRight,
@@ -15,15 +15,17 @@ import api from "../lib/axios";
 import DashboardPreview from "../components/marketing/DashboardPreview";
 import StatsTicker from "../components/marketing/StatsTicker";
 import FeaturesGrid from "../components/marketing/FeaturesGrid";
-import PricingCard from "../components/marketing/PricingCard";
-
-type Tier = "SMALL" | "MEDIUM" | "LARGE";
+import PricingCard, { type Tier } from "../components/marketing/PricingCard";
 
 export default function HomePage() {
   const [showDemoModal, setShowDemoModal] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<Tier>("SMALL");
+  const [selectedTier, setSelectedTier] = useState<string>("SMALL");
+
+  // 🎯 Dynamic tiers fetched from backend
+  const [tiers, setTiers] = useState<Tier[]>([]);
+  const [loadingTiers, setLoadingTiers] = useState(true);
 
   const [form, setForm] = useState({
     name: "",
@@ -32,18 +34,37 @@ export default function HomePage() {
     phone: "",
   });
 
+  // 🎯 Fetch tiers from backend on mount
+  useEffect(() => {
+    api
+      .get("/schools/tiers")
+      .then((res) => setTiers(res.data.data || []))
+      .catch(() => setTiers([]))
+      .finally(() => setLoadingTiers(false));
+  }, []);
+
   // 🎯 Opens modal AND sets the correct tier
-  const openModalWithTier = (tier: Tier) => {
-    setSelectedTier(tier);
+  const openModalWithTier = (tierId: string) => {
+    setSelectedTier(tierId);
     setSuccess(false);
     setShowDemoModal(true);
+  };
+
+  // 🎯 Get dynamic label for the selected tier (for the modal banner)
+  const getTierLabel = (tierId: string): string => {
+    const tier = tiers.find((t) => t.id === tierId);
+    if (!tier) return tierId;
+    const limit =
+      tier.maxStudents >= 99999
+        ? "Unlimited students"
+        : `Up to ${tier.maxStudents.toLocaleString()} students`;
+    return `${tier.name} (${limit})`;
   };
 
   const handleBookDemo = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     try {
-      // 🎯 Sends to the new /school-requests endpoint WITH the tier
       await api.post("/school-requests", {
         ...form,
         tier: selectedTier,
@@ -56,10 +77,13 @@ export default function HomePage() {
     }
   };
 
-  const tierLabel = {
-    SMALL: "Small School (Up to 150 students)",
-    MEDIUM: "Medium School (151–400 students)",
-    LARGE: "Large School (400+ students)",
+  // Default tier for hero "Book a Demo" — use popular or first
+  const defaultTier = (): string => {
+    if (tiers.length === 0) return "SMALL";
+    const explicit = tiers.find((t) => t.popular === true);
+    if (explicit) return explicit.id;
+    if (tiers.length > 1) return tiers[Math.floor(tiers.length / 2)].id;
+    return tiers[0].id;
   };
 
   return (
@@ -98,7 +122,7 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Hero Section */}
+      {/* Hero */}
       <header className="max-w-6xl mx-auto px-6 pt-16 pb-8 text-center relative z-10">
         <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 font-medium text-xs mb-5 border border-blue-100 shadow-sm">
           <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
@@ -116,7 +140,7 @@ export default function HomePage() {
         </p>
         <div className="flex flex-col sm:flex-row justify-center gap-3">
           <button
-            onClick={() => openModalWithTier("MEDIUM")}
+            onClick={() => openModalWithTier(defaultTier())}
             className="flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-[var(--color-primary-dark)] transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
           >
             Book a Free Demo <ArrowRight size={18} />
@@ -150,7 +174,7 @@ export default function HomePage() {
             </p>
           </div>
           <button
-            onClick={() => openModalWithTier("MEDIUM")}
+            onClick={() => openModalWithTier(defaultTier())}
             className="shrink-0 bg-white text-[var(--color-primary)] px-6 py-3 rounded-xl font-bold shadow-sm hover:shadow-md transition-all border border-gray-200"
           >
             Claim Your Pilot
@@ -219,8 +243,12 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 🎯 Pricing Section now receives the tier-selector */}
-      <PricingCard onSelectTier={openModalWithTier} />
+      {/* 🎯 Dynamic Pricing Section */}
+      <PricingCard
+        tiers={tiers}
+        loading={loadingTiers}
+        onSelectTier={openModalWithTier}
+      />
 
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-10 text-center text-sm border-t border-gray-800">
@@ -252,7 +280,7 @@ export default function HomePage() {
         </div>
       </footer>
 
-      {/* 🎯 BOOK DEMO / REQUEST ACCOUNT MODAL */}
+      {/* 🎯 MODAL */}
       {showDemoModal && (
         <div
           className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
@@ -271,10 +299,10 @@ export default function HomePage() {
                   Request Received!
                 </h3>
                 <p className="text-sm text-gray-500 mb-6">
-                  We&apos;ve got your details for the{" "}
-                  <strong>{selectedTier}</strong> plan. Our team will review it
-                  and email your school login link
-                  <strong> within 24 hours</strong>.
+                  We've got your details for the{" "}
+                  <strong>{getTierLabel(selectedTier)}</strong> plan. Our team
+                  will review it and email your school login link{" "}
+                  <strong>within 24 hours</strong>.
                 </p>
                 <button
                   onClick={() => {
@@ -301,13 +329,13 @@ export default function HomePage() {
                   </button>
                 </div>
 
-                {/* 🎯 Selected tier banner */}
+                {/* 🎯 Dynamic tier banner */}
                 <div className="bg-[var(--color-primary-light)] border border-[var(--color-primary)]/20 p-3 rounded-xl mb-4">
                   <p className="text-[10px] font-semibold text-[var(--color-primary-dark)] uppercase tracking-wide mb-0.5">
                     Selected Plan
                   </p>
                   <p className="text-sm font-bold text-[var(--color-primary)]">
-                    {tierLabel[selectedTier]}
+                    {getTierLabel(selectedTier)}
                   </p>
                 </div>
 

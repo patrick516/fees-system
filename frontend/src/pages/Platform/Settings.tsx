@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { Eye, EyeOff, CheckCircle2, Pencil } from "lucide-react";
+import { Eye, EyeOff, CheckCircle2, Pencil, Layers } from "lucide-react";
 import platformApi from "../../lib/platformApi";
+import TierManagerCard from "../../components/Platform/TierManagerCard";
 import {
   Select,
   SelectContent,
@@ -8,6 +9,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../components/ui/select";
+
+interface Tier {
+  id: string;
+  name: string;
+  price: number;
+  maxStudents: number;
+  description: string;
+  features: string[];
+  popular?: boolean;
+}
+
 interface PlatformSettings {
   id: string;
   name: string;
@@ -21,6 +33,7 @@ interface PlatformSettings {
   subscriptionWebhookSecretReversed: string;
   hasSubscriptionSecretSuccess: boolean;
   hasSubscriptionSecretReversed: boolean;
+  tiers: Tier[];
 }
 
 export default function PlatformSettingsPage() {
@@ -40,6 +53,9 @@ export default function PlatformSettingsPage() {
   const [merchantAccount, setMerchantAccount] = useState("");
   const [secretSuccess, setSecretSuccess] = useState("");
   const [secretReversed, setSecretReversed] = useState("");
+
+  // 🎯 Tier state (managed locally until "Save Tiers" in TierManagerCard is clicked)
+  const [tiers, setTiers] = useState<Tier[]>([]);
 
   // Eye toggles for secret inputs
   const [showSecretSuccess, setShowSecretSuccess] = useState(false);
@@ -63,6 +79,7 @@ export default function PlatformSettingsPage() {
       setMerchantAccount(s.subscriptionMerchantAccount || "");
       setSecretSuccess(s.subscriptionWebhookSecretSuccess || "");
       setSecretReversed(s.subscriptionWebhookSecretReversed || "");
+      setTiers(s.tiers || []);
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to load settings");
     } finally {
@@ -88,6 +105,7 @@ export default function PlatformSettingsPage() {
         defaultTermPrice,
         defaultTrialDays,
         subscriptionMerchantAccount: merchantAccount || null,
+        tiers, // 🎯 Send the current tiers array along with everything else
       };
       if (secretSuccess.trim())
         body.subscriptionWebhookSecretSuccess = secretSuccess;
@@ -117,14 +135,14 @@ export default function PlatformSettingsPage() {
   }
 
   return (
-    <div className={`p-8 ${mode === "view" ? "w-full" : "max-w-3xl"}`}>
+    <div className={`p-8 ${mode === "view" ? "w-full" : "max-w-4xl"}`}>
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900">
           Platform Settings
         </h1>
         <p className="text-sm text-slate-500">
-          Defaults applied to new schools + your own subscription revenue
-          account
+          Defaults applied to new schools, subscription tiers, and your own
+          subscription revenue account
         </p>
       </div>
 
@@ -183,12 +201,13 @@ export default function PlatformSettingsPage() {
               Subscription Defaults
             </h2>
             <p className="text-xs text-slate-500 mb-4">
-              Applied to new schools unless overridden at invite time.
+              Fallback values for schools that haven't been assigned a specific
+              tier yet.
             </p>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Price per Term
+                  Fallback Price per Term
                 </label>
                 <input
                   type="number"
@@ -232,6 +251,9 @@ export default function PlatformSettingsPage() {
               </div>
             </div>
           </div>
+
+          {/* 🎯 Subscription Tiers (Dynamic) */}
+          <TierManagerCard tiers={tiers} onChange={setTiers} />
 
           {/* Subscription Revenue Account */}
           <div className="bg-white border border-slate-200 rounded-xl p-6">
@@ -336,119 +358,213 @@ export default function PlatformSettingsPage() {
               {saving ? "Saving..." : "Save Settings"}
             </button>
             {saved && <span className="text-sm text-green-700">✓ Saved</span>}
+            <button
+              type="button"
+              onClick={() => setMode("view")}
+              disabled={saving}
+              className="text-sm text-slate-600 hover:text-slate-900 px-3 py-2.5 disabled:opacity-50"
+            >
+              Cancel
+            </button>
           </div>
         </form>
       )}
 
-      {/* ============ VIEW MODE — saved summary in one row ============ */}
+      {/* ============ VIEW MODE ============ */}
       {mode === "view" && settings && (
-        <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-green-50/60">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 size={16} className="text-green-700" />
-              <p className="text-sm font-semibold text-green-800">
-                Settings saved
-              </p>
+        <div className="space-y-6">
+          {/* Saved summary row */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-green-50/60">
+              <div className="flex items-center gap-2">
+                <CheckCircle2 size={16} className="text-green-700" />
+                <p className="text-sm font-semibold text-green-800">
+                  Settings saved
+                </p>
+              </div>
+              <button
+                onClick={() => setMode("edit")}
+                className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-900 bg-white border border-blue-200 hover:bg-blue-50 rounded-lg px-3 py-1.5 transition"
+                title="Edit settings"
+              >
+                <Pencil size={12} /> Edit
+              </button>
             </div>
-            <button
-              onClick={() => setMode("edit")}
-              className="flex items-center gap-1.5 text-xs font-semibold text-blue-700 hover:text-blue-900 bg-white border border-blue-200 hover:bg-blue-50 rounded-lg px-3 py-1.5 transition"
-              title="Edit settings"
-            >
-              <Pencil size={12} /> Edit
-            </button>
+
+            <div className="overflow-x-auto">
+              <div className="flex divide-x divide-slate-100 min-w-max w-full">
+                <div className="px-5 py-4">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Platform
+                  </p>
+                  <p className="text-sm font-medium text-slate-900 whitespace-nowrap">
+                    {settings.name || "—"}
+                  </p>
+                </div>
+                <div className="px-5 py-4">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Email
+                  </p>
+                  <p className="text-sm text-slate-900 whitespace-nowrap">
+                    {settings.email || "—"}
+                  </p>
+                </div>
+                <div className="px-5 py-4">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Phone
+                  </p>
+                  <p className="text-sm text-slate-900 whitespace-nowrap">
+                    {settings.phone || "—"}
+                  </p>
+                </div>
+                <div className="px-5 py-4">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Fallback Price
+                  </p>
+                  <p className="text-sm text-slate-900 font-mono whitespace-nowrap">
+                    {settings.currency || "MWK"}{" "}
+                    {Number(settings.defaultTermPrice || 0).toLocaleString()}
+                  </p>
+                </div>
+                <div className="px-5 py-4">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Trial
+                  </p>
+                  <p className="text-sm text-slate-900 whitespace-nowrap">
+                    {settings.defaultTrialDays ?? 30}{" "}
+                    <span className="text-slate-400 text-xs">days</span>
+                  </p>
+                </div>
+                <div className="px-5 py-4">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Merchant Acct
+                  </p>
+                  {settings.subscriptionMerchantAccount ? (
+                    <p className="text-sm font-mono text-slate-900 whitespace-nowrap">
+                      {settings.subscriptionMerchantAccount}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-slate-400">Not set</p>
+                  )}
+                </div>
+                <div className="px-5 py-4">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Secret · Success
+                  </p>
+                  {settings.hasSubscriptionSecretSuccess ? (
+                    <span className="inline-flex items-center gap-1 text-sm text-green-700 font-medium whitespace-nowrap">
+                      <CheckCircle2 size={14} /> Configured
+                    </span>
+                  ) : (
+                    <p className="text-sm text-slate-400">Not set</p>
+                  )}
+                </div>
+                <div className="px-5 py-4">
+                  <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Secret · Reversed
+                  </p>
+                  {settings.hasSubscriptionSecretReversed ? (
+                    <span className="inline-flex items-center gap-1 text-sm text-green-700 font-medium whitespace-nowrap">
+                      <CheckCircle2 size={14} /> Configured
+                    </span>
+                  ) : (
+                    <p className="text-sm text-slate-400">Not set</p>
+                  )}
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* One row */}
-          <div className="overflow-x-auto">
-            <div className="flex divide-x divide-slate-100 min-w-max w-full">
-              <div className="px-5 py-4">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                  Platform
-                </p>
-                <p className="text-sm font-medium text-slate-900 whitespace-nowrap">
-                  {settings.name || "—"}
-                </p>
-              </div>
-
-              <div className="px-5 py-4">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                  Email
-                </p>
-                <p className="text-sm text-slate-900 whitespace-nowrap">
-                  {settings.email || "—"}
-                </p>
-              </div>
-
-              <div className="px-5 py-4">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                  Phone
-                </p>
-                <p className="text-sm text-slate-900 whitespace-nowrap">
-                  {settings.phone || "—"}
-                </p>
-              </div>
-
-              <div className="px-5 py-4">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                  Price / Term
-                </p>
-                <p className="text-sm text-slate-900 font-mono whitespace-nowrap">
-                  {settings.currency || "MWK"}{" "}
-                  {Number(settings.defaultTermPrice || 0).toLocaleString()}
-                </p>
-              </div>
-
-              <div className="px-5 py-4">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                  Trial
-                </p>
-                <p className="text-sm text-slate-900 whitespace-nowrap">
-                  {settings.defaultTrialDays ?? 30}{" "}
-                  <span className="text-slate-400 text-xs">days</span>
-                </p>
-              </div>
-
-              <div className="px-5 py-4">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                  Merchant Acct
-                </p>
-                {settings.subscriptionMerchantAccount ? (
-                  <p className="text-sm font-mono text-slate-900 whitespace-nowrap">
-                    {settings.subscriptionMerchantAccount}
+          {/* 🎯 Subscription Tiers summary (read-only preview) */}
+          <div className="bg-white border border-slate-200 rounded-xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
+              <div className="flex items-center gap-2">
+                <Layers size={16} className="text-slate-400" />
+                <div>
+                  <h2 className="text-sm font-semibold text-slate-900">
+                    Subscription Tiers
+                  </h2>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {tiers.length} {tiers.length === 1 ? "plan" : "plans"}{" "}
+                    configured · shown on the marketing site
                   </p>
-                ) : (
-                  <p className="text-sm text-slate-400">Not set</p>
-                )}
+                </div>
               </div>
-
-              <div className="px-5 py-4">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                  Secret · Success
-                </p>
-                {settings.hasSubscriptionSecretSuccess ? (
-                  <span className="inline-flex items-center gap-1 text-sm text-green-700 font-medium whitespace-nowrap">
-                    <CheckCircle2 size={14} /> Configured
-                  </span>
-                ) : (
-                  <p className="text-sm text-slate-400">Not set</p>
-                )}
-              </div>
-
-              <div className="px-5 py-4">
-                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                  Secret · Reversed
-                </p>
-                {settings.hasSubscriptionSecretReversed ? (
-                  <span className="inline-flex items-center gap-1 text-sm text-green-700 font-medium whitespace-nowrap">
-                    <CheckCircle2 size={14} /> Configured
-                  </span>
-                ) : (
-                  <p className="text-sm text-slate-400">Not set</p>
-                )}
-              </div>
+              <button
+                onClick={() => setMode("edit")}
+                className="text-xs font-semibold text-blue-700 hover:text-blue-900"
+              >
+                Manage →
+              </button>
             </div>
+
+            {tiers.length === 0 ? (
+              <div className="p-8 text-center">
+                <p className="text-sm text-slate-500">
+                  No tiers configured yet. Click "Edit" to add one.
+                </p>
+              </div>
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {tiers.map((tier) => (
+                  <div
+                    key={tier.id}
+                    className="px-5 py-4 flex items-center justify-between gap-4 flex-wrap"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div
+                        className={`w-2 h-2 rounded-full shrink-0 ${
+                          tier.popular ? "bg-blue-600" : "bg-slate-300"
+                        }`}
+                      />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <p className="text-sm font-semibold text-slate-900">
+                            {tier.name}
+                          </p>
+                          {tier.popular && (
+                            <span className="text-[10px] font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded">
+                              POPULAR
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5">
+                          {tier.description}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-6 text-sm shrink-0">
+                      <div className="text-right">
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wide">
+                          Price
+                        </p>
+                        <p className="font-mono font-semibold text-slate-900">
+                          MWK {Number(tier.price).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wide">
+                          Max Students
+                        </p>
+                        <p className="font-semibold text-slate-900">
+                          {tier.maxStudents >= 99999
+                            ? "Unlimited"
+                            : Number(tier.maxStudents).toLocaleString()}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-[10px] text-slate-500 uppercase tracking-wide">
+                          Features
+                        </p>
+                        <p className="font-semibold text-slate-900">
+                          {tier.features?.length || 0}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}
