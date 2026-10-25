@@ -161,7 +161,7 @@ const Dashboard = () => {
         title: "Activate a Term",
         desc: "Set the current term and academic year to start collecting fees.",
         done: onboarding.hasActiveTerm,
-        path: "/settings", // Adjust if Term activation is elsewhere
+        path: "/classes",
         icon: CalendarDays,
       },
       {
