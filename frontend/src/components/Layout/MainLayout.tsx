@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Sidebar from "./Sidebar/index";
 import Topbar from "./Topbar/index";
 import { useAuthStore } from "../../store/authStore";
-import { AlertTriangle, Lock, CalendarDays } from "lucide-react";
+import { AlertTriangle, Lock, CalendarDays, Building2 } from "lucide-react";
 import api from "../../lib/axios";
 
 const MainLayout = () => {
@@ -13,42 +13,50 @@ const MainLayout = () => {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // 🎯 Setup Guard: Ensure a term is active before they can do anything
-  const [hasActiveTerm, setHasActiveTerm] = useState<boolean | null>(null);
+  // 🎯 Setup Guard: Check both School Details AND Active Term
+  const [onboarding, setOnboarding] = useState<{
+    hasSchoolDetails: boolean;
+    hasActiveTerm: boolean;
+  } | null>(null);
 
   useEffect(() => {
     let isMounted = true;
-    const checkTerm = async () => {
+    const checkSetup = async () => {
       try {
-        await api.get("/schools/active-term");
-        if (isMounted) setHasActiveTerm(true);
-      } catch (err: any) {
+        const res = await api.get("/schools/onboarding-status");
         if (isMounted) {
-          if (err.response?.status === 404) {
-            setHasActiveTerm(false);
-          } else {
-            setHasActiveTerm(true); // Fail-safe: if backend errors, don't lock the user out
-          }
+          setOnboarding({
+            hasSchoolDetails: res.data.data.hasSchoolDetails,
+            hasActiveTerm: res.data.data.hasActiveTerm,
+          });
         }
+      } catch (err) {
+        // Fail-safe: don't lock them out if backend errors
+        if (isMounted)
+          setOnboarding({ hasSchoolDetails: true, hasActiveTerm: true });
       }
     };
-    checkTerm();
+    checkSetup();
     return () => {
       isMounted = false;
     };
-  }, [location.pathname]); // Re-check on every navigation (cheap API call)
+  }, [location.pathname]); // Re-check on every navigation
 
-  // Paths they ARE allowed to visit without an active term
-  const ALLOWED_WITHOUT_TERM = [
-    "/dashboard",
-    "/classes",
-    "/settings",
-    "/support",
-  ];
-  const isBlocked =
-    hasActiveTerm === false &&
-    !ALLOWED_WITHOUT_TERM.some((p) => location.pathname.startsWith(p));
+  // Determine which blocks apply
+  const blockedBySchoolDetails =
+    onboarding?.hasSchoolDetails === false &&
+    !["/dashboard", "/settings", "/support"].some((p) =>
+      location.pathname.startsWith(p),
+    );
 
+  const blockedByTerm =
+    onboarding?.hasSchoolDetails === true &&
+    onboarding?.hasActiveTerm === false &&
+    !["/classes", "/dashboard", "/settings", "/support"].some((p) =>
+      location.pathname.startsWith(p),
+    );
+
+  // Subscription Banners
   let banner = null;
   if (school) {
     const now = new Date();
@@ -84,6 +92,54 @@ const MainLayout = () => {
     }
   }
 
+  // Render the lock screen
+  let blockContent = null;
+
+  if (blockedBySchoolDetails) {
+    blockContent = (
+      <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto">
+        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+          <Building2 className="text-[var(--color-primary)]" size={28} />
+        </div>
+        <h2 className="text-xl font-bold text-gray-800 mb-2">
+          Complete School Profile
+        </h2>
+        <p className="text-gray-500 mb-6 text-sm leading-relaxed">
+          Please update your school's name in Settings before adding students.
+          This ensures all student IDs and receipts are generated correctly.
+        </p>
+        <button
+          onClick={() => navigate("/settings")}
+          className="bg-[var(--color-primary)] text-white px-6 py-2.5 rounded-lg font-medium hover:bg-[var(--color-primary-dark)] transition-colors"
+        >
+          Go to Settings
+        </button>
+      </div>
+    );
+  } else if (blockedByTerm) {
+    blockContent = (
+      <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto">
+        <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
+          <CalendarDays className="text-[var(--color-primary)]" size={28} />
+        </div>
+        <h2 className="text-xl font-bold text-gray-800 mb-2">
+          Activate a Term First
+        </h2>
+        <p className="text-gray-500 mb-6 text-sm leading-relaxed">
+          You must activate a term before you can access this page. This ensures
+          that all fees, payments, and student records are properly tracked and
+          no inconsistent data is created.
+        </p>
+        <button
+          onClick={() => navigate("/classes")}
+          className="bg-[var(--color-primary)] text-white px-6 py-2.5 rounded-lg font-medium hover:bg-[var(--color-primary-dark)] transition-colors"
+        >
+          Go to Classes & Terms
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden">
       <Sidebar />
@@ -91,32 +147,7 @@ const MainLayout = () => {
         <Topbar />
         {banner}
         <main className="flex-1 overflow-y-auto p-6">
-          {isBlocked ? (
-            <div className="flex flex-col items-center justify-center h-full text-center max-w-md mx-auto">
-              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mb-4">
-                <CalendarDays
-                  className="text-[var(--color-primary)]"
-                  size={28}
-                />
-              </div>
-              <h2 className="text-xl font-bold text-gray-800 mb-2">
-                Activate a Term First
-              </h2>
-              <p className="text-gray-500 mb-6 text-sm leading-relaxed">
-                You must activate a term before you can access this page. This
-                ensures that all fees, payments, and student records are
-                properly tracked and no inconsistent data is created.
-              </p>
-              <button
-                onClick={() => navigate("/classes")}
-                className="bg-[var(--color-primary)] text-white px-6 py-2.5 rounded-lg font-medium hover:bg-[var(--color-primary-dark)] transition-colors"
-              >
-                Go to Classes & Terms
-              </button>
-            </div>
-          ) : (
-            <Outlet />
-          )}
+          {blockContent ? blockContent : <Outlet />}
         </main>
       </div>
     </div>

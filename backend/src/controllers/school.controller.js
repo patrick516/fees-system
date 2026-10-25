@@ -576,12 +576,12 @@ const getSubscriptionPaymentStatus = async (req, res) => {
 };
 
 //  ONBOARDING STATUS
-// GET /api/schools/onboarding-status
+
 const getOnboardingStatus = async (req, res) => {
   try {
     const school = await prisma.school.findUnique({
       where: { id: req.schoolId },
-      select: { activeTerm: true, activeAcademicYear: true },
+      select: { name: true, activeTerm: true, activeAcademicYear: true },
     });
 
     if (!school) {
@@ -596,17 +596,24 @@ const getOnboardingStatus = async (req, res) => {
       prisma.student.count({ where: { schoolId: req.schoolId } }),
     ]);
 
+    // Check if they changed "Pending Setup" to a real name
+    const hasSchoolDetails = !!school.name && school.name !== "Pending Setup";
     const hasClasses = classCount > 0;
     const hasFeeStructures = feeCount > 0;
     const hasActiveTerm = !!(school.activeTerm && school.activeAcademicYear);
     const hasStudents = studentCount > 0;
 
     const isComplete =
-      hasClasses && hasFeeStructures && hasActiveTerm && hasStudents;
+      hasSchoolDetails &&
+      hasClasses &&
+      hasFeeStructures &&
+      hasActiveTerm &&
+      hasStudents;
 
     return res.json({
       success: true,
       data: {
+        hasSchoolDetails,
         hasClasses,
         hasFeeStructures,
         hasActiveTerm,
@@ -621,8 +628,8 @@ const getOnboardingStatus = async (req, res) => {
       .json({ success: false, message: "Failed to check status" });
   }
 };
-// ==================== GET TIER STATUS ====================
-// GET /api/schools/tier-status
+//  GET TIER STATUS
+
 const getTierStatus = async (req, res) => {
   try {
     const school = await prisma.school.findUnique({

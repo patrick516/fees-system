@@ -19,6 +19,7 @@ import {
   BookOpen,
   CalendarDays,
   PartyPopper,
+  Building2,
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { PaymentSummary } from "../../types";
@@ -143,6 +144,13 @@ const Dashboard = () => {
     if (!onboarding || onboarding.isComplete) return null;
 
     const steps = [
+      {
+        title: "Complete School Profile",
+        desc: "Set your school's name so we can generate the correct Student IDs.",
+        done: onboarding.hasSchoolDetails, // This comes from the backend
+        path: "/settings",
+        icon: Building2,
+      },
       {
         title: "Create Classes",
         desc: "Add the classes or forms in your school (e.g. Form 1, Grade 5).",
