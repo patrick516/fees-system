@@ -15,7 +15,7 @@ export default function DashboardPreview() {
         </div>
       </div>
 
-      <div className="flex h-[500px] bg-gray-50/50">
+      <div className="flex md:h-[500px] bg-gray-50/50">
         {/* Fake Sidebar */}
         <div className="w-48 bg-white border-r border-gray-200 p-4 hidden md:block">
           <div className="space-y-4 mt-4">
@@ -27,7 +27,7 @@ export default function DashboardPreview() {
         </div>
 
         {/* Fake Dashboard Content */}
-        <div className="flex-1 p-6 md:p-8 overflow-hidden">
+        <div className="flex-1 min-w-0 p-4 md:p-8 overflow-hidden">
           <div className="flex justify-between items-center mb-6">
             <div>
               <h3 className="text-lg font-bold text-gray-800">Overview</h3>
@@ -37,7 +37,7 @@ export default function DashboardPreview() {
           </div>
 
           {/* Top Stats */}
-          <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 mb-6">
             <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
               <div className="flex justify-between items-center mb-2">
                 <p className="text-xs font-medium text-gray-500">
@@ -45,7 +45,9 @@ export default function DashboardPreview() {
                 </p>
                 <Wallet size={14} className="text-green-500" />
               </div>
-              <p className="text-xl font-bold text-gray-800">MWK 12,450,000</p>
+              <p className="text-lg sm:text-base lg:text-xl font-bold text-gray-800">
+                MWK 12,450,000
+              </p>
               <p className="text-[10px] text-green-600 flex items-center gap-1 mt-1">
                 <ArrowUpRight size={10} /> +15% from last term
               </p>
@@ -55,7 +57,9 @@ export default function DashboardPreview() {
                 <p className="text-xs font-medium text-gray-500">Outstanding</p>
                 <TrendingUp size={14} className="text-orange-500" />
               </div>
-              <p className="text-xl font-bold text-gray-800">MWK 3,200,000</p>
+              <p className="text-lg sm:text-base lg:text-xl font-bold text-gray-800">
+                MWK 3,200,000
+              </p>
               <p className="text-[10px] text-gray-400 mt-1">24 debtors</p>
             </div>
             <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
@@ -65,13 +69,15 @@ export default function DashboardPreview() {
                 </p>
                 <Users size={14} className="text-blue-500" />
               </div>
-              <p className="text-xl font-bold text-gray-800">342 Students</p>
+              <p className="text-lg sm:text-base lg:text-xl font-bold text-gray-800">
+                342 Students
+              </p>
               <p className="text-[10px] text-gray-400 mt-1">Out of 400</p>
             </div>
           </div>
 
           {/* Charts Area */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
             {/* Bar Chart (Term Collections) */}
             <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm">
               <p className="text-xs font-semibold text-gray-700 mb-4">
@@ -81,12 +87,14 @@ export default function DashboardPreview() {
                 {[40, 70, 90].map((height, i) => (
                   <div
                     key={i}
-                    className="flex-1 flex flex-col items-center gap-2"
+                    className="flex-1 h-full flex flex-col items-center justify-end gap-2"
                   >
-                    <div
-                      className="w-full bg-[var(--color-primary)] rounded-t-md opacity-80 hover:opacity-100 transition-all"
-                      style={{ height: `${height}%` }}
-                    />
+                    <div className="w-full flex-1 flex items-end">
+                      <div
+                        className="w-full bg-[var(--color-primary)] rounded-t-md opacity-80 hover:opacity-100 transition-all"
+                        style={{ height: `${height}%` }}
+                      />
+                    </div>
                     <span className="text-[10px] text-gray-400">
                       Term {i + 1}
                     </span>
@@ -96,7 +104,7 @@ export default function DashboardPreview() {
             </div>
 
             {/* Donut Chart (Payment Methods) */}
-            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between">
+            <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex items-center justify-between gap-4">
               <div>
                 <p className="text-xs font-semibold text-gray-700 mb-2">
                   Channels
@@ -114,7 +122,7 @@ export default function DashboardPreview() {
                   </div>
                 </div>
               </div>
-              <div className="relative w-24 h-24 rounded-full border-[12px] border-gray-100 flex items-center justify-center">
+              <div className="relative w-24 h-24 shrink-0 rounded-full border-[12px] border-gray-100 flex items-center justify-center">
                 <div
                   className="absolute inset-0 rounded-full border-[12px] border-[var(--color-primary)]"
                   style={{
