@@ -1,9 +1,5 @@
 const prisma = require("../config/db");
-const {
-  generateStudentCode,
-  regenerateStudentCode,
-  generateReceiptNumber,
-} = require("../lib/utils");
+const { generateStudentCode } = require("../lib/utils");
 
 const XLSX = require("xlsx");
 
@@ -242,15 +238,27 @@ const addStudent = async (req, res) => {
       });
     }
 
-    const classCount = await prisma.student.count({
+    //  Find the HIGHEST existing ID instead of counting
+    let startSeq = 0;
+    const lastStudent = await prisma.student.findFirst({
       where: { schoolId: req.schoolId, classId },
+      orderBy: { studentCode: "desc" },
+      select: { studentCode: true },
     });
+
+    if (lastStudent && lastStudent.studentCode) {
+      const parts = lastStudent.studentCode.split("-");
+      const lastSeqStr = parts[parts.length - 1];
+      const parsed = parseInt(lastSeqStr, 10);
+      if (!isNaN(parsed)) startSeq = parsed;
+    }
+
     const studentCode = generateStudentCode(
       school.name,
       classExists.name,
       classExists.level,
       year,
-      classCount + 1,
+      startSeq + 1,
     );
 
     const student = await prisma.student.create({
@@ -901,9 +909,21 @@ const bulkImport = async (req, res) => {
     const failed = [];
     const classCounts = {};
     for (const cls of classes) {
-      classCounts[cls.id] = await prisma.student.count({
+      //  Find the HIGHEST existing ID instead of counting
+      const lastStudent = await prisma.student.findFirst({
         where: { schoolId: req.schoolId, classId: cls.id },
+        orderBy: { studentCode: "desc" },
+        select: { studentCode: true },
       });
+
+      let startSeq = 0;
+      if (lastStudent && lastStudent.studentCode) {
+        const parts = lastStudent.studentCode.split("-");
+        const lastSeqStr = parts[parts.length - 1];
+        const parsed = parseInt(lastSeqStr, 10);
+        if (!isNaN(parsed)) startSeq = parsed;
+      }
+      classCounts[cls.id] = startSeq;
     }
 
     for (const r of results) {
