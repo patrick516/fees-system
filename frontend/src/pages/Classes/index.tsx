@@ -1012,7 +1012,7 @@ const ClassesPage = () => {
                               )}
                             </div>
                             <p className="text-lg font-bold text-gray-800">
-                              MWK {fee.totalAmount.toLocaleString()}
+                              MWK {Number(fee.totalAmount).toLocaleString()}
                             </p>
                           </div>
                         ))}
