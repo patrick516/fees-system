@@ -44,7 +44,12 @@ router.get("/payment-info/:schoolId", async (req, res) => {
   }
 });
 
-// ==================== PROTECTED ROUTES ====================
+//  PROTECTED ROUTES
+router.get(
+  "/onboarding-status",
+  verifyStaff,
+  schoolController.getOnboardingStatus,
+);
 
 router.get(
   "/classes",
@@ -63,6 +68,13 @@ router.get(
               term: true,
               academicYear: true,
               totalAmount: true,
+              tuitionFee: true,
+              examFee: true,
+              buildingLevy: true,
+              uniformFee: true,
+              bookFee: true,
+              otherFees: true,
+              otherFeesDescription: true,
             },
           },
         },
@@ -511,10 +523,10 @@ router.post(
           message: "End date must be after start date",
         });
       }
-
       const currentSchool = await prisma.school.findUnique({
         where: { id: req.schoolId },
         select: {
+          name: true,
           activeTerm: true,
           activeAcademicYear: true,
           activeTermStartDate: true,
@@ -591,8 +603,13 @@ router.post(
         const paymentCount = await prisma.feePayment.count({
           where: { schoolId: req.schoolId },
         });
-        const { generateReceiptNumber } = require("../lib/utils");
+        const {
+          generateReceiptNumber,
+          buildSchoolPrefix,
+        } = require("../lib/utils");
+        const schoolPrefix = buildSchoolPrefix(currentSchool.name || "");
         const receiptNumber = generateReceiptNumber(
+          schoolPrefix,
           academicYear,
           paymentCount + 1,
         );

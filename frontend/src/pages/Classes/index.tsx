@@ -48,6 +48,15 @@ const formatDate = (iso?: string | null) => {
 
 const termLabel = (t?: string | null) =>
   t ? t.replace("_", " ").replace("TERM", "Term") : "";
+// Formats a number string with commas (e.g. 2500000 -> 2,500,000)
+const formatCurrency = (val: string | number) => {
+  if (val === undefined || val === null || val === "") return "";
+  const str = String(val).replace(/,/g, "");
+  if (str.endsWith(".")) return str; // allow typing decimals
+  const parts = str.split(".");
+  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
+  return parts.join(".");
+};
 
 const termOrder: Record<string, number> = {
   TERM_1: 1,
@@ -474,6 +483,12 @@ const ClassesPage = () => {
     }
   };
 
+  // Fee structure for the currently active term (or undefined if not set)
+  const getActiveFee = (cls: any) =>
+    cls.feeStructures?.find(
+      (f: any) => f.term === currentTerm && f.academicYear === activeYear,
+    );
+
   return (
     <div className="space-y-6">
       <div>
@@ -866,13 +881,21 @@ const ClassesPage = () => {
       )}
 
       {/* Classes List with Fee Structures */}
-      <div className="space-y-4">
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        {!loading && classes.length > 0 && (
+          <div className="grid grid-cols-12 gap-2 px-4 sm:px-6 py-2.5 bg-gray-50 border-b border-gray-100 text-xs font-medium text-gray-500 uppercase">
+            <div className="col-span-5 sm:col-span-4">Class</div>
+            <div className="hidden sm:block sm:col-span-2">Students</div>
+            <div className="col-span-3">Term Fee</div>
+            <div className="col-span-4 sm:col-span-3 text-right">Actions</div>
+          </div>
+        )}
         {loading ? (
           <div className="flex items-center justify-center h-32">
             <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--color-primary)]" />
           </div>
         ) : classes.length === 0 ? (
-          <div className="bg-white rounded-xl p-12 text-center border border-gray-100">
+          <div className="p-12 text-center">
             <GraduationCap size={40} className="mx-auto mb-2 text-gray-300" />
             <p className="text-sm text-gray-400">No classes added yet</p>
           </div>
@@ -880,33 +903,68 @@ const ClassesPage = () => {
           classes.map((cls: any) => (
             <div
               key={cls.id}
-              className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden"
+              className="border-b border-gray-100 last:border-b-0"
             >
               <div
-                className="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-gray-50"
+                className="grid grid-cols-12 items-center gap-2 px-4 sm:px-6 py-3.5 cursor-pointer hover:bg-gray-50"
                 onClick={() =>
                   setExpandedClass(expandedClass === cls.id ? null : cls.id)
                 }
               >
-                <div className="flex items-center gap-4">
-                  <div className="w-10 h-10 bg-[var(--color-primary-light)] rounded-xl flex items-center justify-center">
+                {/* Class */}
+                <div className="col-span-5 sm:col-span-4 flex items-center gap-3 min-w-0">
+                  <div className="w-9 h-9 bg-[var(--color-primary-light)] rounded-lg flex items-center justify-center shrink-0">
                     <GraduationCap
-                      size={18}
+                      size={16}
                       className="text-[var(--color-primary)]"
                     />
                   </div>
-                  <div>
-                    <p className="font-medium text-gray-800">{cls.name}</p>
-                    <p className="text-xs text-gray-400">
-                      Level {cls.level} • {cls._count?.students || 0} students
+                  <div className="min-w-0">
+                    <p className="font-medium text-gray-800 truncate">
+                      {cls.name}
                     </p>
+                    <p className="text-xs text-gray-400">Level {cls.level}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-gray-500">
-                    {cls.feeStructures?.length || 0} fee structure
-                    {cls.feeStructures?.length !== 1 ? "s" : ""} set
-                  </span>
+
+                {/* Students */}
+                <div className="hidden sm:block sm:col-span-2 text-sm text-gray-600">
+                  {cls._count?.students || 0}
+                </div>
+
+                {/* Fee for the active term */}
+                <div className="col-span-3">
+                  {getActiveFee(cls) ? (
+                    <span className="text-xs sm:text-sm font-semibold text-gray-800">
+                      MWK{" "}
+                      {Number(getActiveFee(cls).totalAmount).toLocaleString()}
+                    </span>
+                  ) : (
+                    <span className="inline-flex px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 text-xs font-medium">
+                      Not set
+                    </span>
+                  )}
+                </div>
+
+                {/* Actions */}
+                <div className="col-span-4 sm:col-span-3 flex items-center justify-end gap-1">
+                  {can("payments", "write") && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setExpandedClass(cls.id);
+                        openFeeForm(cls.id, getActiveFee(cls));
+                      }}
+                      className="p-1.5 text-gray-400 hover:text-[var(--color-primary)] hover:bg-gray-100 rounded"
+                      title={getActiveFee(cls) ? "Edit fee" : "Set fee"}
+                    >
+                      {getActiveFee(cls) ? (
+                        <Edit2 size={14} />
+                      ) : (
+                        <Plus size={14} />
+                      )}
+                    </button>
+                  )}
                   {can("classes", "delete") && (
                     <button
                       onClick={(e) => {
@@ -914,6 +972,7 @@ const ClassesPage = () => {
                         handleDeleteClass(cls.id);
                       }}
                       className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
+                      title="Delete class"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -1071,10 +1130,13 @@ const ClassesPage = () => {
                                 {label}
                               </label>
                               <input
-                                type="number"
-                                value={(feeForm as any)[field]}
+                                type="text"
+                                value={formatCurrency((feeForm as any)[field])}
                                 onChange={(e) =>
-                                  handleFeeChange(field, e.target.value)
+                                  handleFeeChange(
+                                    field,
+                                    e.target.value.replace(/,/g, ""),
+                                  )
                                 }
                                 placeholder="0"
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
@@ -1092,12 +1154,12 @@ const ClassesPage = () => {
                           </span>
                         </label>
                         <input
-                          type="number"
-                          value={feeForm.totalAmount}
+                          type="text"
+                          value={formatCurrency(feeForm.totalAmount)}
                           onChange={(e) =>
                             setFeeForm({
                               ...feeForm,
-                              totalAmount: e.target.value,
+                              totalAmount: e.target.value.replace(/,/g, ""),
                             })
                           }
                           required
