@@ -1,4 +1,3 @@
-// ==================== STUDENT CODE ====================
 const buildSchoolPrefix = (schoolName) => {
   return schoolName
     .trim()
@@ -8,10 +7,20 @@ const buildSchoolPrefix = (schoolName) => {
     .toUpperCase()
     .slice(0, 3);
 };
-
 const buildClassTag = (className, level) => {
-  const firstLetter = className.trim().charAt(0).toUpperCase();
-  return `${firstLetter}${level}`;
+  const cleanName = String(className)
+    .trim()
+    .replace(/[^A-Za-z0-9]/g, "")
+    .toUpperCase();
+  const firstLetter = cleanName.charAt(0);
+
+  //  Try to extract the number directly from the name (e.g., "FORM1" -> 1)
+  const nameMatch = cleanName.match(/\d+/);
+
+  // If the name has a number, use it. If not (e.g., "Kindergarten"), fall back to the level.
+  const finalLevel = nameMatch ? nameMatch[0] : level;
+
+  return `${firstLetter}${finalLevel}`;
 };
 
 const buildYearTag = (academicYear) => {

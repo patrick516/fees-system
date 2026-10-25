@@ -96,13 +96,21 @@ router.post(
   async (req, res) => {
     try {
       const { name, level } = req.body;
-      if (!name || !level) {
+      if (!name) {
         return res
           .status(400)
-          .json({ success: false, message: "Name and level are required" });
+          .json({ success: false, message: "Class name is required" });
       }
+
+      //  SANITIZATION: Remove spaces (e.g., "Form 1" -> "Form1")
+      const cleanName = name.trim().replace(/\s+/g, "");
+
+      //  SMART LEVEL: Extract number from name. If found, it overrides the user's level input.
+      const match = cleanName.match(/\d+/);
+      const finalLevel = match ? parseInt(match[0], 10) : parseInt(level) || 1;
+
       const cls = await prisma.class.create({
-        data: { schoolId: req.schoolId, name, level: parseInt(level) },
+        data: { schoolId: req.schoolId, name: cleanName, level: finalLevel },
       });
       res.status(201).json({ success: true, data: cls });
     } catch (err) {

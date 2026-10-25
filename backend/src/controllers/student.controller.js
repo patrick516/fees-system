@@ -49,12 +49,18 @@ const validateImportRow = (row, rowNumber, classes, fallbackYear) => {
 
   let classMatch = null;
   if (className) {
+    // 🎯 Normalize by removing all spaces and ignoring case
+    const normalize = (str) => String(str).toLowerCase().replace(/\s+/g, "");
+    const normalizedExcelClass = normalize(className);
+
     classMatch = classes.find(
-      (c) => c.name.toLowerCase() === className.toLowerCase(),
+      (c) => normalize(c.name) === normalizedExcelClass,
     );
+
     if (!classMatch) errors.push(`Class "${className}" not found`);
   }
 
+  // 🎯 Ensure parentPhone is defined before using it
   const parentPhone = phoneRaw ? normalizePhone(phoneRaw) : null;
   if (phoneRaw && !parentPhone)
     errors.push(`Invalid parent phone: "${phoneRaw}"`);
