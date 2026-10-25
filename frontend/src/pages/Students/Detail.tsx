@@ -23,6 +23,13 @@ import {
 } from "lucide-react";
 import api from "../../lib/axios";
 import { usePermission } from "../../hooks/usePermission";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
 
 const statusConfig = {
   VERIFIED: {
@@ -765,18 +772,28 @@ const StudentDetail = () => {
                 <label className="block text-xs font-medium text-gray-700 mb-1">
                   Term
                 </label>
-                <select
+                <Select
                   value={discountForm.term}
-                  onChange={(e) =>
-                    setDiscountForm({ ...discountForm, term: e.target.value })
+                  onValueChange={(val) =>
+                    setDiscountForm({ ...discountForm, term: val })
                   }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
                   required
                 >
-                  <option value="TERM_1">Term 1</option>
-                  <option value="TERM_2">Term 2</option>
-                  <option value="TERM_3">Term 3</option>
-                </select>
+                  <SelectTrigger className="w-full bg-white border-gray-300 rounded-lg text-sm h-[38px]">
+                    <SelectValue placeholder="Select term" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="TERM_1" className="cursor-pointer">
+                      Term 1
+                    </SelectItem>
+                    <SelectItem value="TERM_2" className="cursor-pointer">
+                      Term 2
+                    </SelectItem>
+                    <SelectItem value="TERM_3" className="cursor-pointer">
+                      Term 3
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">
