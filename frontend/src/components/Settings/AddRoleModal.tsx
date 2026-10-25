@@ -18,10 +18,12 @@ const RESOURCES: { value: Resource; label: string }[] = [
   { value: "sms", label: "Send SMS" },
   { value: "results", label: "Exam Results" },
   { value: "staff", label: "Staff" },
+  { value: "employees", label: "Employees" },
+  { value: "payroll", label: "Payroll" },
+  { value: "support", label: "Support" },
   { value: "settings", label: "Settings" },
   { value: "audit", label: "Audit Trail" },
 ];
-
 const ACTIONS: { value: PermissionAction; label: string }[] = [
   { value: "read", label: "Read" },
   { value: "write", label: "Write" },

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   LayoutDashboard,
@@ -16,8 +16,12 @@ import {
   Menu,
   UserCog,
   History,
+  Briefcase,
+  Wallet,
+  LifeBuoy,
 } from "lucide-react";
 import { useAuthStore } from "../../../store/authStore";
+import api from "../../../lib/axios";
 import type { Resource } from "../../../types";
 
 type NavItem = {
@@ -65,6 +69,14 @@ const navItems: NavItem[] = [
     resource: "results",
   },
   { to: "/staff", icon: UserCog, label: "Staff", resource: "staff" },
+  {
+    to: "/employees",
+    icon: Briefcase,
+    label: "Employees",
+    resource: "employees",
+  },
+  { to: "/payroll", icon: Wallet, label: "Payroll", resource: "payroll" },
+  { to: "/support", icon: LifeBuoy, label: "Support", resource: "support" },
   { to: "/audit", icon: History, label: "Audit Trail", resource: "audit" },
   { to: "/settings", icon: Settings, label: "Settings", resource: "settings" },
 ];
@@ -73,6 +85,7 @@ const Sidebar = () => {
   const { staff, logout } = useAuthStore();
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
+  const [supportUnread, setSupportUnread] = useState(0);
 
   // Check if the logged-in user has "read" permission for a resource.
   // School Admin always passes (safety fallback).
@@ -82,6 +95,21 @@ const Sidebar = () => {
     const perms = staff.role.permissions?.[resource];
     return Array.isArray(perms) && perms.includes("read");
   };
+
+  // 🎯 Poll support unread count every 60s
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const res = await api.get("/support/unread-count");
+        setSupportUnread(res.data.data?.count || 0);
+      } catch {
+        // ignore
+      }
+    };
+    load();
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
+  }, []);
 
   const visibleNavItems = navItems.filter((item) => canRead(item.resource));
 
@@ -141,7 +169,12 @@ const Sidebar = () => {
             }
           >
             <item.icon size={18} />
-            {item.label}
+            <span className="flex-1">{item.label}</span>
+            {item.to === "/support" && supportUnread > 0 && (
+              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {supportUnread > 99 ? "99+" : supportUnread}
+              </span>
+            )}
           </NavLink>
         ))}
       </nav>

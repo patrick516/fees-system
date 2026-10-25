@@ -40,8 +40,13 @@ import PlatformAnalytics from "./pages/Platform/Analytics";
 import PlatformOneKhusaMerchants from "./pages/Platform/OneKhusaMerchants";
 import { usePlatformAuthStore } from "./store/platformAuthStore";
 import PlatformRequestsPage from "./pages/Platform/Requests";
+import EmployeesPage from "./pages/Employees/index";
+import EmployeeDetail from "./pages/Employees/Detail";
+import PayrollPage from "./pages/Payroll/index";
+import SupportPage from "./pages/Support/index";
+import PlatformSupportPage from "./pages/Platform/Support";
 
-// ==================== GUARDS ====================
+//  GUARDS
 
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   const {
@@ -175,7 +180,7 @@ const ForcePasswordRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-// ==================== APP ====================
+//  APP
 
 function App() {
   // Only subscribe to staff, not the whole store, to prevent unnecessary re-renders
@@ -331,6 +336,39 @@ function App() {
             }
           />
           <Route
+            path="employees"
+            element={
+              <PermissionGuard resource="employees">
+                <EmployeesPage />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="employees/:id"
+            element={
+              <PermissionGuard resource="employees">
+                <EmployeeDetail />
+              </PermissionGuard>
+            }
+          />
+          {/* : Payroll */}
+          <Route
+            path="payroll"
+            element={
+              <PermissionGuard resource="payroll">
+                <PayrollPage />
+              </PermissionGuard>
+            }
+          />
+          <Route
+            path="support"
+            element={
+              <PermissionGuard resource="support">
+                <SupportPage />
+              </PermissionGuard>
+            }
+          />
+          <Route
             path="audit"
             element={
               <PermissionGuard resource="audit">
@@ -364,6 +402,7 @@ function App() {
           <Route path="subscriptions" element={<PlatformSubscriptions />} />
           <Route path="analytics" element={<PlatformAnalytics />} />
           <Route path="onekhusa" element={<PlatformOneKhusaMerchants />} />
+          <Route path="support" element={<PlatformSupportPage />} />
           <Route path="settings" element={<PlatformSettingsPage />} />
         </Route>
 

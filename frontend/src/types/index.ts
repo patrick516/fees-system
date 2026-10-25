@@ -7,6 +7,9 @@ export type Resource =
   | "sms"
   | "results"
   | "staff"
+  | "employees"
+  | "payroll"
+  | "support"
   | "settings"
   | "audit";
 
@@ -212,7 +215,6 @@ export interface NotificationDefaults {
   defaultChannel: NotificationChannel;
 }
 
-//  AUDIT
 export interface AuditLog {
   id: string;
   schoolId?: string | null;
@@ -229,4 +231,122 @@ export interface AuditLog {
   ipAddress?: string | null;
   userAgent?: string | null;
   createdAt: string;
+}
+
+// ==================== EMPLOYEES ====================
+
+export type EmployeeStatus = "ACTIVE" | "ON_LEAVE" | "TERMINATED";
+
+export interface Employee {
+  id: string;
+  firstName: string;
+  lastName: string;
+  fullName: string;
+  title?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  nationalId?: string | null;
+  dateOfBirth?: string | null;
+  hireDate?: string | null;
+  photo?: string | null;
+  departmentId?: string | null;
+  department?: { id: string; name: string } | null;
+
+  basicSalary: number;
+  housingAllowance: number;
+  transportAllowance: number;
+  otherAllowances: number;
+
+  payeTax: number;
+  pensionDeduction: number;
+  otherDeductions: number;
+
+  status: EmployeeStatus;
+  terminationDate?: string | null;
+  notes?: string | null;
+
+  _count?: { payrollRecords: number };
+  payrollRecords?: PayrollRecord[];
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==================== PAYROLL ====================
+
+export type PayrollStatus = "PENDING" | "PAID";
+
+export interface PayrollRecord {
+  id: string;
+  employeeId: string;
+  month: string;
+  year: number;
+
+  basicSalary: number;
+  housingAllowance: number;
+  transportAllowance: number;
+  otherAllowances: number;
+
+  payeTax: number;
+  pensionDeduction: number;
+  otherDeductions: number;
+
+  bonus: number;
+  bonusReason?: string | null;
+  extraDeduction: number;
+  extraDeductionReason?: string | null;
+
+  grossSalary: number;
+  totalDeductions: number;
+  netSalary: number;
+
+  status: PayrollStatus;
+  paidAt?: string | null;
+  notes?: string | null;
+
+  employee?: {
+    id: string;
+    fullName: string;
+    title?: string | null;
+    department?: { name: string } | null;
+  };
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ==================== SUPPORT ====================
+
+export type SupportTicketType = "SCHOOL_SUPPORT" | "PLATFORM_SUPPORT";
+export type SupportTicketStatus = "OPEN" | "RESOLVED" | "CLOSED";
+export type SupportSenderType = "CREATOR" | "RESPONDER";
+
+export interface SupportMessage {
+  id: string;
+  ticketId: string;
+  senderType: SupportSenderType;
+  senderName: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
+}
+
+export interface SupportTicket {
+  id: string;
+  schoolId: string;
+  school?: { id: string; name: string };
+  ticketType: SupportTicketType;
+  creatorType: "PARENT" | "STAFF";
+  creatorId: string;
+  creatorName: string;
+  creatorEmail?: string | null;
+  creatorPhone?: string | null;
+  subject: string;
+  status: SupportTicketStatus;
+  lastReplyAt?: string | null;
+  lastReplyBy?: SupportSenderType | null;
+  messages?: SupportMessage[];
+  _count?: { messages: number };
+  createdAt: string;
+  updatedAt: string;
 }

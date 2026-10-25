@@ -6,7 +6,12 @@ import NotificationBell from "../../components/Platform/NotificationBell";
 
 const NAV = [
   { to: "/platform/dashboard", label: "Dashboard" },
-  { to: "/platform/requests", label: "School Requests", showBadge: true },
+  {
+    to: "/platform/requests",
+    label: "School Requests",
+    showBadge: "requests" as const,
+  },
+  { to: "/platform/support", label: "Support", showBadge: "support" as const },
   { to: "/platform/subscriptions", label: "Subscriptions" },
   { to: "/platform/analytics", label: "Revenue & Analytics" },
   { to: "/platform/onekhusa", label: "OneKhusa Merchants" },
@@ -17,22 +22,27 @@ export default function PlatformLayout() {
   const { admin, logout } = usePlatformAuthStore();
   const location = useLocation();
   const navigate = useNavigate();
-  const [pendingRequests, setPendingRequests] = useState(0);
 
-  const fetchPending = async () => {
-    try {
-      const res = await platformApi.get(
-        "/platform/schools/requests/pending-count",
-      );
-      setPendingRequests(res.data.data?.count || 0);
-    } catch {
-      // ignore
-    }
-  };
+  // 🎯 Badge Counts
+  const [pendingRequests, setPendingRequests] = useState(0);
+  const [supportTickets, setSupportTickets] = useState(0);
 
   useEffect(() => {
-    fetchPending();
-    const t = setInterval(fetchPending, 30_000);
+    const load = async () => {
+      try {
+        const [reqRes, supRes] = await Promise.all([
+          platformApi.get("/platform/schools/requests/pending-count"),
+          platformApi.get("/platform/support/unread-count"),
+        ]);
+        setPendingRequests(reqRes.data.data?.count || 0);
+        setSupportTickets(supRes.data.data?.count || 0);
+      } catch {
+        // ignore polling errors
+      }
+    };
+
+    load();
+    const t = setInterval(load, 30_000);
     return () => clearInterval(t);
   }, []);
 
@@ -64,6 +74,15 @@ export default function PlatformLayout() {
         <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
           {NAV.map((item) => {
             const active = location.pathname.startsWith(item.to);
+
+            // 🎯 Calculate the badge for this specific item
+            const badgeCount =
+              item.showBadge === "requests"
+                ? pendingRequests
+                : item.showBadge === "support"
+                  ? supportTickets
+                  : 0;
+
             return (
               <Link
                 key={item.to}
@@ -75,9 +94,10 @@ export default function PlatformLayout() {
                 }`}
               >
                 <span>{item.label}</span>
-                {item.showBadge && pendingRequests > 0 && (
+
+                {badgeCount > 0 && (
                   <span className="min-w-[20px] h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                    {pendingRequests > 99 ? "99+" : pendingRequests}
+                    {badgeCount > 99 ? "99+" : badgeCount}
                   </span>
                 )}
               </Link>
