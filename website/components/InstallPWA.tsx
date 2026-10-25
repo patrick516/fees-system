@@ -8,14 +8,19 @@ export default function InstallPWA() {
   const [showPrompt, setShowPrompt] = useState(false);
 
   useEffect(() => {
-    // 1. Check if the app is ALREADY installed (standalone mode)
+    // 1. Register the Service Worker manually (production only)
+    if ("serviceWorker" in navigator && process.env.NODE_ENV === "production") {
+      navigator.serviceWorker.register("/sw.js").catch((err) => {
+        console.error("Service Worker registration failed:", err);
+      });
+    }
+
+    // 2. Check if already installed or dismissed
     const isStandalone =
       window.matchMedia("(display-mode: standalone)").matches ||
       (navigator as any).standalone;
-    if (isStandalone) return;
-
-    // 2. Check if the user has already installed it previously
-    if (localStorage.getItem("pwa-installed") === "true") return;
+    if (isStandalone || localStorage.getItem("pwa-installed") === "true")
+      return;
 
     // 3. Listen for the Chromium install prompt
     const handler = (e: any) => {
@@ -41,10 +46,8 @@ export default function InstallPWA() {
 
   const handleInstallClick = async () => {
     if (!deferredPrompt) return;
-
     deferredPrompt.prompt();
     const { outcome } = await deferredPrompt.userChoice;
-
     if (outcome === "accepted") {
       setShowPrompt(false);
       localStorage.setItem("pwa-installed", "true");
@@ -54,7 +57,6 @@ export default function InstallPWA() {
 
   const handleDismiss = () => {
     setShowPrompt(false);
-    // Hide for the current session, but allow it to show again next time they visit
     sessionStorage.setItem("pwa-dismissed", "true");
   };
 
