@@ -738,7 +738,7 @@ const parentLoginWithStudentId = async (req, res) => {
       });
     }
 
-    const student = await prisma.student.findUnique({
+    const student = await prisma.student.findFirst({
       where: { studentCode: studentCode.toUpperCase().trim() },
       include: {
         school: {

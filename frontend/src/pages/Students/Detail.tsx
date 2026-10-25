@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import api from "../../lib/axios";
 import { usePermission } from "../../hooks/usePermission";
+import { useAuthStore } from "../../store/authStore";
 import {
   Select,
   SelectContent,
@@ -56,6 +57,8 @@ const StudentDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { can } = usePermission();
+  const { staff } = useAuthStore();
+  const schoolLogo = staff?.school?.logo;
   const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
@@ -847,9 +850,16 @@ const StudentDetail = () => {
 
       {/* HIDDEN RECEIPT PRINT LAYOUT */}
       {receiptToPrint && (
-        <div className="print-receipt hidden">
+        <div className="print-receipt hidden print:block">
           <div className="max-w-3xl mx-auto p-8 bg-white">
-            <div className="text-center border-b-2 border-gray-300 pb-6 mb-6">
+            <div className="text-center border-b-2 border-gray-300 pb-6 mb-6 flex flex-col items-center">
+              {schoolLogo && (
+                <img
+                  src={schoolLogo}
+                  alt="School Logo"
+                  className="h-20 w-20 object-contain mb-3"
+                />
+              )}
               <h1 className="text-3xl font-bold text-gray-900 mb-1">
                 {student.school?.name || "SchoolPay"}
               </h1>

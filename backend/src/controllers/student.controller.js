@@ -798,11 +798,11 @@ const searchStudents = async (req, res) => {
   }
 };
 
-// ==================== GET STUDENT BY CODE ====================
+//  GET STUDENT BY CODE
 const getStudentByCode = async (req, res) => {
   try {
     const { code } = req.params;
-    const student = await prisma.student.findUnique({
+    const student = await prisma.student.findFirst({
       where: { studentCode: code.toUpperCase() },
       select: {
         id: true,
