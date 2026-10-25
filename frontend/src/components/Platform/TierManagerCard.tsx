@@ -23,6 +23,7 @@ export interface Tier {
 interface TierManagerCardProps {
   tiers: Tier[];
   onChange: (tiers: Tier[]) => void;
+  onSaved?: () => void;
 }
 
 const DEFAULT_NEW_TIER: Tier = {
@@ -35,17 +36,16 @@ const DEFAULT_NEW_TIER: Tier = {
   popular: false,
 };
 
-// Convert "Small School" → "SMALL_SCHOOL" for a stable id
 const slugifyId = (name: string): string =>
   name
     .toUpperCase()
     .trim()
     .replace(/[^A-Z0-9]+/g, "_")
     .replace(/^_|_$/g, "");
-
 export default function TierManagerCard({
   tiers,
   onChange,
+  onSaved,
 }: TierManagerCardProps) {
   const [localTiers, setLocalTiers] = useState<Tier[]>(tiers);
   const [saving, setSaving] = useState(false);
@@ -54,20 +54,12 @@ export default function TierManagerCard({
     text: string;
   } | null>(null);
 
-  // Keep local in sync if parent updates externally
-  if (JSON.stringify(localTiers) !== JSON.stringify(tiers)) {
-    // no-op; we manage locally until save
-  }
-
   const updateTier = (index: number, field: keyof Tier, value: any) => {
     const next = [...localTiers];
     next[index] = { ...next[index], [field]: value };
-
-    // Auto-generate id from name (only if id is empty)
     if (field === "name" && !next[index].id) {
       next[index].id = slugifyId(value);
     }
-
     setLocalTiers(next);
   };
 
@@ -117,12 +109,14 @@ export default function TierManagerCard({
   };
 
   const setPopular = (index: number) => {
-    // Only one tier can be popular
-    const next = localTiers.map((t, i) => ({
-      ...t,
-      popular: i === index,
-    }));
+    if (localTiers[index].popular) return; // Already popular
+    const next = localTiers.map((t, i) => ({ ...t, popular: i === index }));
     setLocalTiers(next);
+    setMessage({
+      type: "success",
+      text: `"${localTiers[index].name}" is now the popular tier. Scroll down and click Save Tiers to apply.`,
+    });
+    setTimeout(() => setMessage(null), 5000);
   };
 
   const validate = (): string | null => {
@@ -150,12 +144,10 @@ export default function TierManagerCard({
 
     setSaving(true);
     try {
-      // Clean up features (remove empty strings)
       const cleanedTiers = localTiers.map((t) => ({
         ...t,
         features: t.features.filter((f) => f.trim()),
       }));
-
       await platformApi.put("/platform/settings", { tiers: cleanedTiers });
       onChange(cleanedTiers);
       setMessage({
@@ -163,6 +155,7 @@ export default function TierManagerCard({
         text: "Tiers saved. Marketing site will update within 1 minute.",
       });
       setTimeout(() => setMessage(null), 5000);
+      onSaved?.();
     } catch (err: any) {
       setMessage({
         type: "error",
@@ -184,6 +177,7 @@ export default function TierManagerCard({
           </p>
         </div>
         <button
+          type="button"
           onClick={addTier}
           className="flex items-center gap-1.5 text-xs font-semibold bg-blue-50 hover:bg-blue-100 text-blue-700 px-3 py-2 rounded-lg transition-colors"
         >
@@ -223,7 +217,6 @@ export default function TierManagerCard({
                   : "border-slate-200"
               }`}
             >
-              {/* Row header */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-mono bg-slate-100 px-2 py-0.5 rounded text-slate-600">
@@ -237,9 +230,14 @@ export default function TierManagerCard({
                 </div>
                 <div className="flex items-center gap-1">
                   <button
+                    type="button"
                     onClick={() => setPopular(i)}
                     disabled={tier.popular}
-                    title="Mark as popular"
+                    title={
+                      tier.popular
+                        ? "This is the popular tier"
+                        : "Set as the most popular tier"
+                    }
                     className={`p-1.5 rounded transition-colors ${
                       tier.popular
                         ? "bg-blue-100 text-blue-600 cursor-not-allowed"
@@ -252,6 +250,7 @@ export default function TierManagerCard({
                     />
                   </button>
                   <button
+                    type="button"
                     onClick={() => removeTier(i)}
                     className="p-1.5 rounded text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"
                     title="Remove tier"
@@ -261,7 +260,6 @@ export default function TierManagerCard({
                 </div>
               </div>
 
-              {/* Inputs */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 <div>
                   <label className="block text-[11px] font-medium text-slate-600 mb-1">
@@ -314,13 +312,13 @@ export default function TierManagerCard({
                 />
               </div>
 
-              {/* Features */}
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-[11px] font-medium text-slate-600">
                     Features (checkmarks on the pricing card)
                   </label>
                   <button
+                    type="button"
                     onClick={() => addFeature(i)}
                     className="text-[11px] font-semibold text-blue-600 hover:text-blue-800"
                   >
@@ -342,6 +340,7 @@ export default function TierManagerCard({
                         className="flex-1 px-3 py-1.5 border border-slate-200 rounded-lg text-xs focus:ring-2 focus:ring-blue-500 outline-none"
                       />
                       <button
+                        type="button"
                         onClick={() => removeFeature(i, fi)}
                         className="p-1 text-slate-400 hover:text-red-600 transition-colors"
                       >
@@ -358,6 +357,7 @@ export default function TierManagerCard({
 
       <div className="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-end">
         <button
+          type="button"
           onClick={save}
           disabled={saving}
           className="flex items-center gap-2 bg-blue-700 hover:bg-blue-800 disabled:opacity-50 text-white text-sm font-semibold px-5 py-2.5 rounded-lg transition-colors"

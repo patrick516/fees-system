@@ -252,8 +252,12 @@ export default function PlatformSettingsPage() {
             </div>
           </div>
 
-          {/* 🎯 Subscription Tiers (Dynamic) */}
-          <TierManagerCard tiers={tiers} onChange={setTiers} />
+          {/*  Subscription Tiers (Dynamic) */}
+          <TierManagerCard
+            tiers={tiers}
+            onChange={setTiers}
+            onSaved={() => setMode("view")}
+          />
 
           {/* Subscription Revenue Account */}
           <div className="bg-white border border-slate-200 rounded-xl p-6">

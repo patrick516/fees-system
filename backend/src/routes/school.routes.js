@@ -12,9 +12,40 @@ const schoolController = require("../controllers/school.controller");
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-//  CLASSES
+// ==================== PUBLIC ROUTES (No Auth) ====================
+// These MUST be at the top so they aren't shadowed by /:id
+router.get("/tiers", schoolController.getPublicTiers);
+router.get("/public", schoolController.getPublicSchool);
+router.get("/public/:schoolId", schoolController.getPublicInfo);
+router.get("/lookup-by-email", schoolController.lookupByEmail);
+router.get("/by-slug/:slug", schoolController.getBySlug);
+router.get("/payment-info/:schoolId", async (req, res) => {
+  try {
+    const school = await prisma.school.findUnique({
+      where: { id: req.params.schoolId },
+      select: {
+        name: true,
+        phone: true,
+        bankAccounts: true,
+        airtelMoneyNumber: true,
+        mpambaNumber: true,
+        paymentInstructions: true,
+      },
+    });
+    if (!school)
+      return res
+        .status(404)
+        .json({ success: false, message: "School not found" });
+    res.json({ success: true, data: school });
+  } catch (err) {
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to get payment info" });
+  }
+});
 
-// GET /api/schools/classes
+// ==================== PROTECTED ROUTES ====================
+
 router.get(
   "/classes",
   verifyStaff,
@@ -39,7 +70,6 @@ router.get(
       });
       res.json({ success: true, data: classes });
     } catch (err) {
-      console.error(err);
       res
         .status(500)
         .json({ success: false, message: "Failed to get classes" });
@@ -47,7 +77,6 @@ router.get(
   },
 );
 
-// POST /api/schools/classes
 router.post(
   "/classes",
   verifyStaff,
@@ -56,10 +85,9 @@ router.post(
     try {
       const { name, level } = req.body;
       if (!name || !level) {
-        return res.status(400).json({
-          success: false,
-          message: "Name and level are required",
-        });
+        return res
+          .status(400)
+          .json({ success: false, message: "Name and level are required" });
       }
       const cls = await prisma.class.create({
         data: { schoolId: req.schoolId, name, level: parseInt(level) },
@@ -67,10 +95,9 @@ router.post(
       res.status(201).json({ success: true, data: cls });
     } catch (err) {
       if (err.code === "P2002") {
-        return res.status(409).json({
-          success: false,
-          message: "Class already exists",
-        });
+        return res
+          .status(409)
+          .json({ success: false, message: "Class already exists" });
       }
       res
         .status(500)
@@ -79,7 +106,6 @@ router.post(
   },
 );
 
-// DELETE /api/schools/classes/:id (soft delete)
 router.delete(
   "/classes/:id",
   verifyStaff,
@@ -90,11 +116,10 @@ router.delete(
         where: { id: req.params.id, schoolId: req.schoolId },
         include: { _count: { select: { students: true } } },
       });
-      if (!cls) {
+      if (!cls)
         return res
           .status(404)
           .json({ success: false, message: "Class not found" });
-      }
       if (cls._count.students > 0) {
         return res.status(400).json({
           success: false,
@@ -114,9 +139,6 @@ router.delete(
   },
 );
 
-// ==================== FEE STRUCTURES ====================
-
-// GET /api/schools/fee-structures
 router.get(
   "/fee-structures",
   verifyStaff,
@@ -124,7 +146,6 @@ router.get(
   async (req, res) => {
     try {
       const { classId, term, academicYear } = req.query;
-
       const where = { schoolId: req.schoolId, isActive: true };
       if (classId) where.classId = classId;
       if (term) where.term = term;
@@ -132,15 +153,11 @@ router.get(
 
       const feeStructures = await prisma.feeStructure.findMany({
         where,
-        include: {
-          class: { select: { id: true, name: true, level: true } },
-        },
+        include: { class: { select: { id: true, name: true, level: true } } },
         orderBy: [{ class: { level: "asc" } }, { term: "asc" }],
       });
-
       res.json({ success: true, data: feeStructures });
     } catch (err) {
-      console.error(err);
       res
         .status(500)
         .json({ success: false, message: "Failed to get fee structures" });
@@ -148,7 +165,6 @@ router.get(
   },
 );
 
-// GET /api/schools/fee-structures/lookup
 router.get(
   "/fee-structures/lookup",
   verifyStaff,
@@ -156,14 +172,12 @@ router.get(
   async (req, res) => {
     try {
       const { classId, term, academicYear } = req.query;
-
       if (!classId || !term || !academicYear) {
         return res.status(400).json({
           success: false,
           message: "classId, term and academicYear are required",
         });
       }
-
       const feeStructure = await prisma.feeStructure.findFirst({
         where: {
           schoolId: req.schoolId,
@@ -172,11 +186,8 @@ router.get(
           academicYear,
           isActive: true,
         },
-        include: {
-          class: { select: { name: true } },
-        },
+        include: { class: { select: { name: true } } },
       });
-
       if (!feeStructure) {
         return res.status(404).json({
           success: false,
@@ -184,10 +195,8 @@ router.get(
             "No fee structure set for this class and term. Please set fees first.",
         });
       }
-
       res.json({ success: true, data: feeStructure });
     } catch (err) {
-      console.error(err);
       res
         .status(500)
         .json({ success: false, message: "Failed to lookup fee structure" });
@@ -195,7 +204,6 @@ router.get(
   },
 );
 
-// POST /api/schools/fee-structures
 router.post(
   "/fee-structures",
   verifyStaff,
@@ -226,12 +234,10 @@ router.post(
       const cls = await prisma.class.findFirst({
         where: { id: classId, schoolId: req.schoolId },
       });
-      if (!cls) {
-        return res.status(404).json({
-          success: false,
-          message: "Class not found",
-        });
-      }
+      if (!cls)
+        return res
+          .status(404)
+          .json({ success: false, message: "Class not found" });
 
       const feeStructure = await prisma.feeStructure.upsert({
         where: {
@@ -267,9 +273,7 @@ router.post(
           otherFees: otherFees ? parseFloat(otherFees) : null,
           otherFeesDescription: otherFeesDescription || null,
         },
-        include: {
-          class: { select: { name: true } },
-        },
+        include: { class: { select: { name: true } } },
       });
 
       await prisma.auditLog.create({
@@ -289,7 +293,6 @@ router.post(
         data: feeStructure,
       });
     } catch (err) {
-      console.error(err);
       res
         .status(500)
         .json({ success: false, message: "Failed to set fee structure" });
@@ -297,7 +300,6 @@ router.post(
   },
 );
 
-// PUT /api/schools/fee-structures/:id
 router.put(
   "/fee-structures/:id",
   verifyStaff,
@@ -307,11 +309,10 @@ router.put(
       const existing = await prisma.feeStructure.findFirst({
         where: { id: req.params.id, schoolId: req.schoolId },
       });
-      if (!existing) {
+      if (!existing)
         return res
           .status(404)
           .json({ success: false, message: "Fee structure not found" });
-      }
 
       const updated = await prisma.feeStructure.update({
         where: { id: req.params.id },
@@ -342,7 +343,6 @@ router.put(
         },
         include: { class: { select: { name: true } } },
       });
-
       res.json({
         success: true,
         message: "Fee structure updated",
@@ -356,7 +356,6 @@ router.put(
   },
 );
 
-// DELETE /api/schools/fee-structures/:id
 router.delete(
   "/fee-structures/:id",
   verifyStaff,
@@ -366,11 +365,10 @@ router.delete(
       const existing = await prisma.feeStructure.findFirst({
         where: { id: req.params.id, schoolId: req.schoolId },
       });
-      if (!existing) {
+      if (!existing)
         return res
           .status(404)
           .json({ success: false, message: "Fee structure not found" });
-      }
       await prisma.feeStructure.update({
         where: { id: req.params.id },
         data: { isActive: false },
@@ -384,9 +382,6 @@ router.delete(
   },
 );
 
-// ==================== ACTIVE TERM ====================
-
-// GET /api/schools/active-term
 router.get("/active-term", verifyStaffOrParent, async (req, res) => {
   try {
     const school = await prisma.school.findUnique({
@@ -398,14 +393,12 @@ router.get("/active-term", verifyStaffOrParent, async (req, res) => {
         activeTermEndDate: true,
       },
     });
-
     if (!school.activeTerm) {
       return res.status(404).json({
         success: false,
         message: "No active term set. Please activate a term first.",
       });
     }
-
     res.json({
       success: true,
       data: {
@@ -422,7 +415,6 @@ router.get("/active-term", verifyStaffOrParent, async (req, res) => {
   }
 });
 
-// GET /api/schools/term-history
 router.get("/term-history", verifyStaff, async (req, res) => {
   try {
     const activations = await prisma.termActivation.findMany({
@@ -430,18 +422,12 @@ router.get("/term-history", verifyStaff, async (req, res) => {
       orderBy: [{ academicYear: "desc" }, { term: "desc" }],
     });
 
-    if (activations.length === 0) {
-      return res.json({ success: true, data: [] });
-    }
+    if (activations.length === 0) return res.json({ success: true, data: [] });
 
     const students = await prisma.student.findMany({
       where: { schoolId: req.schoolId, isActive: true },
       include: {
-        class: {
-          include: {
-            feeStructures: { where: { isActive: true } },
-          },
-        },
+        class: { include: { feeStructures: { where: { isActive: true } } } },
       },
     });
 
@@ -471,11 +457,9 @@ router.get("/term-history", verifyStaff, async (req, res) => {
             (fs) => fs.term === a.term && fs.academicYear === a.academicYear,
           )?.totalAmount || 0;
         if (fee === 0) continue;
-
         const paid = paidMap.get(`${s.id}|${a.term}|${a.academicYear}`) || 0;
         totalRequired += fee;
         totalCollected += Math.min(paid, fee);
-
         if (paid >= fee) paidFull++;
         else debtors++;
       }
@@ -497,14 +481,12 @@ router.get("/term-history", verifyStaff, async (req, res) => {
 
     res.json({ success: true, data: history });
   } catch (err) {
-    console.error("Get term history error:", err);
     res
       .status(500)
       .json({ success: false, message: "Failed to get term history" });
   }
 });
 
-// POST /api/schools/activate-term
 router.post(
   "/activate-term",
   verifyStaff,
@@ -512,7 +494,6 @@ router.post(
   async (req, res) => {
     try {
       const { term, academicYear, startDate, endDate } = req.body;
-
       if (!term || !academicYear) {
         return res.status(400).json({
           success: false,
@@ -524,7 +505,6 @@ router.post(
       let parsedEnd = null;
       if (startDate) parsedStart = new Date(startDate);
       if (endDate) parsedEnd = new Date(endDate);
-
       if (parsedStart && parsedEnd && parsedEnd < parsedStart) {
         return res.status(400).json({
           success: false,
@@ -546,7 +526,6 @@ router.post(
         const isSameTerm =
           currentSchool.activeTerm === term &&
           currentSchool.activeAcademicYear === academicYear;
-
         if (!isSameTerm) {
           await prisma.termActivation.upsert({
             where: {
@@ -573,14 +552,8 @@ router.post(
       }
 
       const feeStructuresExist = await prisma.feeStructure.count({
-        where: {
-          schoolId: req.schoolId,
-          term,
-          academicYear,
-          isActive: true,
-        },
+        where: { schoolId: req.schoolId, term, academicYear, isActive: true },
       });
-
       if (feeStructuresExist === 0) {
         return res.status(400).json({
           success: false,
@@ -599,7 +572,6 @@ router.post(
       });
 
       let creditsApplied = 0;
-
       for (const student of studentsWithCredit) {
         const feeStructure = await prisma.feeStructure.findFirst({
           where: {
@@ -610,18 +582,15 @@ router.post(
             isActive: true,
           },
         });
-
         if (!feeStructure || student.creditBalance <= 0) continue;
 
         const creditToApply = Math.min(
           student.creditBalance,
           feeStructure.totalAmount,
         );
-
         const paymentCount = await prisma.feePayment.count({
           where: { schoolId: req.schoolId },
         });
-
         const { generateReceiptNumber } = require("../lib/utils");
         const receiptNumber = generateReceiptNumber(
           academicYear,
@@ -652,7 +621,6 @@ router.post(
           where: { id: student.id },
           data: { creditBalance: student.creditBalance - creditToApply },
         });
-
         creditsApplied++;
       }
 
@@ -707,15 +675,12 @@ router.post(
         data: { term, academicYear, creditsApplied },
       });
     } catch (err) {
-      console.error(err);
       res
         .status(500)
         .json({ success: false, message: "Failed to activate term" });
     }
   },
 );
-
-// ==================== STUDENT TERM STATUS ====================
 
 router.get(
   "/student-term-status/:studentId",
@@ -724,23 +689,21 @@ router.get(
     try {
       const { studentId } = req.params;
       const { term, academicYear } = req.query;
-
       if (!term || !academicYear) {
         return res.status(400).json({
           success: false,
           message: "term and academicYear are required",
         });
       }
+
       const student = await prisma.student.findFirst({
         where: { id: studentId, schoolId: req.schoolId },
         include: { class: true },
       });
-
-      if (!student) {
+      if (!student)
         return res
           .status(404)
           .json({ success: false, message: "Student not found" });
-      }
 
       const feeStructure = await prisma.feeStructure.findFirst({
         where: {
@@ -751,14 +714,8 @@ router.get(
           isActive: true,
         },
       });
-
       const paymentsThisTerm = await prisma.feePayment.aggregate({
-        where: {
-          studentId,
-          term,
-          academicYear,
-          status: "VERIFIED",
-        },
+        where: { studentId, term, academicYear, status: "VERIFIED" },
         _sum: { amount: true },
       });
 
@@ -769,7 +726,6 @@ router.get(
           ? Math.max(0, requiredAmount - totalPaidThisTerm)
           : null;
       const isFullyPaid = balanceRemaining === 0;
-      const creditBalance = student.creditBalance;
 
       res.json({
         success: true,
@@ -779,7 +735,7 @@ router.get(
             fullName: student.fullName,
             studentCode: student.studentCode,
             className: student.class.name,
-            creditBalance,
+            creditBalance: student.creditBalance,
           },
           feeStructure: feeStructure
             ? {
@@ -794,21 +750,18 @@ router.get(
             totalPaidThisTerm,
             balanceRemaining,
             isFullyPaid,
-            creditBalance,
+            creditBalance: student.creditBalance,
             hasFeeStructure: !!feeStructure,
           },
         },
       });
     } catch (err) {
-      console.error(err);
       res
         .status(500)
         .json({ success: false, message: "Failed to get student term status" });
     }
   },
 );
-
-// ==================== PAYMENT DETAILS ====================
 
 router.put(
   "/payment-details",
@@ -822,14 +775,11 @@ router.put(
         mpambaNumber,
         paymentInstructions,
       } = req.body;
-
       if (bankAccounts && !Array.isArray(bankAccounts)) {
-        return res.status(400).json({
-          success: false,
-          message: "bankAccounts must be an array",
-        });
+        return res
+          .status(400)
+          .json({ success: false, message: "bankAccounts must be an array" });
       }
-
       const updated = await prisma.school.update({
         where: { id: req.schoolId },
         data: {
@@ -839,7 +789,6 @@ router.put(
           paymentInstructions: paymentInstructions || null,
         },
       });
-
       await prisma.auditLog.create({
         data: {
           schoolId: req.schoolId,
@@ -850,67 +799,25 @@ router.put(
           changes: { bankAccounts, airtelMoneyNumber, mpambaNumber },
         },
       });
-
       res.json({
         success: true,
         message: "Payment details updated successfully",
         data: updated,
       });
     } catch (err) {
-      console.error(err);
-      res.status(500).json({
-        success: false,
-        message: "Failed to update payment details",
-      });
+      res
+        .status(500)
+        .json({ success: false, message: "Failed to update payment details" });
     }
   },
 );
-
-// GET /api/schools/payment-info/:schoolId — public
-router.get("/payment-info/:schoolId", async (req, res) => {
-  try {
-    const school = await prisma.school.findUnique({
-      where: { id: req.params.schoolId },
-      select: {
-        name: true,
-        phone: true,
-        bankAccounts: true,
-        airtelMoneyNumber: true,
-        mpambaNumber: true,
-        paymentInstructions: true,
-      },
-    });
-
-    if (!school) {
-      return res.status(404).json({
-        success: false,
-        message: "School not found",
-      });
-    }
-
-    res.json({ success: true, data: school });
-  } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: "Failed to get payment info",
-    });
-  }
-});
-
-// ==================== SCHOOL INFO ====================
 
 router.get("/me", verifyStaff, async (req, res) => {
   try {
     const school = await prisma.school.findUnique({
       where: { id: req.schoolId },
       include: {
-        _count: {
-          select: {
-            students: true,
-            staff: true,
-            classes: true,
-          },
-        },
+        _count: { select: { students: true, staff: true, classes: true } },
       },
     });
     res.json({ success: true, data: school });
@@ -920,8 +827,6 @@ router.get("/me", verifyStaff, async (req, res) => {
       .json({ success: false, message: "Failed to get school info" });
   }
 });
-
-// ==================== SETTINGS ====================
 
 router.get("/settings", verifyStaff, schoolController.getSettings);
 router.put(
@@ -943,16 +848,12 @@ router.put(
   requirePermission("settings", "write"),
   schoolController.updateNotificationDefaults,
 );
-
-// OneKhusa status (read-only)
 router.get(
   "/settings/onekhusa-status",
   verifyStaff,
   requirePermission("settings", "read"),
   schoolController.getOneKhusaStatus,
 );
-
-// Settlement account
 router.get(
   "/settings/settlement-account",
   verifyStaff,
@@ -971,11 +872,6 @@ router.post(
   requirePermission("settings", "write"),
   schoolController.initiateSubscriptionPayment,
 );
-router.get("/tiers", schoolController.getPublicTiers);
-router.get("/public", schoolController.getPublicSchool);
-router.get("/public/:schoolId", schoolController.getPublicInfo);
-router.get("/lookup-by-email", schoolController.lookupByEmail);
-router.get("/by-slug/:slug", schoolController.getBySlug);
 router.get("/tier-status", verifyStaff, schoolController.getTierStatus);
 router.get(
   "/subscription/status/:paymentId",

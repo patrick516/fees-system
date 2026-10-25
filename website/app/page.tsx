@@ -160,17 +160,18 @@ export default function HomePage() {
 
       <StatsTicker />
 
-      {/* Free Pilot Banner */}
+      {/* 🎯 Free Pilot Banner - UPDATED COPY */}
       <section className="bg-[var(--color-primary-light)] border-b border-[var(--color-primary)]/20 py-10">
         <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
           <div>
             <h2 className="text-2xl font-bold text-[var(--color-primary-dark)] mb-2">
               Try SchoolPay free for one full term.
             </h2>
-            <p className="text-sm text-[var(--color-primary)] max-w-xl">
-              We'll set up your classes, fees, and students. Training is
-              included. At the end of the term, decide if you want to continue.
-              If not, we hand over your data.
+            <p className="text-sm text-[var(--color-primary)] max-w-2xl leading-relaxed">
+              Claim your school portal and take full control. Set up your
+              classes, fee structures, and student lists in minutes using our
+              guided onboarding wizard. Use the full system completely free for
+              one term. If it's not for you, export your data and walk away.
             </p>
           </div>
           <button
@@ -205,8 +206,8 @@ export default function HomePage() {
               },
               {
                 step: "2",
-                title: "Setup & Training",
-                desc: "We set up your classes, fees, and student list. We train your bursar.",
+                title: "Get Your Portal",
+                desc: "We invite your admin email to the platform. You log in and set up your own classes, fees, and students.",
                 icon: Settings,
               },
               {
@@ -243,7 +244,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* 🎯 Dynamic Pricing Section */}
+      {/*  Dynamic Pricing Section */}
       <PricingCard
         tiers={tiers}
         loading={loadingTiers}
@@ -253,11 +254,13 @@ export default function HomePage() {
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-10 text-center text-sm border-t border-gray-800">
         <div className="flex justify-center items-center gap-3 mb-3">
-          <img
-            src="/images/SchoolPayLogo.jpg"
-            alt="SchoolPay"
-            className="h-8 w-8 object-contain rounded-lg grayscale opacity-50"
-          />
+          <div className="h-10 w-10 rounded-lg bg-white p-1 flex items-center justify-center shadow-sm">
+            <img
+              src="/images/SchoolPayLogo.jpg"
+              alt="SchoolPay"
+              className="h-full w-full object-contain"
+            />
+          </div>
           <span className="text-white font-bold text-lg">SchoolPay</span>
         </div>
         <p>
