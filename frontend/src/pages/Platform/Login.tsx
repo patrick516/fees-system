@@ -1,11 +1,8 @@
-// frontend/src/pages/Platform/Login.tsx
-// Owner login page. On mount, checks /api/platform/setup-status:
-//   - setupComplete=false → shows "Create Owner" form (one-time)
-//   - setupComplete=true  → shows login form only (setup forever hidden)
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import platformApi from "../../lib/platformApi";
 import { usePlatformAuthStore } from "../../store/platformAuthStore";
+import { Eye, EyeOff } from "lucide-react";
 
 type Mode = "loading" | "setup" | "login";
 
@@ -16,6 +13,7 @@ export default function PlatformLogin() {
   const [mode, setMode] = useState<Mode>("loading");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Setup form
   const [setupFullName, setSetupFullName] = useState("");
@@ -193,25 +191,49 @@ export default function PlatformLogin() {
                 <label className="block text-xs font-medium text-slate-700 mb-1">
                   Password
                 </label>
-                <input
-                  required
-                  type="password"
-                  value={setupPassword}
-                  onChange={(e) => setSetupPassword(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                />
+                <div className="relative">
+                  <input
+                    required
+                    type={showPassword ? "text" : "password"}
+                    value={setupPassword}
+                    onChange={(e) => setSetupPassword(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
                   Confirm Password
                 </label>
-                <input
-                  required
-                  type="password"
-                  value={setupConfirm}
-                  onChange={(e) => setSetupConfirm(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                />
+                <div className="relative">
+                  <input
+                    required
+                    type={showPassword ? "text" : "password"}
+                    value={setupConfirm}
+                    onChange={(e) => setSetupConfirm(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <button
                 disabled={submitting}
@@ -242,13 +264,25 @@ export default function PlatformLogin() {
                 <label className="block text-xs font-medium text-slate-700 mb-1">
                   Password
                 </label>
-                <input
-                  required
-                  type="password"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-                />
+                <div className="relative">
+                  <input
+                    required
+                    type={showPassword ? "text" : "password"}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    aria-label={
+                      showPassword ? "Hide password" : "Show password"
+                    }
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
               </div>
               <button
                 disabled={submitting}

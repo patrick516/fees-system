@@ -195,7 +195,7 @@ export default function HomePage() {
               From demo to live in a few simple steps.
             </p>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
             {[
               {
                 step: "1",
@@ -224,7 +224,7 @@ export default function HomePage() {
             ].map((item, i) => (
               <div
                 key={i}
-                className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm relative"
+                className="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm relative"
               >
                 <div className="absolute -top-3 -left-3 w-8 h-8 bg-[var(--color-primary)] text-white rounded-full flex items-center justify-center font-bold text-sm border-4 border-white shadow-sm">
                   {item.step}
