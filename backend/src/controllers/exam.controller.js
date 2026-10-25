@@ -967,7 +967,7 @@ const getUploadSummary = async (req, res) => {
         },
       });
 
-      // 🎯 AUTO-ENFORCE: Form 1 & 2 = LETTER, Form 3 & 4 = POINTS
+      //  AUTO-ENFORCE: Form 1 & 2 = LETTER, Form 3 & 4 = POINTS
       const isLowerForm =
         cls.level <= 2 ||
         cls.name.toLowerCase().includes("form 1") ||

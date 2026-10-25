@@ -1,6 +1,4 @@
-// backend/src/controllers/role.controller.js
 const prisma = require("../config/db");
-
 const VALID_RESOURCES = [
   "dashboard",
   "students",
@@ -10,6 +8,9 @@ const VALID_RESOURCES = [
   "sms",
   "results",
   "staff",
+  "employees",
+  "payroll",
+  "support",
   "settings",
   "audit",
 ];
@@ -247,7 +248,7 @@ const updateRole = async (req, res) => {
   }
 };
 
-//  DELETE ROLE 
+//  DELETE ROLE
 // DELETE /api/roles/:id
 const deleteRole = async (req, res) => {
   try {

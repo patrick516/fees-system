@@ -16,6 +16,7 @@ import {
   History,
   Banknote,
   Phone,
+  MessageSquare, // 🎯 Added
 } from "lucide-react";
 import api from "../../lib/axios";
 import { useAuthStore } from "../../store/authStore";
@@ -345,12 +346,8 @@ export default function DashboardPage() {
                       </div>
                     )}
 
-                  {/* Action Buttons */}
-                  <div
-                    className={`grid gap-4 ${
-                      resultsAvailable ? "grid-cols-3" : "grid-cols-2"
-                    }`}
-                  >
+                  {/* 🎯 ACTION BUTTONS: Now includes Help & Support */}
+                  <div className="grid grid-cols-2 gap-4">
                     <button
                       onClick={() => router.push("/pay")}
                       className="bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white rounded-xl py-3.5 px-3 shadow-sm transition-all active:scale-[0.98]"
@@ -376,6 +373,14 @@ export default function DashboardPage() {
                         <p className="text-xs font-semibold">View Results</p>
                       </button>
                     )}
+
+                    <button
+                      onClick={() => router.push("/support")}
+                      className="bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-xl py-3.5 px-3 border border-blue-100 transition-all active:scale-[0.98]"
+                    >
+                      <MessageSquare size={18} className="mx-auto mb-1" />
+                      <p className="text-xs font-semibold">Help & Support</p>
+                    </button>
                   </div>
                 </div>
 
@@ -657,7 +662,7 @@ export default function DashboardPage() {
                 </div>
               )}
 
-            {/* ==================== RESULTS TAB ==================== */}
+            {/*  RESULTS TAB  */}
             {activeTab === "results" && student?.id && (
               <ResultsView studentId={student.id} />
             )}

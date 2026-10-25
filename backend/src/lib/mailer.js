@@ -259,11 +259,72 @@ const sendPasswordResetEmail = async ({
     htmlContent: html,
   });
 };
+//  SUPPORT REPLY (Platform Owner → School Admin)
+const sendSupportReplyEmail = async ({
+  to,
+  name,
+  schoolName,
+  subject,
+  replyPreview,
+}) => {
+  const loginUrl = `${process.env.CLIENT_URL || "https://fees-system-one.vercel.app"}/platform/login`;
+  const preview =
+    replyPreview.length > 200
+      ? `${replyPreview.slice(0, 200)}...`
+      : replyPreview;
 
+  const html = `
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #f8fafc;">
+      <div style="background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
+
+        ${LOGO_HEADER}
+
+        <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">SchoolPay Support replied</h2>
+        <p style="margin: 0 0 16px; color: #64748b; font-size: 14px; line-height: 1.5;">
+          Hi ${name || "there"}, SchoolPay Support has replied to your ticket for <strong>${schoolName}</strong>.
+        </p>
+
+        <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
+          <p style="margin: 0 0 4px; color: #475569; font-size: 11px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">
+            Subject
+          </p>
+          <p style="margin: 0 0 12px; color: #1e293b; font-size: 14px; font-weight: 600;">
+            ${subject}
+          </p>
+          <p style="margin: 0 0 4px; color: #475569; font-size: 11px; text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">
+            Reply preview
+          </p>
+          <p style="margin: 0; color: #475569; font-size: 13px; font-style: italic; line-height: 1.5;">
+            "${preview}"
+          </p>
+        </div>
+
+        <a href="${loginUrl}" style="display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;">
+          View Full Reply →
+        </a>
+
+        <p style="margin: 24px 0 0; color: #94a3b8; font-size: 11px; line-height: 1.5;">
+          Log in to your portal to read the full reply and respond.
+        </p>
+      </div>
+      <p style="text-align: center; color: #94a3b8; font-size: 11px; margin-top: 16px;">
+        ${SENDER_NAME} • Automated message, please do not reply
+      </p>
+    </div>
+  `;
+
+  return sendEmail({
+    to,
+    toName: name,
+    subject: `Reply from SchoolPay Support — ${subject}`,
+    htmlContent: html,
+  });
+};
 module.exports = {
   sendEmail,
   sendOtpEmail,
   sendInvitationEmail,
   sendPlatformSchoolInviteEmail,
   sendPasswordResetEmail,
+  sendSupportReplyEmail,
 };

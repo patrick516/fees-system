@@ -183,8 +183,13 @@ const platformSettingsRoutes = require("./src/routes/platformSettings.routes");
 const notificationRoutes = require("./src/routes/notification.routes");
 const platformOnekhusaRoutes = require("./src/routes/platformOnekhusa.routes");
 const schoolRequestRoutes = require("./src/routes/schoolRequest.routes");
+const employeeRoutes = require("./src/routes/employee.routes");
+const payrollRoutes = require("./src/routes/payroll.routes");
+const supportRoutes = require("./src/routes/support.routes");
+const parentSupportRoutes = require("./src/routes/parentSupport.routes");
+const platformSupportRoutes = require("./src/routes/platformSupport.routes");
 
-// ==================== MOUNT ROUTES ====================
+//  MOUNT ROUTES
 
 // Auth and platform routes are NOT affected by subscription locks
 app.use("/api/auth", authRoutes);
@@ -195,7 +200,6 @@ app.use("/api/platform/notifications", notificationRoutes);
 app.use("/api/platform/onekhusa", platformOnekhusaRoutes);
 app.use("/api/platform", platformAuthRoutes);
 app.use("/api/school-requests", schoolRequestRoutes);
-// Apply subscription guard to all school data routes
 app.use("/api/students", requireActiveSubscription, studentRoutes);
 app.use("/api/payments", requireActiveSubscription, paymentRoutes);
 app.use("/api/sms", requireActiveSubscription, smsRoutes);
@@ -205,6 +209,11 @@ app.use("/api/staff", requireActiveSubscription, staffRoutes);
 app.use("/api/departments", requireActiveSubscription, departmentRoutes);
 app.use("/api/roles", requireActiveSubscription, roleRoutes);
 app.use("/api/audit", requireActiveSubscription, auditRoutes);
+app.use("/api/employees", employeeRoutes);
+app.use("/api/payroll", payrollRoutes);
+app.use("/api/support", supportRoutes);
+app.use("/api/parent/support", parentSupportRoutes);
+app.use("/api/platform/support", platformSupportRoutes);
 
 // Schools routes need special handling: block everything EXCEPT the subscription pay route
 app.use(
