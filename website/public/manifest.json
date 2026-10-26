@@ -1,9 +1,13 @@
 {
+  "id": "/login",
   "name": "SchoolPay — Parent Portal",
   "short_name": "SchoolPay",
   "description": "View your child's school fee payment status",
   "start_url": "/login",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait",
+  "lang": "en",
   "background_color": "#ffffff",
   "theme_color": "#1e3a8a",
   "icons": [

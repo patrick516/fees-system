@@ -19,7 +19,9 @@ api.interceptors.response.use(
     const status = error.response?.status;
     const url = error.config?.url || "";
     const onLoginPage =
-      typeof window !== "undefined" && window.location.pathname === "/";
+      typeof window !== "undefined" &&
+      (window.location.pathname === "/" ||
+        window.location.pathname === "/login");
 
     // Only force-logout on 401 from auth endpoints (login/refresh).
     // Other 401s (e.g. a background poll on a route the parent can't reach)
