@@ -5,6 +5,7 @@ import { getCurrentAcademicYear } from "../lib/utils";
 interface ActiveTermResponse {
   activeTerm: string | null;
   activeAcademicYear: string | null;
+  activeTermEndDate: string | null;
 }
 
 /**
@@ -27,5 +28,6 @@ export function useActiveTerm() {
     loading,
     activeTerm: data?.activeTerm || null,
     academicYear: data?.activeAcademicYear || getCurrentAcademicYear(),
+    termEndDate: data?.activeTermEndDate || null,
   };
 }

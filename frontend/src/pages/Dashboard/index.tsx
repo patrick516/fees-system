@@ -67,72 +67,82 @@ const AcademicYearProgress = ({
     { id: "TERM_1", label: "Term 1" },
     { id: "TERM_2", label: "Term 2" },
     { id: "TERM_3", label: "Term 3" },
-    { id: "YEAR_END", label: "Year End" },
   ];
 
   const currentIndex = steps.findIndex((s) => s.id === currentTerm);
-  // Calculate how far the green line should stretch
   const progressWidth =
     currentIndex >= 0 ? (currentIndex / (steps.length - 1)) * 100 : 0;
 
   return (
-    <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 mb-6">
-      <div className="flex items-center justify-between mb-6">
-        <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
-          <CalendarDays size={16} className="text-[var(--color-primary)]" />
-          Academic Year Progress
-        </h2>
-        <span className="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-1 rounded-md">
+    <div className="bg-white rounded-xl py-3 px-5 shadow-sm border border-gray-100 mb-5">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        {/* Header */}
+        <div className="flex items-center justify-between md:justify-start gap-4 shrink-0">
+          <div className="flex items-center gap-2">
+            <CalendarDays size={16} className="text-[var(--color-primary)]" />
+            <h2 className="text-sm font-semibold text-gray-800">
+              Academic Year Progress
+            </h2>
+          </div>
+          {/* Mobile Badge */}
+          <span className="md:hidden text-[10px] font-medium text-gray-500 bg-gray-50 px-2 py-1 rounded-md">
+            {currentTerm ? currentTerm.replace("_", " ") : "No Active Term"}
+          </span>
+        </div>
+
+        {/* Tracker */}
+        <div className="relative flex justify-between items-center w-full max-w-sm mx-auto px-2 md:px-0">
+          {/* Background Line */}
+          <div className="absolute left-0 top-[10px] -translate-y-1/2 w-full h-1 bg-gray-100 -z-10 rounded-full" />
+
+          {/* Active Progress Line */}
+          <div
+            className="absolute left-0 top-[10px] -translate-y-1/2 h-1 bg-green-500 -z-10 rounded-full transition-all duration-500"
+            style={{ width: `${progressWidth}%` }}
+          />
+
+          {steps.map((step, index) => {
+            const isCompleted = index < currentIndex;
+            const isActive = index === currentIndex;
+
+            return (
+              <div
+                key={step.id}
+                className="flex flex-col items-center gap-1 bg-white px-2"
+              >
+                <div
+                  className={`w-5 h-5 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                    isCompleted
+                      ? "bg-green-500 border-green-500 text-white"
+                      : isActive
+                        ? "bg-[var(--color-primary)] border-[var(--color-primary)] text-white shadow-sm"
+                        : "bg-white border-gray-200 text-gray-400"
+                  }`}
+                >
+                  {isCompleted ? (
+                    <CheckCircle2 size={12} />
+                  ) : (
+                    <span className="text-[9px] font-bold">{index + 1}</span>
+                  )}
+                </div>
+                <span
+                  className={`text-[10px] font-medium ${
+                    isActive
+                      ? "text-[var(--color-primary)] font-bold"
+                      : "text-gray-500"
+                  }`}
+                >
+                  {step.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Desktop Badge */}
+        <span className="hidden md:block text-[10px] font-medium text-gray-500 bg-gray-50 px-2.5 py-1 rounded-md shrink-0 uppercase tracking-wide">
           {currentTerm ? currentTerm.replace("_", " ") : "No Active Term"}
         </span>
-      </div>
-
-      <div className="relative flex justify-between items-center w-full max-w-2xl mx-auto px-4">
-        {/* Background Line */}
-        <div className="absolute left-0 top-4 -translate-y-1/2 w-full h-1 bg-gray-100 -z-10 rounded-full" />
-
-        {/* Active Progress Line */}
-        <div
-          className="absolute left-0 top-4 -translate-y-1/2 h-1 bg-green-500 -z-10 rounded-full transition-all duration-500"
-          style={{ width: `${progressWidth}%` }}
-        />
-
-        {steps.map((step, index) => {
-          const isCompleted = index < currentIndex;
-          const isActive = index === currentIndex;
-
-          return (
-            <div
-              key={step.id}
-              className="flex flex-col items-center gap-2 bg-white px-2"
-            >
-              <div
-                className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
-                  isCompleted
-                    ? "bg-green-500 border-green-500 text-white"
-                    : isActive
-                      ? "bg-[var(--color-primary)] border-[var(--color-primary)] text-white shadow-md shadow-blue-200"
-                      : "bg-white border-gray-200 text-gray-400"
-                }`}
-              >
-                {isCompleted ? (
-                  <CheckCircle2 size={16} />
-                ) : (
-                  <span className="text-xs font-bold">{index + 1}</span>
-                )}
-              </div>
-              <span
-                className={`text-[11px] font-medium ${
-                  isActive
-                    ? "text-[var(--color-primary)] font-bold"
-                    : "text-gray-500"
-                }`}
-              >
-                {step.label}
-              </span>
-            </div>
-          );
-        })}
       </div>
     </div>
   );
@@ -222,7 +232,7 @@ const Dashboard = () => {
     );
   }
 
-  //  Onboarding Checklist Component
+  // ==================== ONBOARDING CHECKLIST ====================
   const renderOnboarding = () => {
     if (!onboarding || onboarding.isComplete) return null;
 
@@ -342,15 +352,15 @@ const Dashboard = () => {
 
   return (
     <div className="space-y-6">
-      {/*  Onboarding Wizard */}
+      {/* Onboarding Wizard */}
       {renderOnboarding()}
 
-      {/* 🎯 Academic Year Progress Widget (Only shows when onboarding is complete) */}
+      {/* Academic Year Progress Widget */}
       {onboarding?.isComplete && (
         <AcademicYearProgress currentTerm={currentTerm} />
       )}
 
-      {/* Non-blocking error banner — data is showing but stale */}
+      {/* Non-blocking error banner */}
       {error && summary && (
         <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-200 rounded-xl p-3">
           <AlertCircle size={15} className="text-amber-600 shrink-0" />
