@@ -105,7 +105,7 @@ export default function PlatformLogin() {
       <div className="min-h-screen relative flex items-center justify-center">
         <div
           className="absolute inset-0 bg-cover bg-center"
-          style={{ backgroundImage: "url('/images/background.png')" }}
+          style={{ backgroundImage: "url('/images/background.webp')" }}
         />
         <div className="absolute inset-0 bg-slate-900/60" />
         <div className="relative w-10 h-10 rounded-full border-2 border-white/30 border-t-white animate-spin" />
@@ -118,7 +118,7 @@ export default function PlatformLogin() {
       {/* Background image */}
       <div
         className="absolute inset-0 bg-cover bg-center"
-        style={{ backgroundImage: "url('/images/background.png')" }}
+        style={{ backgroundImage: "url('/images/background.webp')" }}
       />
       {/* Dark overlay for contrast */}
       <div className="absolute inset-0 bg-slate-900/60" />

@@ -28,7 +28,7 @@ const ForgotPassword = () => {
   };
 
   return (
-    <div className="fixed inset-0 w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat overflow-hidden">
+    <div className="fixed inset-0 w-full bg-[url('/images/background.webp')] bg-cover bg-center bg-no-repeat overflow-hidden">
       <div className="absolute inset-0 bg-black/40" />
 
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-4 py-4">

@@ -82,7 +82,7 @@ const ResetPassword = () => {
   // ==================== LOADING ====================
   if (checking) {
     return (
-      <div className="fixed inset-0 w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat overflow-hidden">
+      <div className="fixed inset-0 w-full bg-[url('/images/background.webp')] bg-cover bg-center bg-no-repeat overflow-hidden">
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative z-10 h-full flex items-center justify-center">
           <div className="w-10 h-10 rounded-full border-2 border-white/30 border-t-white animate-spin" />
@@ -94,7 +94,7 @@ const ResetPassword = () => {
   // ==================== INVALID TOKEN ====================
   if (!tokenValid) {
     return (
-      <div className="fixed inset-0 w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat overflow-hidden">
+      <div className="fixed inset-0 w-full bg-[url('/images/background.webp')] bg-cover bg-center bg-no-repeat overflow-hidden">
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative z-10 h-full flex flex-col items-center justify-center px-4">
           <div className="w-full max-w-md bg-white rounded-2xl p-8 text-center">
@@ -131,7 +131,7 @@ const ResetPassword = () => {
   // ==================== SUCCESS ====================
   if (success) {
     return (
-      <div className="fixed inset-0 w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat overflow-hidden">
+      <div className="fixed inset-0 w-full bg-[url('/images/background.webp')] bg-cover bg-center bg-no-repeat overflow-hidden">
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative z-10 h-full flex flex-col items-center justify-center px-4">
           <div className="w-full max-w-md bg-white rounded-2xl p-8 text-center">
@@ -150,7 +150,7 @@ const ResetPassword = () => {
 
   // ==================== VALID TOKEN → FORM ====================
   return (
-    <div className="fixed inset-0 w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat overflow-hidden">
+    <div className="fixed inset-0 w-full bg-[url('/images/background.webp')] bg-cover bg-center bg-no-repeat overflow-hidden">
       <div className="absolute inset-0 bg-black/40" />
 
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-4 py-4">

@@ -69,7 +69,7 @@ const VerifyEmail = () => {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat">
+    <div className="relative min-h-screen w-full bg-[url('/images/background.webp')] bg-cover bg-center bg-no-repeat">
       <div className="absolute inset-0 bg-black/40" />
 
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-10">

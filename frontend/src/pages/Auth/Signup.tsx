@@ -180,7 +180,7 @@ const Signup = () => {
   // ==================== SETUP CHECK: LOADING ====================
   if (checkingSetup) {
     return (
-      <div className="fixed inset-0 w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat overflow-hidden">
+      <div className="fixed inset-0 w-full bg-[url('/images/background.webp')] bg-cover bg-center bg-no-repeat overflow-hidden">
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative z-10 h-full flex flex-col items-center justify-center">
           <Loader2 size={28} className="animate-spin text-white" />
@@ -193,7 +193,7 @@ const Signup = () => {
   // ==================== SETUP CHECK: BLOCKED ====================
   if (setupComplete) {
     return (
-      <div className="fixed inset-0 w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat overflow-hidden">
+      <div className="fixed inset-0 w-full bg-[url('/images/background.webp')] bg-cover bg-center bg-no-repeat overflow-hidden">
         <div className="absolute inset-0 bg-black/40" />
         <div className="relative z-10 h-full flex flex-col items-center justify-center px-4">
           <div className="w-full max-w-md bg-white rounded-2xl p-8 text-center">
@@ -225,7 +225,7 @@ const Signup = () => {
   }
 
   return (
-    <div className="fixed inset-0 w-full bg-[url('/images/background.png')] bg-cover bg-center bg-no-repeat overflow-hidden">
+    <div className="fixed inset-0 w-full bg-[url('/images/background.webp')] bg-cover bg-center bg-no-repeat overflow-hidden">
       <div className="absolute inset-0 bg-black/40" />
 
       <div className="relative z-10 h-full flex flex-col items-center justify-center px-4 py-4">
