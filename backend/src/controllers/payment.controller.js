@@ -11,12 +11,10 @@ const recordManualPayment = async (req, res) => {
       req.body;
 
     if (!studentId || !amount || !term) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "studentId, amount and term are required",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "studentId, amount and term are required",
+      });
     }
 
     const student = await prisma.student.findFirst({
@@ -250,20 +248,16 @@ const submitPayment = async (req, res) => {
     } = req.body;
 
     if (!studentId || !amount || !paymentMethod || !term) {
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "studentId, amount, paymentMethod and term are required",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "studentId, amount, paymentMethod and term are required",
+      });
     }
     if (req.student.id !== studentId)
-      return res
-        .status(403)
-        .json({
-          success: false,
-          message: "You can only submit payments for your own child",
-        });
+      return res.status(403).json({
+        success: false,
+        message: "You can only submit payments for your own child",
+      });
 
     const year = academicYear || new Date().getFullYear().toString();
     const student = await prisma.student.findUnique({
@@ -307,22 +301,18 @@ const submitPayment = async (req, res) => {
         });
         receiptImageUrl = uploadResult.secure_url;
       } catch (uploadErr) {
-        return res
-          .status(500)
-          .json({
-            success: false,
-            message: "Failed to upload receipt. Please try again.",
-          });
+        return res.status(500).json({
+          success: false,
+          message: "Failed to upload receipt. Please try again.",
+        });
       }
     }
 
     if (!receiptImageUrl && paymentMethod !== "CASH")
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: "Please upload your payment receipt",
-        });
+      return res.status(400).json({
+        success: false,
+        message: "Please upload your payment receipt",
+      });
 
     const paymentCount = await prisma.feePayment.count({
       where: { schoolId: req.student.schoolId },
@@ -362,14 +352,12 @@ const submitPayment = async (req, res) => {
       },
     });
 
-    return res
-      .status(201)
-      .json({
-        success: true,
-        message:
-          "Payment submitted successfully. The school will verify it shortly.",
-        data: payment,
-      });
+    return res.status(201).json({
+      success: true,
+      message:
+        "Payment submitted successfully. The school will verify it shortly.",
+      data: payment,
+    });
   } catch (error) {
     console.error("Submit payment error:", error);
     return res
@@ -477,13 +465,11 @@ const verifyPayment = async (req, res) => {
       schoolName: school.name,
     }).catch((e) => console.error("Verify notification error:", e));
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        message: "Payment verified successfully",
-        data: result.verified,
-      });
+    return res.status(200).json({
+      success: true,
+      message: "Payment verified successfully",
+      data: result.verified,
+    });
   } catch (error) {
     if (error.message === "NOT_FOUND")
       return res
@@ -517,12 +503,10 @@ const rejectPayment = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Payment not found" });
     if (payment.status !== "PENDING")
-      return res
-        .status(400)
-        .json({
-          success: false,
-          message: `Payment is already ${payment.status.toLowerCase()}`,
-        });
+      return res.status(400).json({
+        success: false,
+        message: `Payment is already ${payment.status.toLowerCase()}`,
+      });
 
     const rejected = await prisma.$transaction(async (tx) => {
       const updated = await tx.feePayment.update({
@@ -631,18 +615,16 @@ const getPayments = async (req, res) => {
       prisma.feePayment.count({ where }),
     ]);
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        data: payments,
-        pagination: {
-          total,
-          page: parseInt(page),
-          limit: parseInt(limit),
-          totalPages: Math.ceil(total / parseInt(limit)),
-        },
-      });
+    return res.status(200).json({
+      success: true,
+      data: payments,
+      pagination: {
+        total,
+        page: parseInt(page),
+        limit: parseInt(limit),
+        totalPages: Math.ceil(total / parseInt(limit)),
+      },
+    });
   } catch (error) {
     console.error("Get payments error:", error);
     return res
@@ -712,15 +694,13 @@ const getMyChildPayments = async (req, res) => {
       .filter((p) => p.status === "PENDING")
       .reduce((sum, p) => sum + Number(p.amount), 0);
 
-    return res
-      .status(200)
-      .json({
-        success: true,
-        data: {
-          payments,
-          summary: { totalPaid, pendingAmount, totalPayments: payments.length },
-        },
-      });
+    return res.status(200).json({
+      success: true,
+      data: {
+        payments,
+        summary: { totalPaid, pendingAmount, totalPayments: payments.length },
+      },
+    });
   } catch (error) {
     console.error("Get my child payments error:", error);
     return res
@@ -1011,6 +991,27 @@ const getPaymentInsights = async (req, res) => {
       .json({ success: false, message: "Failed to load insights" });
   }
 };
+// GET /api/payments/pending-count
+// Lightweight endpoint for sidebar badge — no aggregations, just a count
+const getPendingCount = async (req, res) => {
+  try {
+    const { academicYear, term } = req.query;
+    const where = {
+      schoolId: req.schoolId,
+      status: "PENDING",
+    };
+    if (academicYear) where.academicYear = academicYear;
+    if (term) where.term = term;
+
+    const count = await prisma.feePayment.count({ where });
+    return res.json({ success: true, data: { count } });
+  } catch (err) {
+    console.error("getPendingCount error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to get pending count" });
+  }
+};
 
 module.exports = {
   recordManualPayment,
@@ -1022,4 +1023,5 @@ module.exports = {
   getMyChildPayments,
   getPaymentSummary,
   getPaymentInsights,
+  getPendingCount,
 };

@@ -110,7 +110,7 @@ const listRequests = async (req, res) => {
   }
 };
 
-// ==================== PENDING COUNT ====================
+//  PENDING COUNT
 const getPendingCount = async (req, res) => {
   try {
     const count = await prisma.schoolRequest.count({
@@ -122,7 +122,7 @@ const getPendingCount = async (req, res) => {
   }
 };
 
-// ==================== APPROVE ====================
+//  APPROVE
 const approveRequest = async (req, res) => {
   try {
     const { id } = req.params;

@@ -51,7 +51,7 @@ router.get(
   onekhusaController.getStatus,
 );
 
-// ==================== STAFF ROUTES ====================
+//  STAFF ROUTES
 router.get(
   "/insights",
   verifyStaff,
@@ -65,7 +65,12 @@ router.get(
   requirePermission("dashboard", "read"),
   getPaymentSummary,
 );
-
+router.get(
+  "/pending-count",
+  verifyStaff,
+  requirePermission("payments", "read"),
+  paymentController.getPendingCount,
+);
 router.get(
   "/pending",
   verifyStaff,

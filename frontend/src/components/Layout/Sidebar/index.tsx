@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
+
 import {
   LayoutDashboard,
   Users,
@@ -23,6 +24,7 @@ import {
 import { useAuthStore } from "../../../store/authStore";
 import api from "../../../lib/axios";
 import type { Resource } from "../../../types";
+import { useActiveTerm } from "../../../hooks/useActiveTerm";
 
 type NavItem = {
   to: string;
@@ -32,53 +34,99 @@ type NavItem = {
   resource: Resource;
 };
 
-const navItems: NavItem[] = [
+type NavSection = {
+  title: string;
+  items: NavItem[];
+};
+
+// 🎯 Grouped Navigation
+const navSections: NavSection[] = [
   {
-    to: "/dashboard",
-    icon: LayoutDashboard,
-    label: "Dashboard",
-    end: true,
-    resource: "dashboard",
-  },
-  { to: "/students", icon: Users, label: "Students", resource: "students" },
-  {
-    to: "/payments",
-    icon: CreditCard,
-    label: "Payments",
-    end: true,
-    resource: "payments",
-  },
-  {
-    to: "/payments/pending",
-    icon: Clock,
-    label: "Pending",
-    resource: "payments",
+    title: "Main",
+    items: [
+      {
+        to: "/dashboard",
+        icon: LayoutDashboard,
+        label: "Dashboard",
+        end: true,
+        resource: "dashboard",
+      },
+    ],
   },
   {
-    to: "/classes",
-    icon: GraduationCap,
-    label: "Classes",
-    resource: "classes",
+    title: "Students & Academics",
+    items: [
+      { to: "/students", icon: Users, label: "Students", resource: "students" },
+      {
+        to: "/classes",
+        icon: GraduationCap,
+        label: "Classes",
+        resource: "classes",
+      },
+      {
+        to: "/results",
+        icon: FileText,
+        label: "Exam Results",
+        resource: "results",
+      },
+    ],
   },
-  { to: "/reports", icon: BarChart2, label: "Reports", resource: "reports" },
-  { to: "/sms", icon: MessageSquare, label: "Send SMS", resource: "sms" },
   {
-    to: "/results",
-    icon: FileText,
-    label: "Exam Results",
-    resource: "results",
+    title: "Fees & Finance",
+    items: [
+      {
+        to: "/payments",
+        icon: CreditCard,
+        label: "Payments",
+        end: true,
+        resource: "payments",
+      },
+      {
+        to: "/payments/pending",
+        icon: Clock,
+        label: "Pending",
+        resource: "payments",
+      },
+      {
+        to: "/reports",
+        icon: BarChart2,
+        label: "Reports",
+        resource: "reports",
+      },
+    ],
   },
-  { to: "/staff", icon: UserCog, label: "Staff", resource: "staff" },
   {
-    to: "/employees",
-    icon: Briefcase,
-    label: "Employees",
-    resource: "employees",
+    title: "Communication",
+    items: [
+      { to: "/sms", icon: MessageSquare, label: "Send SMS", resource: "sms" },
+      {
+        to: "/support",
+        icon: LifeBuoy,
+        label: "Support",
+        resource: "support",
+      },
+    ],
   },
-  { to: "/payroll", icon: Wallet, label: "Payroll", resource: "payroll" },
-  { to: "/support", icon: LifeBuoy, label: "Support", resource: "support" },
-  { to: "/audit", icon: History, label: "Audit Trail", resource: "audit" },
-  { to: "/settings", icon: Settings, label: "Settings", resource: "settings" },
+  {
+    title: "Admin",
+    items: [
+      { to: "/staff", icon: UserCog, label: "Staff", resource: "staff" },
+      {
+        to: "/employees",
+        icon: Briefcase,
+        label: "Employees",
+        resource: "employees",
+      },
+      { to: "/payroll", icon: Wallet, label: "Payroll", resource: "payroll" },
+      { to: "/audit", icon: History, label: "Audit Trail", resource: "audit" },
+      {
+        to: "/settings",
+        icon: Settings,
+        label: "Settings",
+        resource: "settings",
+      },
+    ],
+  },
 ];
 
 const Sidebar = () => {
@@ -86,6 +134,8 @@ const Sidebar = () => {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [supportUnread, setSupportUnread] = useState(0);
+  const [pendingCount, setPendingCount] = useState(0);
+  const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
 
   // Check if the logged-in user has "read" permission for a resource.
   // School Admin always passes (safety fallback).
@@ -95,7 +145,6 @@ const Sidebar = () => {
     const perms = staff.role.permissions?.[resource];
     return Array.isArray(perms) && perms.includes("read");
   };
-
   // 🎯 Poll support unread count every 60s
   useEffect(() => {
     const load = async () => {
@@ -111,8 +160,26 @@ const Sidebar = () => {
     return () => clearInterval(t);
   }, []);
 
-  const visibleNavItems = navItems.filter((item) => canRead(item.resource));
+  //  Poll pending payments count every 60s (lightweight endpoint)
+  useEffect(() => {
+    if (!activeYear) return;
 
+    const load = async () => {
+      try {
+        const params = new URLSearchParams();
+        params.set("academicYear", activeYear);
+        if (currentTerm) params.set("term", currentTerm);
+        const res = await api.get(`/payments/pending-count?${params}`);
+        setPendingCount(res.data.data?.count || 0);
+      } catch {
+        // Silently ignore — user may lack permissions or no data yet
+      }
+    };
+
+    load();
+    const t = setInterval(load, 60_000);
+    return () => clearInterval(t);
+  }, [activeYear, currentTerm]);
   const handleLogout = () => {
     logout();
     navigate("/login");
@@ -121,7 +188,8 @@ const Sidebar = () => {
   const close = () => setOpen(false);
 
   const sidebarContent = (
-    <div className="w-64 bg-[var(--color-primary)] text-white flex flex-col h-full md:rounded-2xl shadow-xl overflow-hidden">
+    // 🎯 Removed md:rounded-2xl to make it flush
+    <div className="w-64 bg-[var(--color-primary)] text-white flex flex-col h-full shadow-xl overflow-hidden">
       {/* Logo */}
       <div className="p-6 border-b border-white/10">
         <div className="flex items-center gap-3">
@@ -153,34 +221,58 @@ const Sidebar = () => {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
-        {visibleNavItems.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.end}
-            onClick={close}
-            className={({ isActive }) =>
-              `flex items-center gap-3 px-4 py-3 rounded-lg text-sm transition-colors ${
-                isActive
-                  ? "bg-white/15 text-white font-medium"
-                  : "text-white/70 hover:bg-white/10 hover:text-white"
-              }`
-            }
-          >
-            <item.icon size={18} />
-            <span className="flex-1">{item.label}</span>
-            {item.to === "/support" && supportUnread > 0 && (
-              <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
-                {supportUnread > 99 ? "99+" : supportUnread}
-              </span>
-            )}
-          </NavLink>
-        ))}
+      <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-6 custom-scrollbar">
+        {navSections.map((section) => {
+          // Filter items based on permissions
+          const visibleItems = section.items.filter((item) =>
+            canRead(item.resource),
+          );
+
+          // If user has no access to any item in this section, hide the section header
+          if (visibleItems.length === 0) return null;
+
+          return (
+            <div key={section.title}>
+              <h3 className="px-3 text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+                {section.title}
+              </h3>
+              <div className="space-y-1">
+                {visibleItems.map((item) => (
+                  <NavLink
+                    key={item.to}
+                    to={item.to}
+                    end={item.end}
+                    onClick={close}
+                    className={({ isActive }) =>
+                      `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                        isActive
+                          ? "bg-white/15 text-white font-medium"
+                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                      }`
+                    }
+                  >
+                    <item.icon size={18} />
+                    <span className="flex-1">{item.label}</span>
+                    {item.to === "/payments/pending" && pendingCount > 0 && (
+                      <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                        {pendingCount > 99 ? "99+" : pendingCount}
+                      </span>
+                    )}
+                    {item.to === "/support" && supportUnread > 0 && (
+                      <span className="min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                        {supportUnread > 99 ? "99+" : supportUnread}
+                      </span>
+                    )}
+                  </NavLink>
+                ))}
+              </div>
+            </div>
+          );
+        })}
       </nav>
 
       {/* User info and logout */}
-      <div className="p-4 border-t border-white/10">
+      <div className="p-4 border-t border-white/10 bg-black/10">
         <div className="flex items-center gap-3 mb-3 px-2">
           <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold shrink-0">
             {staff?.fullName?.charAt(0) || "?"}
