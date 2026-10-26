@@ -25,6 +25,7 @@ import api from "../../lib/axios";
 import type { PaymentSummary } from "../../types";
 import { useActiveTerm } from "../../hooks/useActiveTerm";
 
+// ==================== STAT CARD ====================
 const StatCard = ({
   title,
   value,
@@ -56,6 +57,88 @@ const formatMWK = (amount: number) => {
   return `MWK ${amount.toLocaleString()}`;
 };
 
+// ==================== ACADEMIC YEAR PROGRESS ====================
+const AcademicYearProgress = ({
+  currentTerm,
+}: {
+  currentTerm: string | null;
+}) => {
+  const steps = [
+    { id: "TERM_1", label: "Term 1" },
+    { id: "TERM_2", label: "Term 2" },
+    { id: "TERM_3", label: "Term 3" },
+    { id: "YEAR_END", label: "Year End" },
+  ];
+
+  const currentIndex = steps.findIndex((s) => s.id === currentTerm);
+  // Calculate how far the green line should stretch
+  const progressWidth =
+    currentIndex >= 0 ? (currentIndex / (steps.length - 1)) * 100 : 0;
+
+  return (
+    <div className="bg-white rounded-xl p-5 shadow-sm border border-gray-100 mb-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-sm font-semibold text-gray-800 flex items-center gap-2">
+          <CalendarDays size={16} className="text-[var(--color-primary)]" />
+          Academic Year Progress
+        </h2>
+        <span className="text-xs font-medium text-gray-500 bg-gray-50 px-2 py-1 rounded-md">
+          {currentTerm ? currentTerm.replace("_", " ") : "No Active Term"}
+        </span>
+      </div>
+
+      <div className="relative flex justify-between items-center w-full max-w-2xl mx-auto px-4">
+        {/* Background Line */}
+        <div className="absolute left-0 top-4 -translate-y-1/2 w-full h-1 bg-gray-100 -z-10 rounded-full" />
+
+        {/* Active Progress Line */}
+        <div
+          className="absolute left-0 top-4 -translate-y-1/2 h-1 bg-green-500 -z-10 rounded-full transition-all duration-500"
+          style={{ width: `${progressWidth}%` }}
+        />
+
+        {steps.map((step, index) => {
+          const isCompleted = index < currentIndex;
+          const isActive = index === currentIndex;
+
+          return (
+            <div
+              key={step.id}
+              className="flex flex-col items-center gap-2 bg-white px-2"
+            >
+              <div
+                className={`w-8 h-8 rounded-full flex items-center justify-center border-2 transition-all duration-300 ${
+                  isCompleted
+                    ? "bg-green-500 border-green-500 text-white"
+                    : isActive
+                      ? "bg-[var(--color-primary)] border-[var(--color-primary)] text-white shadow-md shadow-blue-200"
+                      : "bg-white border-gray-200 text-gray-400"
+                }`}
+              >
+                {isCompleted ? (
+                  <CheckCircle2 size={16} />
+                ) : (
+                  <span className="text-xs font-bold">{index + 1}</span>
+                )}
+              </div>
+              <span
+                className={`text-[11px] font-medium ${
+                  isActive
+                    ? "text-[var(--color-primary)] font-bold"
+                    : "text-gray-500"
+                }`}
+              >
+                {step.label}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ==================== DASHBOARD PAGE ====================
 const Dashboard = () => {
   const navigate = useNavigate();
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
@@ -147,7 +230,7 @@ const Dashboard = () => {
       {
         title: "Complete School Profile",
         desc: "Set your school's name so we can generate the correct Student IDs.",
-        done: onboarding.hasSchoolDetails, // This comes from the backend
+        done: onboarding.hasSchoolDetails,
         path: "/settings",
         icon: Building2,
       },
@@ -162,7 +245,7 @@ const Dashboard = () => {
         title: "Set Fee Structures",
         desc: "Define how much each class pays per term.",
         done: onboarding.hasFeeStructures,
-        path: "/classes", // Adjust if you have a dedicated fee page
+        path: "/classes",
         icon: CreditCard,
       },
       {
@@ -261,6 +344,11 @@ const Dashboard = () => {
     <div className="space-y-6">
       {/*  Onboarding Wizard */}
       {renderOnboarding()}
+
+      {/* 🎯 Academic Year Progress Widget (Only shows when onboarding is complete) */}
+      {onboarding?.isComplete && (
+        <AcademicYearProgress currentTerm={currentTerm} />
+      )}
 
       {/* Non-blocking error banner — data is showing but stale */}
       {error && summary && (
