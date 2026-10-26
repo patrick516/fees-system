@@ -472,12 +472,19 @@ router.get("/term-history", verifyStaff, async (req, res) => {
       let paidFull = 0;
 
       for (const s of students) {
-        const fee =
+        const rawFee =
           s.class.feeStructures.find(
             (fs) => fs.term === a.term && fs.academicYear === a.academicYear,
           )?.totalAmount || 0;
+
+        // 🎯 Force to Number
+        const fee = Number(rawFee);
         if (fee === 0) continue;
-        const paid = paidMap.get(`${s.id}|${a.term}|${a.academicYear}`) || 0;
+
+        const rawPaid = paidMap.get(`${s.id}|${a.term}|${a.academicYear}`) || 0;
+        // 🎯 Force to Number
+        const paid = Number(rawPaid);
+
         totalRequired += fee;
         totalCollected += Math.min(paid, fee);
         if (paid >= fee) paidFull++;
@@ -491,9 +498,12 @@ router.get("/term-history", verifyStaff, async (req, res) => {
         startDate: a.startDate,
         endDate: a.endDate,
         activatedAt: a.activatedAt,
-        totalRequired,
-        totalCollected,
-        outstanding: Math.max(0, totalRequired - totalCollected),
+        totalRequired: Number(totalRequired),
+        totalCollected: Number(totalCollected),
+        outstanding: Math.max(
+          0,
+          Number(totalRequired) - Number(totalCollected),
+        ),
         debtors,
         paidFull,
       };
@@ -531,6 +541,7 @@ router.post(
           message: "End date must be after start date",
         });
       }
+
       const currentSchool = await prisma.school.findUnique({
         where: { id: req.schoolId },
         select: {
@@ -542,10 +553,26 @@ router.post(
         },
       });
 
+      // 🎯 TERM LOCK: Prevent activating a new term early
       if (currentSchool?.activeTerm && currentSchool.activeAcademicYear) {
         const isSameTerm =
           currentSchool.activeTerm === term &&
           currentSchool.activeAcademicYear === academicYear;
+
+        // If they are trying to switch to a DIFFERENT term, check the date
+        if (!isSameTerm && currentSchool.activeTermEndDate) {
+          const currentEndDate = new Date(currentSchool.activeTermEndDate);
+          const now = new Date();
+
+          if (now < currentEndDate) {
+            return res.status(400).json({
+              success: false,
+              message: `Cannot activate a new term yet. The current term (${currentSchool.activeTerm.replace("_", " ")}) is active until ${currentEndDate.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })}.`,
+            });
+          }
+        }
+
+        // Archive the old term if switching
         if (!isSameTerm) {
           await prisma.termActivation.upsert({
             where: {

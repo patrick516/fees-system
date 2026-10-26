@@ -796,15 +796,17 @@ const ClassesPage = () => {
                         )}
                       </td>
                       <td className="px-6 py-3 text-right font-medium text-green-700">
-                        MWK {t.totalCollected.toLocaleString()}
+                        MWK {Number(t.totalCollected || 0).toLocaleString()}
                       </td>
                       <td
                         className={`px-6 py-3 text-right font-medium ${
-                          t.outstanding > 0 ? "text-red-600" : "text-green-600"
+                          Number(t.outstanding) > 0
+                            ? "text-red-600"
+                            : "text-green-600"
                         }`}
                       >
-                        {t.outstanding > 0
-                          ? `MWK ${t.outstanding.toLocaleString()}`
+                        {Number(t.outstanding) > 0
+                          ? `MWK ${Number(t.outstanding).toLocaleString()}`
                           : "✓ Clear"}
                       </td>
                       <td className="px-6 py-3 text-center">
