@@ -49,8 +49,8 @@ const UI = {
     en: "See your child's school fees easily.",
     ny: "Onani ndalama za sukulu za mwana wanu mosavuta.",
   },
-  install: { en: "Install app", ny: "Ikani app" },
-  howto: { en: "Show me how", ny: "Ndiwonetseni momwe" },
+  install: { en: "Install app", ny: "Ikani app mu Foni" },
+  howto: { en: "Show me how", ny: "Ndiwonetseni njira yake" },
   later: { en: "Not now", ny: "Pambuyo pake" },
   next: { en: "Next", ny: "Chotsatira" },
   back: { en: "Back", ny: "Kumbuyo" },
@@ -60,7 +60,7 @@ const UI = {
   doneTitle: { en: "Done!", ny: "Zatheka!" },
   doneText: {
     en: "Look for the SchoolPay picture on your phone screen.",
-    ny: "Yang'anani chithunzi cha SchoolPay pa sikirini ya foni yanu.",
+    ny: "Yang'anani chithunzi cha SchoolPay pa screen ya foni yanu.",
   },
 } as const;
 
@@ -79,7 +79,7 @@ const STEPS: Record<Exclude<Platform, "other">, Step[]> = {
     {
       art: "dialog-shortcut",
       en: "Tap “Add shortcut”. Do NOT tap “Install”.",
-      ny: "Dinani “Add shortcut”. MUSATI “Install”.",
+      ny: "Dinani “Add shortcut”. OSATI “Install”.",
     },
     {
       art: "dialog-add",
@@ -114,12 +114,12 @@ const STEPS: Record<Exclude<Platform, "other">, Step[]> = {
     {
       art: "open-safari",
       en: "Open this page in Safari (the blue compass).",
-      ny: "Tsegulani tsamba ili mu Safari (kampasi yabuluu).",
+      ny: "Tsegulani tsamba ili mu Safari (kampasi ya blue).",
     },
     {
       art: "ios-share",
       en: "Tap the Share button at the bottom of the screen.",
-      ny: "Dinani batani ya Share pansi pa sikirini.",
+      ny: "Dinani batani ya Share pansi pa screen.",
     },
     {
       art: "ios-add-home",
