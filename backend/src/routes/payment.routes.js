@@ -5,7 +5,7 @@ const path = require("path");
 
 const onekhusaController = require("../controllers/onekhusa.controller");
 const {
-  recordManualPayment, // 🎯 Renamed (was recordCashPayment)
+  recordManualPayment,
   submitPayment,
   verifyPayment,
   rejectPayment,
@@ -14,6 +14,7 @@ const {
   getMyChildPayments,
   getPaymentSummary,
   getPaymentInsights,
+  getPendingCount,
 } = require("../controllers/payment.controller");
 
 const {
@@ -65,12 +66,15 @@ router.get(
   requirePermission("dashboard", "read"),
   getPaymentSummary,
 );
+
+//  Lightweight endpoint for sidebar pending badge
 router.get(
   "/pending-count",
   verifyStaff,
   requirePermission("payments", "read"),
-  paymentController.getPendingCount,
+  getPendingCount,
 );
+
 router.get(
   "/pending",
   verifyStaff,
@@ -85,7 +89,7 @@ router.get(
   getPayments,
 );
 
-// 🎯 Fixed: uses the bare function name, not paymentController.xxx
+//  Fixed: uses the bare function name, not paymentController.xxx
 router.post(
   "/manual",
   verifyStaff,
@@ -107,7 +111,7 @@ router.patch(
   rejectPayment,
 );
 
-// ==================== PARENT ROUTES ====================
+//  PARENT ROUTES
 router.get("/my-child", verifyParent, getMyChildPayments);
 router.post("/submit", verifyParent, upload.single("receipt"), submitPayment);
 
