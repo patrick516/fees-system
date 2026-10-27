@@ -64,41 +64,48 @@ export default function PayPage() {
     if (!paymentInfo) return [];
     const methods = [];
 
+    // 🎯 Airtel Money — always shown if school has saved a number
     if (paymentInfo.airtelMoneyNumber) {
       methods.push({
         value: "AIRTEL_MONEY",
-        label: "Airtel Money",
+        label: `Airtel Money · ${paymentInfo.airtelMoneyNumber}`,
         icon: Smartphone,
         color: "red",
       });
     }
+
+    // 🎯 TNM Mpamba — always shown if school has saved a number
     if (paymentInfo.mpambaNumber) {
       methods.push({
         value: "TNM_MPAMBA",
-        label: "TNM Mpamba",
+        label: `TNM Mpamba · ${paymentInfo.mpambaNumber}`,
         icon: Smartphone,
         color: "amber",
       });
     }
 
+    // 🎯 Every bank account the school has saved
     if (paymentInfo.bankAccounts && paymentInfo.bankAccounts.length > 0) {
-      const seenBanks = new Set();
       paymentInfo.bankAccounts.forEach((bank: any) => {
+        // Convert bankName to the enum value the backend expects
         let enumVal = bank.bankName.toUpperCase().replace(/\s+/g, "_");
         if (!BANK_METHODS.includes(enumVal)) enumVal = "OTHER_BANK";
 
-        if (!seenBanks.has(enumVal)) {
-          seenBanks.add(enumVal);
-          methods.push({
-            value: enumVal,
-            label: bank.bankName,
-            icon: Landmark,
-            color: "blue",
-          });
-        }
+        // Include the bank name + branch in the label so the user knows which account
+        const label = bank.branch
+          ? `${bank.bankName} · ${bank.branch}`
+          : bank.bankName;
+
+        methods.push({
+          value: enumVal,
+          label,
+          icon: Landmark,
+          color: "blue",
+        });
       });
     }
 
+    // Fallback if the school hasn't saved any payment details yet
     if (methods.length === 0) {
       methods.push({
         value: "OTHER_BANK",
@@ -107,6 +114,7 @@ export default function PayPage() {
         color: "blue",
       });
     }
+
     return methods;
   }, [paymentInfo]);
 
@@ -433,7 +441,7 @@ export default function PayPage() {
         {/* ============ RECEIPT MODE ============ */}
         {mode === "receipt" && (
           <div className="space-y-4">
-            {/* Method selection — bigger list-style, matches mockup */}
+            {/* Method selection — dynamic based on what school has saved */}
             <div className="space-y-2">
               {availablePaymentMethods.map((m) => {
                 const Icon = m.icon;
@@ -608,33 +616,24 @@ export default function PayPage() {
 
       {/* ============ STICKY BOTTOM BAR ============ */}
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-100 p-4">
-        <div className="max-w-lg mx-auto space-y-2">
+        <div className="max-w-lg mx-auto">
           {mode === "receipt" ? (
-            <>
-              <button
-                type="button"
-                onClick={handleReceiptSubmit}
-                disabled={loading || !canSubmitReceipt}
-                className="w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white py-3.5 rounded-2xl font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
-              >
-                {loading ? (
-                  <>
-                    <Loader2 size={16} className="animate-spin" /> Submitting...
-                  </>
-                ) : (
-                  <>
-                    <Upload size={16} /> Upload Receipt
-                  </>
-                )}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode("online")}
-                className="w-full flex items-center justify-center gap-2 bg-white border-2 border-[var(--color-primary)] text-[var(--color-primary)] py-3.5 rounded-2xl font-bold text-sm hover:bg-blue-50 transition-colors"
-              >
-                Pay Online
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={handleReceiptSubmit}
+              disabled={loading || !canSubmitReceipt}
+              className="w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white py-3.5 rounded-2xl font-bold text-sm transition-colors disabled:opacity-40 disabled:cursor-not-allowed shadow-sm"
+            >
+              {loading ? (
+                <>
+                  <Loader2 size={16} className="animate-spin" /> Submitting...
+                </>
+              ) : (
+                <>
+                  <Upload size={16} /> Upload Receipt
+                </>
+              )}
+            </button>
           ) : (
             <button
               type="button"
