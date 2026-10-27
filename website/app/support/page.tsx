@@ -11,6 +11,8 @@ import {
   ChevronRight,
   Lock,
   AlertCircle,
+  Inbox,
+  HelpCircle,
 } from "lucide-react";
 import api from "../../lib/axios";
 import { useAuthStore } from "../../store/authStore";
@@ -70,41 +72,37 @@ export default function ParentSupportPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
-      {/* Header */}
-      <div className="bg-[var(--color-primary)] text-white sticky top-0 z-20 shadow-md">
-        <div className="max-w-lg mx-auto px-4 py-3 flex items-center gap-3">
+    <div className="min-h-screen bg-white pb-28">
+      {/* Header — white, centered title, back arrow left */}
+      <header className="sticky top-0 z-20 bg-white border-b border-gray-100">
+        <div className="max-w-lg mx-auto px-4 py-3 relative">
           <button
             onClick={() => router.push("/dashboard")}
-            className="p-2 -ml-2 hover:bg-white/10 rounded-xl transition"
+            className="absolute left-4 top-1/2 -translate-y-1/2 p-2 -ml-2 hover:bg-gray-100 rounded-xl transition"
             aria-label="Back"
           >
-            <ArrowLeft size={18} />
+            <ArrowLeft size={20} className="text-gray-700" />
           </button>
-          <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-semibold">Help & Support</h1>
-            <p className="text-[11px] text-white/70">Ask the school anything</p>
+          <div className="text-center">
+            <h1 className="text-lg font-bold text-gray-900">Help & Support</h1>
+            <p className="text-xs text-gray-500 mt-0.5">
+              Ask the school anything
+            </p>
           </div>
-          <button
-            onClick={() => setShowNewTicket(true)}
-            className="flex items-center gap-1.5 bg-white/20 hover:bg-white/30 px-3 py-2 rounded-xl text-sm font-semibold transition"
-          >
-            <Plus size={14} /> New
-          </button>
         </div>
-      </div>
+      </header>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
-        {/* Filter chips */}
-        <div className="flex gap-2">
+        {/* Segmented filter control */}
+        <div className="bg-gray-100 rounded-2xl p-1 grid grid-cols-3 gap-1">
           {(["ALL", "OPEN", "CLOSED"] as const).map((f) => (
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-full text-xs font-semibold transition ${
+              className={`py-2 rounded-xl text-sm font-semibold transition-all ${
                 filter === f
-                  ? "bg-[var(--color-primary)] text-white"
-                  : "bg-white text-gray-600 border border-gray-200 hover:border-gray-300"
+                  ? "bg-[var(--color-primary)] text-white shadow-sm"
+                  : "text-gray-600 hover:text-gray-800"
               }`}
             >
               {f === "ALL" ? "All" : f === "OPEN" ? "Open" : "Closed"}
@@ -118,27 +116,7 @@ export default function ParentSupportPage() {
             <Loader2 size={24} className="animate-spin text-gray-300 mx-auto" />
           </div>
         ) : filtered.length === 0 ? (
-          <div className="bg-white rounded-2xl p-8 text-center border border-gray-100">
-            <div className="w-14 h-14 rounded-full bg-[var(--color-primary-light)] flex items-center justify-center mx-auto mb-4">
-              <MessageSquare
-                size={24}
-                className="text-[var(--color-primary)]"
-              />
-            </div>
-            <p className="text-sm font-semibold text-gray-800 mb-1">
-              {filter === "ALL" ? "No messages yet" : "Nothing here"}
-            </p>
-            <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-              Have a question about fees or your child&apos;s account? Send the
-              school a message.
-            </p>
-            <button
-              onClick={() => setShowNewTicket(true)}
-              className="inline-flex items-center gap-1.5 bg-[var(--color-primary)] text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-[var(--color-primary-dark)] transition"
-            >
-              <Plus size={14} /> Send a Message
-            </button>
-          </div>
+          <EmptyState filter={filter} onCreate={() => setShowNewTicket(true)} />
         ) : (
           <div className="space-y-2">
             {filtered.map((t) => {
@@ -149,24 +127,24 @@ export default function ParentSupportPage() {
                 <button
                   key={t.id}
                   onClick={() => setOpenTicket(t)}
-                  className="w-full bg-white rounded-2xl p-4 text-left border border-gray-100 hover:border-[var(--color-primary)]/30 transition-colors flex items-start gap-3"
+                  className="w-full bg-white rounded-2xl p-4 text-left border border-gray-100 hover:border-[var(--color-primary)]/30 hover:shadow-sm transition-all flex items-start gap-3"
                 >
                   <div
-                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
+                    className={`w-11 h-11 rounded-xl flex items-center justify-center shrink-0 ${
                       isClosed
                         ? "bg-gray-100 text-gray-500"
-                        : "bg-blue-100 text-blue-600"
+                        : "bg-blue-50 text-[var(--color-primary)]"
                     }`}
                   >
                     {isClosed ? (
-                      <Lock size={16} />
+                      <Lock size={18} />
                     ) : (
-                      <MessageSquare size={16} />
+                      <MessageSquare size={18} />
                     )}
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <p className="text-sm font-semibold text-gray-800 truncate flex-1">
+                      <p className="text-sm font-semibold text-gray-900 truncate flex-1">
                         {t.subject}
                       </p>
                       {needsReply && (
@@ -175,12 +153,12 @@ export default function ParentSupportPage() {
                         </span>
                       )}
                       {isClosed && (
-                        <span className="text-[9px] font-bold text-gray-500 bg-gray-100 px-1.5 py-0.5 rounded-full shrink-0">
+                        <span className="text-[9px] font-bold text-gray-500 bg-gray-100 px-2 py-0.5 rounded-full shrink-0 tracking-wide">
                           CLOSED
                         </span>
                       )}
                     </div>
-                    <p className="text-xs text-gray-400 mt-0.5">
+                    <p className="text-xs text-gray-400 mt-1">
                       {t._count?.messages || 0} message
                       {(t._count?.messages || 0) !== 1 ? "s" : ""}
                       {" · "}
@@ -188,14 +166,27 @@ export default function ParentSupportPage() {
                     </p>
                   </div>
                   <ChevronRight
-                    size={16}
-                    className="text-gray-300 shrink-0 mt-1"
+                    size={18}
+                    className="text-gray-300 shrink-0 mt-2"
                   />
                 </button>
               );
             })}
           </div>
         )}
+      </div>
+
+      {/* Fixed bottom CTA */}
+      <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-100 p-4">
+        <div className="max-w-lg mx-auto">
+          <button
+            onClick={() => setShowNewTicket(true)}
+            className="w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] text-white py-3.5 rounded-2xl font-semibold text-sm transition-colors shadow-sm"
+          >
+            <Plus size={16} />
+            New Ticket
+          </button>
+        </div>
       </div>
 
       {/* Modals */}
@@ -217,6 +208,60 @@ export default function ParentSupportPage() {
             loadTickets();
           }}
         />
+      )}
+    </div>
+  );
+}
+
+// ==================== EMPTY STATE ====================
+
+function EmptyState({
+  filter,
+  onCreate,
+}: {
+  filter: "ALL" | "OPEN" | "CLOSED";
+  onCreate: () => void;
+}) {
+  const message =
+    filter === "ALL"
+      ? "No tickets here"
+      : filter === "OPEN"
+        ? "No open tickets"
+        : "No closed tickets";
+
+  const subtitle =
+    filter === "ALL"
+      ? "Create a new ticket or check back later."
+      : filter === "OPEN"
+        ? "You have no open conversations with the school."
+        : "No conversations have been closed yet.";
+
+  return (
+    <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
+      {/* Illustration: soft circle + inbox icon */}
+      <div className="relative mb-6">
+        <div className="w-32 h-32 rounded-full bg-gradient-to-b from-blue-50 to-slate-50 flex items-center justify-center">
+          <Inbox size={56} className="text-[var(--color-primary)]/40" />
+        </div>
+      </div>
+
+      <h3 className="text-base font-bold text-gray-900 mb-1">{message}</h3>
+      <p className="text-xs text-gray-500 mb-6 max-w-xs leading-relaxed">
+        {subtitle}
+      </p>
+
+      {filter === "ALL" && (
+        <div className="flex flex-col items-center gap-3">
+          <button
+            onClick={onCreate}
+            className="inline-flex items-center gap-1.5 bg-[var(--color-primary)] text-white px-5 py-2.5 rounded-2xl text-sm font-semibold hover:bg-[var(--color-primary-dark)] transition"
+          >
+            <Plus size={14} /> New Ticket
+          </button>
+          <div className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center text-gray-400 mt-2">
+            <HelpCircle size={18} />
+          </div>
+        </div>
       )}
     </div>
   );
