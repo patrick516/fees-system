@@ -390,17 +390,18 @@ model Employee {
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   // Identity
+  honorific   String? // Mr, Mrs, Ms, Dr, Rev, Prof, Chief
   firstName   String
   lastName    String
   fullName    String
-  title       String? // Driver, Cook, Teacher, etc.
+  gender      Gender? // MALE | FEMALE
+  jobTitle    String? // Groundskeeper, Teacher, Driver, Cook, etc.
   phone       String?
   email       String?
   nationalId  String?
   dateOfBirth DateTime?
   hireDate    DateTime?
   photo       String?
-
   // Salary — additions
   basicSalary        Decimal @default(0) @db.Decimal(12, 2)
   housingAllowance   Decimal @default(0) @db.Decimal(12, 2)

@@ -88,13 +88,15 @@ const getEmployee = async (req, res) => {
   }
 };
 
-// ==================== CREATE ====================
+//  CREATE
 // POST /api/employees
 const createEmployee = async (req, res) => {
   try {
     const {
+      honorific,
       firstName,
       lastName,
+      gender,
       title,
       departmentId,
       phone,
@@ -123,9 +125,11 @@ const createEmployee = async (req, res) => {
     const employee = await prisma.employee.create({
       data: {
         schoolId: req.schoolId,
+        honorific: honorific?.trim() || null,
         firstName: firstName.trim(),
         lastName: lastName.trim(),
         fullName: buildFullName(firstName, lastName),
+        gender: gender || null,
         title: title?.trim() || null,
         departmentId: departmentId || null,
         phone: phone?.trim() || null,
@@ -183,7 +187,7 @@ const updateEmployee = async (req, res) => {
     const b = req.body;
     const data = {};
 
-    // Only update fields present in the body
+    if (b.honorific !== undefined) data.honorific = b.honorific?.trim() || null;
     if (b.firstName !== undefined) data.firstName = b.firstName.trim();
     if (b.lastName !== undefined) data.lastName = b.lastName.trim();
     if (b.firstName !== undefined || b.lastName !== undefined) {
@@ -192,6 +196,7 @@ const updateEmployee = async (req, res) => {
         b.lastName ?? existing.lastName,
       );
     }
+    if (b.gender !== undefined) data.gender = b.gender || null;
     if (b.title !== undefined) data.title = b.title?.trim() || null;
     if (b.departmentId !== undefined)
       data.departmentId = b.departmentId || null;

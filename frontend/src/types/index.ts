@@ -242,6 +242,7 @@ export interface Employee {
   firstName: string;
   lastName: string;
   fullName: string;
+  gender?: "MALE" | "FEMALE" | null;
   title?: string | null;
   phone?: string | null;
   email?: string | null;
@@ -250,6 +251,7 @@ export interface Employee {
   hireDate?: string | null;
   photo?: string | null;
   departmentId?: string | null;
+  honorific?: string | null;
   department?: { id: string; name: string } | null;
 
   basicSalary: number;

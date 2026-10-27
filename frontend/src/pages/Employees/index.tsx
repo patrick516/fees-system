@@ -8,17 +8,25 @@ import {
   Users,
   Wallet,
   X,
-  //   Trash2,
-  //   Filter,
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { Employee, Department } from "../../types";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { DatePicker } from "../../components/ui/date-picker";
 
 const STATUS_COLORS: Record<string, string> = {
   ACTIVE: "bg-green-100 text-green-700",
   ON_LEAVE: "bg-amber-100 text-amber-700",
   TERMINATED: "bg-gray-100 text-gray-600",
 };
+
+const HONORIFICS = ["Mr", "Mrs", "Ms", "Dr", "Rev", "Prof", "Chief"];
 
 const formatMWK = (n: number) => `MWK ${Number(n || 0).toLocaleString()}`;
 
@@ -32,6 +40,9 @@ const computeNet = (e: Employee) => {
     Number(e.payeTax) + Number(e.pensionDeduction) + Number(e.otherDeductions);
   return gross - deductions;
 };
+
+const displayName = (e: Employee) =>
+  [e.honorific, e.firstName, e.lastName].filter(Boolean).join(" ");
 
 export default function EmployeesPage() {
   const navigate = useNavigate();
@@ -169,28 +180,38 @@ export default function EmployeesPage() {
             className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
           />
         </div>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+
+        <Select
+          value={statusFilter || "ALL"}
+          onValueChange={(v) => setStatusFilter(v === "ALL" ? "" : v)}
         >
-          <option value="">All Statuses</option>
-          <option value="ACTIVE">Active</option>
-          <option value="ON_LEAVE">On Leave</option>
-          <option value="TERMINATED">Terminated</option>
-        </select>
-        <select
-          value={departmentFilter}
-          onChange={(e) => setDepartmentFilter(e.target.value)}
-          className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+          <SelectTrigger className="w-[180px] bg-white border-gray-300 rounded-lg text-sm h-[42px]">
+            <SelectValue placeholder="All Statuses" />
+          </SelectTrigger>
+          <SelectContent className="bg-white">
+            <SelectItem value="ALL">All Statuses</SelectItem>
+            <SelectItem value="ACTIVE">Active</SelectItem>
+            <SelectItem value="ON_LEAVE">On Leave</SelectItem>
+            <SelectItem value="TERMINATED">Terminated</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select
+          value={departmentFilter || "ALL"}
+          onValueChange={(v) => setDepartmentFilter(v === "ALL" ? "" : v)}
         >
-          <option value="">All Departments</option>
-          {departments.map((d) => (
-            <option key={d.id} value={d.id}>
-              {d.name}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-[200px] bg-white border-gray-300 rounded-lg text-sm h-[42px]">
+            <SelectValue placeholder="All Departments" />
+          </SelectTrigger>
+          <SelectContent className="bg-white">
+            <SelectItem value="ALL">All Departments</SelectItem>
+            {departments.map((d) => (
+              <SelectItem key={d.id} value={d.id}>
+                {d.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Table */}
@@ -218,7 +239,7 @@ export default function EmployeesPage() {
                     Name
                   </th>
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
-                    Title
+                    Job Title
                   </th>
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
                     Department
@@ -250,11 +271,11 @@ export default function EmployeesPage() {
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-[var(--color-primary-light)] text-[var(--color-primary)] flex items-center justify-center text-sm font-bold shrink-0">
-                          {emp.fullName.charAt(0)}
+                          {emp.firstName.charAt(0)}
                         </div>
                         <div className="min-w-0">
                           <p className="text-sm font-medium text-gray-800 truncate">
-                            {emp.fullName}
+                            {displayName(emp)}
                           </p>
                           <p className="text-xs text-gray-400 truncate">
                             {emp.email || "—"}
@@ -331,8 +352,10 @@ function EmployeeModal({
 }) {
   const isEdit = !!employee;
   const [form, setForm] = useState({
+    honorific: (employee as any)?.honorific || "",
     firstName: employee?.firstName || "",
     lastName: employee?.lastName || "",
+    gender: (employee as any)?.gender || "",
     title: employee?.title || "",
     departmentId: employee?.departmentId || "",
     phone: employee?.phone || "",
@@ -375,8 +398,10 @@ function EmployeeModal({
     setError("");
     try {
       const body: any = {
+        honorific: form.honorific.trim() || null,
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
+        gender: form.gender || null,
         title: form.title.trim() || null,
         departmentId: form.departmentId || null,
         phone: form.phone.trim() || null,
@@ -445,6 +470,47 @@ function EmployeeModal({
               Personal Info
             </p>
             <div className="grid grid-cols-2 gap-3">
+              {/* Honorific */}
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Title
+                </label>
+                <Select
+                  value={form.honorific}
+                  onValueChange={(v) => set("honorific", v)}
+                >
+                  <SelectTrigger className="w-full bg-white border-gray-200 rounded-lg text-sm h-[38px]">
+                    <SelectValue placeholder="Select title" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    {HONORIFICS.map((h) => (
+                      <SelectItem key={h} value={h}>
+                        {h}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Gender */}
+              <div className="col-span-2 sm:col-span-1">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Gender
+                </label>
+                <Select
+                  value={form.gender}
+                  onValueChange={(v) => set("gender", v)}
+                >
+                  <SelectTrigger className="w-full bg-white border-gray-200 rounded-lg text-sm h-[38px]">
+                    <SelectValue placeholder="Select gender" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="MALE">Male</SelectItem>
+                    <SelectItem value="FEMALE">Female</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
               <input
                 required
                 value={form.firstName}
@@ -462,21 +528,35 @@ function EmployeeModal({
               <input
                 value={form.title}
                 onChange={(e) => set("title", e.target.value)}
-                placeholder="Job title (e.g. Driver)"
+                placeholder="Job title (e.g. Driver, Cook, Teacher)"
                 className="col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm"
               />
-              <select
-                value={form.departmentId}
-                onChange={(e) => set("departmentId", e.target.value)}
-                className="col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm"
-              >
-                <option value="">No department</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
+
+              {/* Department */}
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Department
+                </label>
+                <Select
+                  value={form.departmentId || "NONE"}
+                  onValueChange={(v) =>
+                    set("departmentId", v === "NONE" ? "" : v)
+                  }
+                >
+                  <SelectTrigger className="w-full bg-white border-gray-200 rounded-lg text-sm h-[38px]">
+                    <SelectValue placeholder="No department" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="NONE">No department</SelectItem>
+                    {departments.map((d) => (
+                      <SelectItem key={d.id} value={d.id}>
+                        {d.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               <input
                 value={form.phone}
                 onChange={(e) => set("phone", e.target.value)}
@@ -495,18 +575,34 @@ function EmployeeModal({
                 placeholder="National ID"
                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
               />
-              <input
-                type="date"
-                value={form.dateOfBirth}
-                onChange={(e) => set("dateOfBirth", e.target.value)}
-                className="px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600"
-              />
-              <input
-                type="date"
-                value={form.hireDate}
-                onChange={(e) => set("hireDate", e.target.value)}
-                className="col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-600"
-              />
+
+              {/* Date of Birth */}
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Date of Birth
+                </label>
+                <DatePicker
+                  value={form.dateOfBirth}
+                  onChange={(v) => set("dateOfBirth", v)}
+                  placeholder="Pick date of birth"
+                  clearable
+                  className="w-full"
+                />
+              </div>
+
+              {/* Hire Date */}
+              <div className="col-span-2">
+                <label className="block text-xs font-medium text-gray-600 mb-1">
+                  Hire Date
+                </label>
+                <DatePicker
+                  value={form.hireDate}
+                  onChange={(v) => set("hireDate", v)}
+                  placeholder="Pick hire date"
+                  clearable
+                  className="w-full"
+                />
+              </div>
             </div>
           </section>
 
@@ -615,18 +711,24 @@ function EmployeeModal({
 
           {/* Status + notes */}
           <section className="grid grid-cols-2 gap-3">
-            <label className="text-xs text-gray-600">
-              Status
-              <select
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">
+                Status
+              </label>
+              <Select
                 value={form.status}
-                onChange={(e) => set("status", e.target.value)}
-                className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                onValueChange={(v) => set("status", v)}
               >
-                <option value="ACTIVE">Active</option>
-                <option value="ON_LEAVE">On Leave</option>
-                <option value="TERMINATED">Terminated</option>
-              </select>
-            </label>
+                <SelectTrigger className="w-full bg-white border-gray-200 rounded-lg text-sm h-[38px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-white">
+                  <SelectItem value="ACTIVE">Active</SelectItem>
+                  <SelectItem value="ON_LEAVE">On Leave</SelectItem>
+                  <SelectItem value="TERMINATED">Terminated</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <input
               value={form.notes}
               onChange={(e) => set("notes", e.target.value)}
