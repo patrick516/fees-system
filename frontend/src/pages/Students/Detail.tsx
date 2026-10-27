@@ -117,13 +117,31 @@ const StudentDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  const handlePrint = (payment: any) => {
+  const handlePrint = async (payment: any) => {
     setReceiptToPrint(payment);
-    setTimeout(() => {
-      window.print();
-      setReceiptToPrint(null);
-    }, 150);
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const logoUrl = schoolLogo || "/images/SchoolPayLogo.jpg";
+    try {
+      await new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(true);
+        img.src = logoUrl;
+        setTimeout(() => resolve(true), 1500);
+      });
+    } catch {
+      // Ignore
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    window.print();
+    setReceiptToPrint(null);
   };
+
   const handleApplyDiscount = async (e: React.FormEvent) => {
     e.preventDefault();
     setDiscountError("");
@@ -232,9 +250,29 @@ const StudentDetail = () => {
     <>
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          .print-receipt, .print-receipt * { visibility: visible; }
-          .print-receipt { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+          body * { visibility: hidden !important; }
+          .print-receipt,
+          .print-receipt * { visibility: visible !important; }
+          .print-receipt {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            padding: 20px !important;
+            background: white !important;
+            color: black !important;
+            display: block !important;
+          }
+          .print-receipt table { display: table !important; }
+          .print-receipt thead { display: table-header-group !important; }
+          .print-receipt tbody { display: table-row-group !important; }
+          .print-receipt tfoot { display: table-footer-group !important; }
+          .print-receipt tr { display: table-row !important; }
+          .print-receipt th,
+          .print-receipt td { display: table-cell !important; }
+          .print-receipt .flex { display: flex !important; }
+          .print-receipt .grid { display: grid !important; }
+          .print-receipt img { display: block !important; max-width: 100% !important; }
           @page { margin: 15mm; size: auto; }
         }
       `}</style>
@@ -916,13 +954,12 @@ const StudentDetail = () => {
         <div className="print-receipt hidden print:block">
           <div className="max-w-3xl mx-auto p-8 bg-white">
             <div className="text-center border-b-2 border-gray-300 pb-6 mb-6 flex flex-col items-center">
-              {schoolLogo && (
-                <img
-                  src={schoolLogo}
-                  alt="School Logo"
-                  className="h-20 w-20 object-contain mb-3"
-                />
-              )}
+              <img
+                src={schoolLogo || "/images/SchoolPayLogo.jpg"}
+                alt="School Logo"
+                className="h-20 w-20 object-contain mb-3"
+                crossOrigin="anonymous"
+              />
               <h1 className="text-3xl font-bold text-gray-900 mb-1">
                 {student.school?.name || "SchoolPay"}
               </h1>

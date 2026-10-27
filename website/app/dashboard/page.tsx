@@ -38,13 +38,9 @@ export default function DashboardPage() {
   const [resultsAvailable, setResultsAvailable] = useState(false);
   const [termStatus, setTermStatus] = useState<any>(null);
 
-  // State for printing
   const [receiptToPrint, setReceiptToPrint] = useState<any>(null);
-
-  // Copy-to-clipboard feedback for the Student ID
   const [copied, setCopied] = useState(false);
 
-  // Active term — same source of truth as admin
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
 
   useEffect(() => {
@@ -56,7 +52,6 @@ export default function DashboardPage() {
     fetchData();
   }, [_hasHydrated, isAuthenticated]);
 
-  // Fetch term status (required fee + balance) whenever the student or active term is known
   useEffect(() => {
     if (!student?.id || !currentTerm || !activeYear) return;
     api
@@ -83,15 +78,12 @@ export default function DashboardPage() {
 
       if (student?.id) {
         try {
-          // Try fetching this specific student's results
           const resultsRes = await api.get(
             `/exams/student-results/${student.id}`,
           );
-          // If the backend returns an array of results, show the tab
           const hasMarks = resultsRes.data?.data?.results?.length > 0;
           setResultsAvailable(hasMarks);
         } catch {
-          // If the backend returns a 404 (no results yet), hide the tab
           setResultsAvailable(false);
         }
       }
@@ -107,17 +99,32 @@ export default function DashboardPage() {
     router.push("/");
   };
 
-  const handlePrint = (payment: any) => {
+  const handlePrint = async (payment: any) => {
     setReceiptToPrint(payment);
-    setTimeout(() => {
-      window.print();
-      setReceiptToPrint(null);
-    }, 150);
+
+    await new Promise((resolve) => setTimeout(resolve, 100));
+
+    const logoUrl = student?.school?.logo || "/images/SchoolPayLogo.jpg";
+    try {
+      await new Promise((resolve) => {
+        const img = new Image();
+        img.crossOrigin = "anonymous";
+        img.onload = () => resolve(true);
+        img.onerror = () => resolve(true);
+        img.src = logoUrl;
+        setTimeout(() => resolve(true), 1500);
+      });
+    } catch {
+      // Ignore
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 150));
+
+    window.print();
+    setReceiptToPrint(null);
   };
 
-  // 🎯 Reliable copy that works on all mobile browsers
   const copyToClipboard = async (text: string) => {
-    // Modern API (works on HTTPS + recent browsers)
     try {
       if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text);
@@ -127,7 +134,6 @@ export default function DashboardPage() {
       }
     } catch {}
 
-    // Fallback for older mobile browsers
     try {
       const ta = document.createElement("textarea");
       ta.value = text;
@@ -142,7 +148,6 @@ export default function DashboardPage() {
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
-      // Last resort: prompt the user
       alert(`Please copy manually: ${text}`);
     }
   };
@@ -151,6 +156,7 @@ export default function DashboardPage() {
     if (!student?.studentCode) return;
     copyToClipboard(student.studentCode);
   };
+
   if (!_hasHydrated || loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -162,8 +168,6 @@ export default function DashboardPage() {
   const summary = data?.payments?.summary || {};
   const pendingPayments = payments.filter((p: any) => p.status === "PENDING");
 
-  // Pull values from termStatus — the amount required, what's been paid for the
-  // active term, and the remaining balance
   const requiredAmount = termStatus?.termStatus?.requiredAmount || 0;
   const paidThisTerm = termStatus?.termStatus?.totalPaidThisTerm || 0;
   const balanceRemaining = termStatus?.termStatus?.balanceRemaining || 0;
@@ -186,7 +190,6 @@ export default function DashboardPage() {
     ...(resultsAvailable ? [{ key: "results" as Tab, label: "Results" }] : []),
   ];
 
-  // The three term summary cards (Required / Paid / Balance)
   const summaryCards = [
     {
       label: "Required",
@@ -224,18 +227,37 @@ export default function DashboardPage() {
     <>
       <style>{`
         @media print {
-          body * { visibility: hidden; }
-          .print-receipt, .print-receipt * { visibility: visible; }
-          .print-receipt { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; }
+          body * { visibility: hidden !important; }
+          .print-receipt,
+          .print-receipt * { visibility: visible !important; }
+          .print-receipt {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            padding: 20px !important;
+            background: white !important;
+            color: black !important;
+            display: block !important;
+          }
+          .print-receipt table { display: table !important; }
+          .print-receipt thead { display: table-header-group !important; }
+          .print-receipt tbody { display: table-row-group !important; }
+          .print-receipt tfoot { display: table-footer-group !important; }
+          .print-receipt tr { display: table-row !important; }
+          .print-receipt th,
+          .print-receipt td { display: table-cell !important; }
+          .print-receipt .flex { display: flex !important; }
+          .print-receipt .grid { display: grid !important; }
+          .print-receipt img { display: block !important; max-width: 100% !important; }
           @page { margin: 15mm; size: auto; }
         }
       `}</style>
 
       <div className="min-h-screen bg-slate-50 py-4 px-3 sm:py-6 sm:px-6 lg:py-8 lg:px-8 print:hidden">
         <div className="max-w-6xl mx-auto w-full space-y-4">
-          {/* ==================== HEADER ==================== */}
+          {/* HEADER */}
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm px-4 py-3 lg:px-6 lg:py-4 flex items-center justify-between gap-3">
-            {/* Brand + school */}
             <div className="flex items-center gap-3 min-w-0">
               <img
                 src="/images/SchoolPayLogo.jpg"
@@ -260,7 +282,6 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            {/* Student (laptop) + avatar + logout */}
             <div className="flex items-center gap-2 lg:gap-4 shrink-0">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 lg:w-12 lg:h-12 rounded-full bg-blue-100 text-blue-950 flex items-center justify-center text-base lg:text-xl font-bold shrink-0">
@@ -302,7 +323,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Student card (mobile only) */}
+          {/* Mobile student card */}
           <div className="lg:hidden bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex items-center gap-3">
             <div className="w-14 h-14 rounded-full bg-blue-100 text-blue-950 flex items-center justify-center text-2xl font-bold shrink-0">
               {student?.fullName?.charAt(0)}
@@ -320,7 +341,7 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* ==================== TABS ==================== */}
+          {/* TABS */}
           <div className="flex border-b border-slate-200 overflow-x-auto">
             {tabs.map((tab) => (
               <button
@@ -337,12 +358,10 @@ export default function DashboardPage() {
             ))}
           </div>
 
-          {/* ==================== OVERVIEW TAB ==================== */}
+          {/* OVERVIEW TAB */}
           {activeTab === "overview" && (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-5">
-              {/* Left: fee summary + actions */}
               <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-4 sm:p-6 space-y-4">
-                {/* Fee Summary — Required / Paid / Balance */}
                 {hasFeeStructure && currentTerm && (
                   <div className="space-y-3">
                     <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -354,7 +373,6 @@ export default function DashboardPage() {
                           key={c.label}
                           className={`rounded-2xl border p-4 ${c.box}`}
                         >
-                          {/* Phones: icon on the left, text on the right */}
                           <div className="flex items-center gap-3 sm:hidden">
                             <div
                               className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${c.circle}`}
@@ -373,7 +391,6 @@ export default function DashboardPage() {
                             </div>
                           </div>
 
-                          {/* Tablet and laptop: icon + label, value below */}
                           <div className="hidden sm:block">
                             <div className="flex items-center gap-2.5 mb-3">
                               <div
@@ -397,7 +414,6 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Fallback when no fee structure or active term yet */}
                 {!hasFeeStructure && (
                   <div className="grid grid-cols-2 gap-3">
                     <div className="bg-emerald-50 rounded-2xl p-4 border border-emerald-100">
@@ -425,7 +441,6 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Notices */}
                 {hasFeeStructure && !isClear && (
                   <div className="flex items-center gap-3 bg-amber-50 border border-amber-200 rounded-xl p-3.5">
                     <AlertCircle
@@ -474,7 +489,6 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Actions */}
                 <div className="space-y-3">
                   <button
                     onClick={() => router.push("/pay")}
@@ -510,9 +524,7 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Right: contact + recent activity */}
               <div className="space-y-4">
-                {/* School Contact */}
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 lg:p-6">
                   <h3 className="hidden lg:block text-base font-bold text-blue-950 pb-4 mb-4 border-b border-slate-200">
                     School Contact
@@ -547,7 +559,6 @@ export default function DashboardPage() {
                   </div>
                 </div>
 
-                {/* Recent Activity */}
                 {payments.length > 0 && (
                   <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                     <div className="px-4 py-3 border-b border-slate-200">
@@ -628,7 +639,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* ==================== PAYMENTS TAB ==================== */}
+          {/* PAYMENTS TAB */}
           {activeTab === "payments" && (
             <div className="lg:max-w-2xl lg:mx-auto bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
               <div className="px-4 py-3 border-b border-slate-200">
@@ -697,7 +708,7 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* ==================== INFO TAB ==================== */}
+          {/* INFO TAB */}
           {activeTab === "info" && !hasPaymentInfo && (
             <div className="lg:max-w-2xl lg:mx-auto bg-white rounded-2xl border border-slate-200 shadow-sm p-10 text-center text-slate-400">
               <Wallet size={32} className="mx-auto mb-2 opacity-50" />
@@ -709,7 +720,6 @@ export default function DashboardPage() {
 
           {activeTab === "info" && hasPaymentInfo && (
             <div className="lg:max-w-2xl lg:mx-auto space-y-3">
-              {/* Reference Number */}
               <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
                 <p className="text-xs font-medium text-blue-800">
                   Your Reference Number
@@ -722,7 +732,6 @@ export default function DashboardPage() {
                 </p>
               </div>
 
-              {/* Bank Accounts */}
               {paymentInfo.bankAccounts &&
                 paymentInfo.bankAccounts.length > 0 && (
                   <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -764,7 +773,6 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-              {/* Mobile Money */}
               {(paymentInfo.airtelMoneyNumber || paymentInfo.mpambaNumber) && (
                 <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
                   <div className="px-4 py-3 bg-slate-50 border-b border-slate-200">
@@ -824,7 +832,7 @@ export default function DashboardPage() {
                   )}
                 </div>
               )}
-              {/* Instructions */}
+
               {paymentInfo.paymentInstructions && (
                 <div className="bg-slate-100 rounded-2xl p-4 border border-slate-200">
                   <p className="text-xs font-medium text-slate-600 mb-1">
@@ -838,7 +846,6 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* ==================== RESULTS TAB ==================== */}
           {activeTab === "results" && student?.id && (
             <div className="lg:max-w-2xl lg:mx-auto">
               <ResultsView studentId={student.id} />
@@ -847,18 +854,17 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {/*  HIDDEN RECEIPT PRINT LAYOUT */}
+      {/* HIDDEN RECEIPT PRINT LAYOUT — logo properly placed here */}
       {receiptToPrint && (
         <div className="print-receipt hidden print:block">
           <div className="max-w-3xl mx-auto p-8 bg-white text-black">
             <div className="text-center border-b-2 border-gray-300 pb-6 mb-6 flex flex-col items-center">
-              {student?.school?.logo && (
-                <img
-                  src={student.school.logo}
-                  alt="School Logo"
-                  className="h-20 w-20 object-contain mb-3"
-                />
-              )}
+              <img
+                src={student?.school?.logo || "/images/SchoolPayLogo.jpg"}
+                alt="School Logo"
+                className="h-20 w-20 object-contain mb-3"
+                crossOrigin="anonymous"
+              />
               <h1 className="text-3xl font-bold text-gray-900 mb-1">
                 {student?.school?.name || "SchoolPay"}
               </h1>
