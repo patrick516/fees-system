@@ -20,6 +20,7 @@ import {
   Percent,
   Plus,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import api from "../../lib/axios";
 import { usePermission } from "../../hooks/usePermission";
@@ -75,6 +76,26 @@ const StudentDetail = () => {
   });
   const [applyingDiscount, setApplyingDiscount] = useState(false);
 
+  //  Apply discount error (replaces alert)
+  const [discountError, setDiscountError] = useState("");
+
+  //  Remove discount confirmation modal state
+  const [removeDiscountModal, setRemoveDiscountModal] = useState<{
+    open: boolean;
+    discountId: string | null;
+    termLabel: string;
+    amount: number;
+    error: string | null;
+    deleting: boolean;
+  }>({
+    open: false,
+    discountId: null,
+    termLabel: "",
+    amount: 0,
+    error: null,
+    deleting: false,
+  });
+
   const fetchStudent = () => {
     setLoading(true);
     api
@@ -103,29 +124,61 @@ const StudentDetail = () => {
       setReceiptToPrint(null);
     }, 150);
   };
-
   const handleApplyDiscount = async (e: React.FormEvent) => {
     e.preventDefault();
+    setDiscountError("");
     setApplyingDiscount(true);
     try {
       await api.post(`/students/${id}/discounts`, discountForm);
       setShowDiscountModal(false);
-      setDiscountForm({ ...discountForm, amount: "", reason: "" }); // Reset
-      fetchStudent(); // Refresh data to show new discount
+      setDiscountForm({ ...discountForm, amount: "", reason: "" });
+      fetchStudent();
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to apply discount");
+      setDiscountError(
+        err.response?.data?.message || "Failed to apply discount",
+      );
     } finally {
       setApplyingDiscount(false);
     }
   };
 
-  const handleRemoveDiscount = async (discountId: string) => {
-    if (!confirm("Are you sure you want to remove this discount?")) return;
+  const openRemoveDiscountModal = (d: any) => {
+    setRemoveDiscountModal({
+      open: true,
+      discountId: d.id,
+      termLabel: `${termLabel(d.term)} ${d.academicYear}`,
+      amount: Number(d.amount),
+      error: null,
+      deleting: false,
+    });
+  };
+
+  const handleRemoveDiscount = async () => {
+    if (!removeDiscountModal.discountId) return;
+    setRemoveDiscountModal((prev) => ({
+      ...prev,
+      deleting: true,
+      error: null,
+    }));
     try {
-      await api.delete(`/students/${id}/discounts/${discountId}`);
+      await api.delete(
+        `/students/${id}/discounts/${removeDiscountModal.discountId}`,
+      );
+      setRemoveDiscountModal({
+        open: false,
+        discountId: null,
+        termLabel: "",
+        amount: 0,
+        error: null,
+        deleting: false,
+      });
       fetchStudent();
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to remove discount");
+      setRemoveDiscountModal((prev) => ({
+        ...prev,
+        deleting: false,
+        error: err.response?.data?.message || "Failed to remove discount",
+      }));
     }
   };
 
@@ -567,7 +620,7 @@ const StudentDetail = () => {
                           </p>
                           {can("payments", "write") && (
                             <button
-                              onClick={() => handleRemoveDiscount(d.id)}
+                              onClick={() => openRemoveDiscountModal(d)}
                               className="p-1.5 text-purple-400 hover:text-red-500 hover:bg-white rounded transition-colors"
                             >
                               <Trash2 size={14} />
@@ -827,10 +880,20 @@ const StudentDetail = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 outline-none"
                 />
               </div>
+              {discountError && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                  <span>{discountError}</span>
+                </div>
+              )}
+
               <div className="flex justify-end gap-2 pt-2">
                 <button
                   type="button"
-                  onClick={() => setShowDiscountModal(false)}
+                  onClick={() => {
+                    setShowDiscountModal(false);
+                    setDiscountError("");
+                  }}
                   className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
                 >
                   Cancel
@@ -987,6 +1050,70 @@ const StudentDetail = () => {
               <p className="mt-1 font-semibold text-gray-500">
                 Thank you for your payment.
               </p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== REMOVE DISCOUNT MODAL ==================== */}
+      {removeDiscountModal.open && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() =>
+            !removeDiscountModal.deleting &&
+            setRemoveDiscountModal((prev) => ({ ...prev, open: false }))
+          }
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <Percent size={22} className="text-red-600" />
+            </div>
+            <h3 className="text-base font-bold text-gray-900 text-center mb-2">
+              Remove this discount?
+            </h3>
+            <p className="text-sm text-gray-500 text-center mb-1 leading-relaxed">
+              <span className="font-semibold text-gray-800">
+                {removeDiscountModal.termLabel}
+              </span>
+            </p>
+            <p className="text-sm text-gray-500 text-center mb-4 leading-relaxed">
+              The discount of{" "}
+              <span className="font-semibold text-purple-700">
+                MWK {removeDiscountModal.amount.toLocaleString()}
+              </span>{" "}
+              will be removed. The student&apos;s balance will increase back to
+              the full amount.
+            </p>
+            {removeDiscountModal.error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs mb-3 text-center">
+                {removeDiscountModal.error}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() =>
+                  setRemoveDiscountModal((prev) => ({ ...prev, open: false }))
+                }
+                disabled={removeDiscountModal.deleting}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleRemoveDiscount}
+                disabled={removeDiscountModal.deleting}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+              >
+                {removeDiscountModal.deleting ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Trash2 size={14} />
+                )}
+                {removeDiscountModal.deleting ? "Removing..." : "Yes, Remove"}
+              </button>
             </div>
           </div>
         </div>

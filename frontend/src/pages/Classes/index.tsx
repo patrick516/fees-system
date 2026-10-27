@@ -74,6 +74,24 @@ const ClassesPage = () => {
   const [classError, setClassError] = useState("");
   const [expandedClass, setExpandedClass] = useState<string | null>(null);
 
+  // 🎯 Delete confirmation modal state
+  const [deleteModal, setDeleteModal] = useState<{
+    open: boolean;
+    classId: string | null;
+    className: string;
+    error: string | null;
+    deleting: boolean;
+  }>({
+    open: false,
+    classId: null,
+    className: "",
+    error: null,
+    deleting: false,
+  });
+
+  //  Payment details save error (replaces alert)
+  const [paymentSaveError, setPaymentSaveError] = useState("");
+
   // Payment details state
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [mobileMoney, setMobileMoney] = useState({
@@ -261,7 +279,9 @@ const ClassesPage = () => {
       setPaymentDetailsSaved(true);
       setTimeout(() => setPaymentDetailsSaved(false), 3000);
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to save");
+      setPaymentSaveError(
+        err.response?.data?.message || "Failed to save payment details",
+      );
     } finally {
       setPaymentDetailsLoading(false);
     }
@@ -313,13 +333,35 @@ const ClassesPage = () => {
     }
   };
 
-  const handleDeleteClass = async (classId: string) => {
-    if (!confirm("Are you sure you want to delete this class?")) return;
+  const openDeleteModal = (cls: any) => {
+    setDeleteModal({
+      open: true,
+      classId: cls.id,
+      className: cls.name,
+      error: null,
+      deleting: false,
+    });
+  };
+
+  const handleDeleteClass = async () => {
+    if (!deleteModal.classId) return;
+    setDeleteModal((prev) => ({ ...prev, deleting: true, error: null }));
     try {
-      await api.delete(`/schools/classes/${classId}`);
+      await api.delete(`/schools/classes/${deleteModal.classId}`);
+      setDeleteModal({
+        open: false,
+        classId: null,
+        className: "",
+        error: null,
+        deleting: false,
+      });
       fetchClasses();
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to delete class");
+      setDeleteModal((prev) => ({
+        ...prev,
+        deleting: false,
+        error: err.response?.data?.message || "Failed to delete class",
+      }));
     }
   };
 
@@ -971,7 +1013,7 @@ const ClassesPage = () => {
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteClass(cls.id);
+                        openDeleteModal(cls);
                       }}
                       className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
                       title="Delete class"
@@ -1483,6 +1525,13 @@ const ClassesPage = () => {
               />
             </div>
 
+            {paymentSaveError && (
+              <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                <span>{paymentSaveError}</span>
+              </div>
+            )}
+
             <div className="flex items-center gap-3">
               <button
                 type="submit"
@@ -1728,6 +1777,64 @@ const ClassesPage = () => {
                     <CheckCircle size={14} /> Yes, Activate
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ==================== DELETE CLASS MODAL ==================== */}
+      {deleteModal.open && (
+        <div
+          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
+          onClick={() =>
+            !deleteModal.deleting &&
+            setDeleteModal((prev) => ({ ...prev, open: false }))
+          }
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={22} className="text-red-600" />
+            </div>
+            <h3 className="text-base font-bold text-gray-900 text-center mb-2">
+              Delete this class?
+            </h3>
+            <p className="text-sm text-gray-500 text-center mb-4 leading-relaxed">
+              <span className="font-semibold text-gray-800">
+                {deleteModal.className}
+              </span>{" "}
+              will be removed. Students in this class must be moved to another
+              class first.
+            </p>
+            {deleteModal.error && (
+              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs mb-3 text-center">
+                {deleteModal.error}
+              </div>
+            )}
+            <div className="flex gap-3">
+              <button
+                onClick={() =>
+                  setDeleteModal((prev) => ({ ...prev, open: false }))
+                }
+                disabled={deleteModal.deleting}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 disabled:opacity-40"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteClass}
+                disabled={deleteModal.deleting}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleteModal.deleting ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Trash2 size={14} />
+                )}
+                {deleteModal.deleting ? "Deleting..." : "Yes, Delete"}
               </button>
             </div>
           </div>
