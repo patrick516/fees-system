@@ -746,13 +746,6 @@ const parentLoginWithStudentId = async (req, res) => {
       .replace(/[^\w\-]/g, "")
       .trim();
 
-    console.log("  PARENT LOGIN ATTEMPT:", {
-      raw: JSON.stringify(studentCode),
-      rawCodes: Array.from(String(studentCode)).map((c) => c.charCodeAt(0)),
-      normalized: normalizedCode,
-      dob: dateOfBirth,
-    });
-
     const student = await prisma.student.findFirst({
       where: { studentCode: normalizedCode },
       include: {
