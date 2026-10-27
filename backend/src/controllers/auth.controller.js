@@ -738,13 +738,20 @@ const parentLoginWithStudentId = async (req, res) => {
       });
     }
 
-    // 🎯 Normalize the student code: handle smart hyphens, spaces, and casing
+    //  Normalize the student code: handle smart hyphens, spaces, and casing
     const normalizedCode = String(studentCode)
       .toUpperCase()
       .replace(/[\u2010-\u2015]/g, "-")
       .replace(/\s+/g, "")
       .replace(/[^\w\-]/g, "")
       .trim();
+
+    console.log("  PARENT LOGIN ATTEMPT:", {
+      raw: JSON.stringify(studentCode),
+      rawCodes: Array.from(String(studentCode)).map((c) => c.charCodeAt(0)),
+      normalized: normalizedCode,
+      dob: dateOfBirth,
+    });
 
     const student = await prisma.student.findFirst({
       where: { studentCode: normalizedCode },
