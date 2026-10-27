@@ -48,11 +48,11 @@ const formatDate = (iso?: string | null) => {
 
 const termLabel = (t?: string | null) =>
   t ? t.replace("_", " ").replace("TERM", "Term") : "";
-// Formats a number string with commas (e.g. 2500000 -> 2,500,000)
+
 const formatCurrency = (val: string | number) => {
   if (val === undefined || val === null || val === "") return "";
   const str = String(val).replace(/,/g, "");
-  if (str.endsWith(".")) return str; // allow typing decimals
+  if (str.endsWith(".")) return str;
   const parts = str.split(".");
   parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   return parts.join(".");
@@ -74,7 +74,7 @@ const ClassesPage = () => {
   const [classError, setClassError] = useState("");
   const [expandedClass, setExpandedClass] = useState<string | null>(null);
 
-  // 🎯 Delete confirmation modal state
+  // Delete confirmation modal
   const [deleteModal, setDeleteModal] = useState<{
     open: boolean;
     classId: string | null;
@@ -89,14 +89,15 @@ const ClassesPage = () => {
     deleting: false,
   });
 
-  //  Payment details save error (replaces alert)
   const [paymentSaveError, setPaymentSaveError] = useState("");
 
   // Payment details state
   const [bankAccounts, setBankAccounts] = useState<any[]>([]);
   const [mobileMoney, setMobileMoney] = useState({
     airtelMoneyNumber: "",
+    airtelMoneyName: "",
     mpambaNumber: "",
+    mpambaName: "",
     paymentInstructions: "",
   });
   const [paymentDetailsLoading, setPaymentDetailsLoading] = useState(false);
@@ -107,7 +108,9 @@ const ClassesPage = () => {
     bankAccounts: any[];
     mobileMoney: {
       airtelMoneyNumber: string;
+      airtelMoneyName: string;
       mpambaNumber: string;
+      mpambaName: string;
       paymentInstructions: string;
     };
   } | null>(null);
@@ -119,10 +122,10 @@ const ClassesPage = () => {
     branch: "",
   });
 
-  // Active term — single source of truth for the whole app
+  // Active term
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
 
-  // Fee structure form state
+  // Fee structure form
   const [feeForm, setFeeForm] = useState({
     classId: "",
     term: "TERM_1",
@@ -153,17 +156,17 @@ const ClassesPage = () => {
   const [activateSuccess, setActivateSuccess] = useState("");
   const [showActivateForm, setShowActivateForm] = useState(false);
 
-  // Confirmation modal state
+  // Confirmation modal
   const [confirmModal, setConfirmModal] = useState<{
     open: boolean;
     skipWarning: string | null;
   }>({ open: false, skipWarning: null });
 
-  // Term history state
+  // Term history
   const [termHistory, setTermHistory] = useState<any[]>([]);
   const [termHistoryLoading, setTermHistoryLoading] = useState(true);
 
-  // Sync the Activate Term form with the activated values as soon as they load
+  // Sync Activate Term form
   useEffect(() => {
     if (activeYear) {
       setActivateForm((prev) => ({ ...prev, academicYear: activeYear }));
@@ -190,7 +193,7 @@ const ClassesPage = () => {
     activeTerm?.activeTermEndDate,
   ]);
 
-  // Keep the new fee form in sync with the activated term/year
+  // Sync new fee form
   useEffect(() => {
     if (activeYear && showFeeForm && !editingFee) {
       setFeeForm((prev) => ({
@@ -240,7 +243,9 @@ const ClassesPage = () => {
       const banks = school.bankAccounts || [];
       const mm = {
         airtelMoneyNumber: school.airtelMoneyNumber || "",
+        airtelMoneyName: school.airtelMoneyName || "",
         mpambaNumber: school.mpambaNumber || "",
+        mpambaName: school.mpambaName || "",
         paymentInstructions: school.paymentInstructions || "",
       };
       setBankAccounts(banks);
@@ -266,6 +271,7 @@ const ClassesPage = () => {
 
   const handleSavePaymentDetails = async (e: React.FormEvent) => {
     e.preventDefault();
+    setPaymentSaveError("");
     setPaymentDetailsLoading(true);
     try {
       await api.put("/schools/payment-details", {
@@ -294,6 +300,7 @@ const ClassesPage = () => {
     }
     setShowAddBank(false);
     setIsEditingPayment(false);
+    setPaymentSaveError("");
   };
 
   const handleAddBank = () => {
@@ -463,10 +470,8 @@ const ClassesPage = () => {
     }
   };
 
-  // Compute whether the new selection skips or reverses a term
   const computeSkipWarning = (): string | null => {
     if (!activeTerm?.activeTerm || !activeTerm?.activeAcademicYear) return null;
-    // Year change is a fresh cycle, no skip warning
     if (activeTerm.activeAcademicYear !== activateForm.academicYear)
       return null;
 
@@ -484,7 +489,6 @@ const ClassesPage = () => {
     return null;
   };
 
-  // Form submit → open confirmation modal (never submit directly)
   const handleActivateTerm = (e: React.FormEvent) => {
     e.preventDefault();
     setActivateError("");
@@ -501,7 +505,6 @@ const ClassesPage = () => {
     setConfirmModal({ open: true, skipWarning });
   };
 
-  // Modal confirm → actually send request
   const handleConfirmActivate = async () => {
     setConfirmModal({ open: false, skipWarning: null });
     setActivateError("");
@@ -525,7 +528,6 @@ const ClassesPage = () => {
     }
   };
 
-  // Fee structure for the currently active term (or undefined if not set)
   const getActiveFee = (cls: any) =>
     cls.feeStructures?.find(
       (f: any) => f.term === currentTerm && f.academicYear === activeYear,
@@ -924,7 +926,7 @@ const ClassesPage = () => {
         </div>
       )}
 
-      {/* Classes List with Fee Structures */}
+      {/* Classes List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {!loading && classes.length > 0 && (
           <div className="grid grid-cols-12 gap-2 px-4 sm:px-6 py-2.5 bg-gray-50 border-b border-gray-100 text-xs font-medium text-gray-500 uppercase">
@@ -955,7 +957,6 @@ const ClassesPage = () => {
                   setExpandedClass(expandedClass === cls.id ? null : cls.id)
                 }
               >
-                {/* Class */}
                 <div className="col-span-5 sm:col-span-4 flex items-center gap-3 min-w-0">
                   <div className="w-9 h-9 bg-[var(--color-primary-light)] rounded-lg flex items-center justify-center shrink-0">
                     <GraduationCap
@@ -971,12 +972,10 @@ const ClassesPage = () => {
                   </div>
                 </div>
 
-                {/* Students */}
                 <div className="hidden sm:block sm:col-span-2 text-sm text-gray-600">
                   {cls._count?.students || 0}
                 </div>
 
-                {/* Fee for the active term */}
                 <div className="col-span-3">
                   {getActiveFee(cls) ? (
                     <span className="text-xs sm:text-sm font-semibold text-gray-800">
@@ -990,7 +989,6 @@ const ClassesPage = () => {
                   )}
                 </div>
 
-                {/* Actions */}
                 <div className="col-span-4 sm:col-span-3 flex items-center justify-end gap-1">
                   {can("payments", "write") && (
                     <button
@@ -1475,37 +1473,76 @@ const ClassesPage = () => {
                 Mobile Money
               </p>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                    Airtel Money Number
-                  </label>
-                  <input
-                    value={mobileMoney.airtelMoneyNumber}
-                    onChange={(e) =>
-                      setMobileMoney({
-                        ...mobileMoney,
-                        airtelMoneyNumber: e.target.value,
-                      })
-                    }
-                    placeholder="eg. 0999 000 000"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  />
+                {/* Airtel Money */}
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                      Airtel Money Number
+                    </label>
+                    <input
+                      value={mobileMoney.airtelMoneyNumber}
+                      onChange={(e) =>
+                        setMobileMoney({
+                          ...mobileMoney,
+                          airtelMoneyNumber: e.target.value,
+                        })
+                      }
+                      placeholder="eg. 0999 000 000"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                      Registered Name
+                    </label>
+                    <input
+                      value={mobileMoney.airtelMoneyName}
+                      onChange={(e) =>
+                        setMobileMoney({
+                          ...mobileMoney,
+                          airtelMoneyName: e.target.value,
+                        })
+                      }
+                      placeholder="e.g. Blessings Nyirenda"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    />
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                    TNM Mpamba Number
-                  </label>
-                  <input
-                    value={mobileMoney.mpambaNumber}
-                    onChange={(e) =>
-                      setMobileMoney({
-                        ...mobileMoney,
-                        mpambaNumber: e.target.value,
-                      })
-                    }
-                    placeholder="eg. 0888 000 000"
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                  />
+
+                {/* TNM Mpamba */}
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                      TNM Mpamba Number
+                    </label>
+                    <input
+                      value={mobileMoney.mpambaNumber}
+                      onChange={(e) =>
+                        setMobileMoney({
+                          ...mobileMoney,
+                          mpambaNumber: e.target.value,
+                        })
+                      }
+                      placeholder="eg. 0888 000 000"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                      Registered Name
+                    </label>
+                    <input
+                      value={mobileMoney.mpambaName}
+                      onChange={(e) =>
+                        setMobileMoney({
+                          ...mobileMoney,
+                          mpambaName: e.target.value,
+                        })
+                      }
+                      placeholder="e.g. Blessings Nyirenda"
+                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -1623,6 +1660,11 @@ const ClassesPage = () => {
                   <p className="text-sm text-gray-800">
                     {mobileMoney.airtelMoneyNumber || "—"}
                   </p>
+                  {mobileMoney.airtelMoneyName && (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {mobileMoney.airtelMoneyName}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-xs font-medium text-gray-500 mb-1">
@@ -1631,6 +1673,11 @@ const ClassesPage = () => {
                   <p className="text-sm text-gray-800">
                     {mobileMoney.mpambaNumber || "—"}
                   </p>
+                  {mobileMoney.mpambaName && (
+                    <p className="text-xs text-gray-500 mt-0.5">
+                      {mobileMoney.mpambaName}
+                    </p>
+                  )}
                 </div>
               </div>
             </div>
@@ -1647,7 +1694,7 @@ const ClassesPage = () => {
         )}
       </div>
 
-      {/* ==================== CONFIRM ACTIVATION MODAL ==================== */}
+      {/* CONFIRM ACTIVATION MODAL */}
       {confirmModal.open && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
@@ -1684,7 +1731,6 @@ const ClassesPage = () => {
               </button>
             </div>
 
-            {/* From → To */}
             <div className="space-y-3 mb-4">
               {activeTerm ? (
                 <div className="bg-gray-50 rounded-xl p-3">
@@ -1734,7 +1780,6 @@ const ClassesPage = () => {
               </div>
             </div>
 
-            {/* Skip / reverse warning */}
             {confirmModal.skipWarning && (
               <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4 flex items-start gap-2">
                 <AlertTriangle
@@ -1786,7 +1831,7 @@ const ClassesPage = () => {
         </div>
       )}
 
-      {/* ==================== DELETE CLASS MODAL ==================== */}
+      {/* DELETE CLASS MODAL */}
       {deleteModal.open && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"

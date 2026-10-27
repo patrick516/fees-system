@@ -115,13 +115,42 @@ export default function DashboardPage() {
     }, 150);
   };
 
-  const handleCopyCode = () => {
-    if (!student?.studentCode) return;
-    navigator.clipboard?.writeText(student.studentCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  // 🎯 Reliable copy that works on all mobile browsers
+  const copyToClipboard = async (text: string) => {
+    // Modern API (works on HTTPS + recent browsers)
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 1500);
+        return;
+      }
+    } catch {}
+
+    // Fallback for older mobile browsers
+    try {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      ta.style.top = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      // Last resort: prompt the user
+      alert(`Please copy manually: ${text}`);
+    }
   };
 
+  const handleCopyCode = () => {
+    if (!student?.studentCode) return;
+    copyToClipboard(student.studentCode);
+  };
   if (!_hasHydrated || loading)
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-50">
@@ -719,11 +748,9 @@ export default function DashboardPage() {
                             </div>
                             <button
                               onClick={() =>
-                                navigator.clipboard?.writeText(
-                                  bank.accountNumber,
-                                )
+                                copyToClipboard(bank.accountNumber)
                               }
-                              className="text-xs text-blue-700 font-medium px-2.5 py-1 bg-blue-50 rounded-lg"
+                              className="text-xs text-blue-700 font-semibold px-3 py-1.5 bg-blue-50 hover:bg-blue-100 rounded-lg transition-colors"
                             >
                               Copy
                             </button>
@@ -746,44 +773,50 @@ export default function DashboardPage() {
                     </p>
                   </div>
                   {paymentInfo.airtelMoneyNumber && (
-                    <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-                      <div>
+                    <div className="p-4 border-b border-slate-100 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
                         <p className="text-sm font-semibold text-red-600">
                           Airtel Money
                         </p>
-                        <p className="text-xs font-mono text-slate-700">
+                        <p className="text-sm font-mono text-slate-800 mt-0.5">
                           {paymentInfo.airtelMoneyNumber}
                         </p>
+                        {paymentInfo.airtelMoneyName && (
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {paymentInfo.airtelMoneyName}
+                          </p>
+                        )}
                       </div>
                       <button
                         onClick={() =>
-                          navigator.clipboard?.writeText(
-                            paymentInfo.airtelMoneyNumber,
-                          )
+                          copyToClipboard(paymentInfo.airtelMoneyNumber)
                         }
-                        className="text-xs text-red-600 font-medium px-2.5 py-1 bg-red-50 rounded-lg"
+                        className="text-xs text-red-600 font-semibold px-3 py-1.5 bg-red-50 hover:bg-red-100 rounded-lg shrink-0 transition-colors"
                       >
                         Copy
                       </button>
                     </div>
                   )}
                   {paymentInfo.mpambaNumber && (
-                    <div className="p-4 flex items-center justify-between">
-                      <div>
+                    <div className="p-4 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
                         <p className="text-sm font-semibold text-amber-600">
                           TNM Mpamba
                         </p>
-                        <p className="text-xs font-mono text-slate-700">
+                        <p className="text-sm font-mono text-slate-800 mt-0.5">
                           {paymentInfo.mpambaNumber}
                         </p>
+                        {paymentInfo.mpambaName && (
+                          <p className="text-xs text-slate-500 mt-0.5">
+                            {paymentInfo.mpambaName}
+                          </p>
+                        )}
                       </div>
                       <button
                         onClick={() =>
-                          navigator.clipboard?.writeText(
-                            paymentInfo.mpambaNumber,
-                          )
+                          copyToClipboard(paymentInfo.mpambaNumber)
                         }
-                        className="text-xs text-amber-600 font-medium px-2.5 py-1 bg-amber-50 rounded-lg"
+                        className="text-xs text-amber-600 font-semibold px-3 py-1.5 bg-amber-50 hover:bg-amber-100 rounded-lg shrink-0 transition-colors"
                       >
                         Copy
                       </button>
@@ -791,7 +824,6 @@ export default function DashboardPage() {
                   )}
                 </div>
               )}
-
               {/* Instructions */}
               {paymentInfo.paymentInstructions && (
                 <div className="bg-slate-100 rounded-2xl p-4 border border-slate-200">

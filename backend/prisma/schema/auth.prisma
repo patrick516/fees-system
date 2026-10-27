@@ -64,7 +64,9 @@ model School {
 
   bankAccounts        Json?
   airtelMoneyNumber   String?
+  airtelMoneyName     String?
   mpambaNumber        String?
+  mpambaName          String?
   paymentInstructions String?
 
   activeTerm                    Term?

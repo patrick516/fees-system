@@ -28,7 +28,9 @@ router.get("/payment-info/:schoolId", async (req, res) => {
         phone: true,
         bankAccounts: true,
         airtelMoneyNumber: true,
+        airtelMoneyName: true,
         mpambaNumber: true,
+        mpambaName: true,
         paymentInstructions: true,
       },
     });
@@ -824,7 +826,9 @@ router.put(
       const {
         bankAccounts,
         airtelMoneyNumber,
+        airtelMoneyName,
         mpambaNumber,
+        mpambaName,
         paymentInstructions,
       } = req.body;
       if (bankAccounts && !Array.isArray(bankAccounts)) {
@@ -837,7 +841,9 @@ router.put(
         data: {
           bankAccounts: bankAccounts || [],
           airtelMoneyNumber: airtelMoneyNumber || null,
+          airtelMoneyName: airtelMoneyName || null,
           mpambaNumber: mpambaNumber || null,
+          mpambaName: mpambaName || null,
           paymentInstructions: paymentInstructions || null,
         },
       });
@@ -848,7 +854,13 @@ router.put(
           action: "PAYMENT_DETAILS_UPDATED",
           entity: "School",
           entityId: req.schoolId,
-          changes: { bankAccounts, airtelMoneyNumber, mpambaNumber },
+          changes: {
+            bankAccounts,
+            airtelMoneyNumber,
+            airtelMoneyName,
+            mpambaNumber,
+            mpambaName,
+          },
         },
       });
       res.json({
