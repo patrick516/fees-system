@@ -98,32 +98,149 @@ export default function DashboardPage() {
     logout();
     router.push("/");
   };
-
-  const handlePrint = async (payment: any) => {
-    setReceiptToPrint(payment);
-
-    await new Promise((resolve) => setTimeout(resolve, 100));
-
+  const handlePrint = (payment: any) => {
+    // Build the receipt HTML as a standalone document
     const logoUrl = student?.school?.logo || "/images/SchoolPayLogo.jpg";
-    try {
-      await new Promise((resolve) => {
-        const img = new Image();
-        img.crossOrigin = "anonymous";
-        img.onload = () => resolve(true);
-        img.onerror = () => resolve(true);
-        img.src = logoUrl;
-        setTimeout(() => resolve(true), 1500);
-      });
-    } catch {
-      // Ignore
+    const receiptHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>Receipt ${payment.receiptNumber}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <style>
+            * { box-sizing: border-box; }
+            body {
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+              margin: 0;
+              padding: 24px;
+              color: #111;
+              background: #fff;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #d1d5db;
+              padding-bottom: 24px;
+              margin-bottom: 24px;
+            }
+            .header img { height: 80px; width: 80px; object-fit: contain; margin-bottom: 12px; }
+            .header h1 { font-size: 28px; margin: 0 0 4px; font-weight: 700; }
+            .header p { margin: 2px 0; color: #6b7280; font-size: 14px; }
+            .header h2 { font-size: 20px; margin-top: 16px; font-weight: 600; }
+            .meta { display: grid; grid-template-columns: 1fr 1fr; gap: 32px; margin-bottom: 32px; font-size: 14px; }
+            .meta p.label { color: #6b7280; margin: 0 0 4px; }
+            .meta p.value { margin: 0 0 12px; font-weight: 500; }
+            .meta p.mono { font-family: monospace; font-weight: 700; font-size: 16px; }
+            table { width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 32px; }
+            th, td { padding: 8px 0; text-align: left; }
+            th { border-bottom: 2px solid #d1d5db; }
+            td { border-bottom: 1px solid #e5e7eb; }
+            .amount { text-align: right; }
+            .total-row { background: #f9fafb; }
+            .total-row td { padding: 12px 16px; font-weight: 700; }
+            .total-amount { text-align: right; color: #15803d; font-size: 18px; }
+            .summary { background: #f9fafb; padding: 16px; border-radius: 8px; display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; text-align: center; margin-bottom: 48px; font-size: 14px; }
+            .summary p.label { color: #6b7280; margin: 0 0 4px; font-size: 12px; }
+            .summary p.value { margin: 0; font-weight: 600; }
+            .footer { text-align: center; color: #9ca3af; font-size: 12px; margin-top: 64px; padding-top: 16px; border-top: 1px solid #e5e7eb; }
+            @media print {
+              body { padding: 0; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <img src="${logoUrl}" alt="Logo" />
+            <h1>${student?.school?.name || "SchoolPay"}</h1>
+            <p>${student?.school?.address || "Blantyre, Malawi"}</p>
+            <p>Tel: ${student?.school?.phone || "+265 000 000 000"}</p>
+            <h2>OFFICIAL PAYMENT RECEIPT</h2>
+          </div>
+
+          <div class="meta">
+            <div>
+              <p class="label">Receipt Number</p>
+              <p class="mono">${payment.receiptNumber}</p>
+              <p class="label">Date</p>
+              <p class="value">${new Date(payment.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
+            </div>
+            <div>
+              <p class="label">Received From</p>
+              <p class="value">${student?.parentName}</p>
+              <p class="label">Student</p>
+              <p class="value">${student?.fullName} (${student?.studentCode})</p>
+              <p class="label">Class</p>
+              <p class="value">${student?.class}</p>
+            </div>
+          </div>
+
+          <table>
+            <thead>
+              <tr>
+                <th>Description</th>
+                <th class="amount">Amount (MWK)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <p style="margin: 0; font-weight: 500;">School Fees Payment</p>
+                  <p style="margin: 2px 0 0; font-size: 12px; color: #6b7280;">${termLabel(payment.term)} ${payment.academicYear} • ${methodLabel(payment.paymentMethod)}</p>
+                </td>
+                <td class="amount">${Number(payment.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+              </tr>
+            </tbody>
+            <tfoot>
+              <tr class="total-row">
+                <td>Total Paid</td>
+                <td class="total-amount">${Number(payment.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+              </tr>
+            </tfoot>
+          </table>
+
+          <div class="summary">
+            <div>
+              <p class="label">Term Required</p>
+              <p class="value">${payment.requiredAmount ? `MWK ${Number(payment.requiredAmount).toLocaleString()}` : "N/A"}</p>
+            </div>
+            <div>
+              <p class="label">Balance After Payment</p>
+              <p class="value" style="color: ${Number(payment.balance) <= 0 ? "#15803d" : "#b91c1c"};">
+                ${payment.balance !== null ? (Number(payment.balance) <= 0 ? "FULLY PAID" : `MWK ${Number(payment.balance).toLocaleString()}`) : "N/A"}
+              </p>
+            </div>
+            <div>
+              <p class="label">Received By</p>
+              <p class="value">${payment.recordedBy?.fullName || "System"}</p>
+            </div>
+          </div>
+
+          <div class="footer">
+            <p style="margin: 0 0 4px;">This is a computer-generated receipt. No signature is required.</p>
+            <p style="margin: 0; font-weight: 600;">Thank you for your payment.</p>
+          </div>
+        </body>
+      </html>
+    `;
+
+    // Open in a new window
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) {
+      alert("Please allow pop-ups to print your receipt.");
+      return;
     }
 
-    await new Promise((resolve) => setTimeout(resolve, 150));
+    printWindow.document.open();
+    printWindow.document.write(receiptHtml);
+    printWindow.document.close();
 
-    window.print();
-    setReceiptToPrint(null);
+    // Wait for the logo to load, then trigger print
+    printWindow.onload = () => {
+      setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+      }, 500);
+    };
   };
-
   const copyToClipboard = async (text: string) => {
     try {
       if (navigator.clipboard?.writeText) {
