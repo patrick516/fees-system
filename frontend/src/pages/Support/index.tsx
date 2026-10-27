@@ -6,9 +6,7 @@ import {
   X,
   Send,
   Lock,
-  //   CheckCircle2,
-  //   Clock,
-  //   AlertCircle,
+  AlertCircle,
   Building2,
 } from "lucide-react";
 import api from "../../lib/axios";
@@ -130,7 +128,7 @@ function ParentInbox() {
               No parent tickets
             </p>
             <p className="text-xs text-gray-400 mt-1">
-              When parents ask questions, they'll appear here
+              When parents ask questions, they&apos;ll appear here
             </p>
           </div>
         ) : (
@@ -251,7 +249,8 @@ function MyPlatformTickets() {
             <MessageSquare size={40} className="mx-auto mb-3 text-gray-300" />
             <p className="text-sm font-medium text-gray-500">No requests yet</p>
             <p className="text-xs text-gray-400 mt-1">
-              Click "Contact SchoolPay Support" to reach the platform team
+              Click &quot;Contact SchoolPay Support&quot; to reach the platform
+              team
             </p>
           </div>
         ) : (
@@ -355,6 +354,8 @@ function TicketModal({
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
   const [closing, setClosing] = useState(false);
+  const [error, setError] = useState("");
+  const [confirmClose, setConfirmClose] = useState(false);
 
   const load = async () => {
     setLoading(true);
@@ -374,153 +375,206 @@ function TicketModal({
   const sendReply = async () => {
     if (!reply.trim()) return;
     setSending(true);
+    setError("");
     try {
       await api.post(replyEndpoint, { message: reply.trim() });
       setReply("");
       await load();
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to send reply");
+      setError(err.response?.data?.message || "Failed to send reply");
     } finally {
       setSending(false);
     }
   };
 
-  const closeTicket = async () => {
+  const doClose = async () => {
     if (!closeEndpoint) return;
-    if (!confirm("Close this ticket? The other party won't be able to reply."))
-      return;
     setClosing(true);
+    setError("");
     try {
       await api.post(closeEndpoint);
+      setConfirmClose(false);
       onClose();
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to close");
+      setError(err.response?.data?.message || "Failed to close");
+      setConfirmClose(false);
     } finally {
       setClosing(false);
     }
   };
 
   return (
-    <div
-      className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-      onClick={onClose}
-    >
+    <>
       <div
-        className="bg-white w-full max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col max-h-[90vh] sm:max-h-[85vh]"
-        onClick={(e) => e.stopPropagation()}
+        className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+        onClick={onClose}
       >
-        {/* Header */}
-        <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100">
-          <div className="min-w-0">
-            <h3 className="text-base font-semibold text-gray-800 truncate">
-              {ticket?.subject || "Loading..."}
-            </h3>
-            {ticket && (
-              <p className="text-xs text-gray-500 mt-0.5">
-                {ticket.creatorName}
-                {ticket.school && ` · ${ticket.school.name}`}
-              </p>
+        <div
+          className="bg-white w-full max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col max-h-[90vh] sm:max-h-[85vh]"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {/* Header */}
+          <div className="flex items-start justify-between px-5 py-4 border-b border-gray-100">
+            <div className="min-w-0">
+              <h3 className="text-base font-semibold text-gray-800 truncate">
+                {ticket?.subject || "Loading..."}
+              </h3>
+              {ticket && (
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {ticket.creatorName}
+                  {ticket.school && ` · ${ticket.school.name}`}
+                </p>
+              )}
+            </div>
+            <button
+              onClick={onClose}
+              className="p-1 text-gray-400 hover:text-gray-600 shrink-0"
+            >
+              <X size={18} />
+            </button>
+          </div>
+
+          {/* Messages */}
+          <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50">
+            {loading ? (
+              <div className="flex items-center justify-center h-32">
+                <Loader2 size={20} className="animate-spin text-gray-300" />
+              </div>
+            ) : (
+              ticket?.messages?.map((m: SupportMessage) => {
+                const isMine = m.senderType === "RESPONDER";
+                return (
+                  <div
+                    key={m.id}
+                    className={`flex ${isMine ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
+                        isMine
+                          ? "bg-[var(--color-primary)] text-white"
+                          : "bg-white text-gray-800 border border-gray-200"
+                      }`}
+                    >
+                      <p
+                        className={`text-[10px] font-medium mb-0.5 ${isMine ? "text-white/80" : "text-gray-500"}`}
+                      >
+                        {m.senderName}
+                      </p>
+                      <p className="text-sm whitespace-pre-wrap leading-relaxed">
+                        {m.message}
+                      </p>
+                      <p
+                        className={`text-[10px] mt-1 ${isMine ? "text-white/60" : "text-gray-400"}`}
+                      >
+                        {formatDate(m.createdAt)}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })
             )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-1 text-gray-400 hover:text-gray-600 shrink-0"
-          >
-            <X size={18} />
-          </button>
-        </div>
 
-        {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50">
-          {loading ? (
-            <div className="flex items-center justify-center h-32">
-              <Loader2 size={20} className="animate-spin text-gray-300" />
+          {/* Reply + actions */}
+          {ticket?.status === "OPEN" ? (
+            <div className="border-t border-gray-100 p-4 space-y-2">
+              {error && (
+                <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </div>
+              )}
+              <textarea
+                value={reply}
+                onChange={(e) => setReply(e.target.value)}
+                rows={3}
+                placeholder={
+                  isPlatform
+                    ? "Reply to SchoolPay Support..."
+                    : "Reply to this parent... (they'll get an SMS)"
+                }
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
+              />
+              <div className="flex items-center justify-between gap-2">
+                {closeEndpoint && (
+                  <button
+                    onClick={() => setConfirmClose(true)}
+                    disabled={closing}
+                    className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-red-600 disabled:opacity-50"
+                  >
+                    <Lock size={12} /> Close Ticket
+                  </button>
+                )}
+                <div className="flex-1" />
+                <button
+                  onClick={sendReply}
+                  disabled={sending || !reply.trim()}
+                  className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                >
+                  {sending ? (
+                    <Loader2 size={14} className="animate-spin" />
+                  ) : (
+                    <Send size={14} />
+                  )}
+                  {sending ? "Sending..." : "Send Reply"}
+                </button>
+              </div>
             </div>
           ) : (
-            ticket?.messages?.map((m: SupportMessage) => {
-              const isMine = isPlatform
-                ? m.senderType === "RESPONDER"
-                : m.senderType === "RESPONDER";
-              return (
-                <div
-                  key={m.id}
-                  className={`flex ${isMine ? "justify-end" : "justify-start"}`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-2.5 ${
-                      isMine
-                        ? "bg-[var(--color-primary)] text-white"
-                        : "bg-white text-gray-800 border border-gray-200"
-                    }`}
-                  >
-                    <p
-                      className={`text-[10px] font-medium mb-0.5 ${isMine ? "text-white/80" : "text-gray-500"}`}
-                    >
-                      {m.senderName}
-                    </p>
-                    <p className="text-sm whitespace-pre-wrap leading-relaxed">
-                      {m.message}
-                    </p>
-                    <p
-                      className={`text-[10px] mt-1 ${isMine ? "text-white/60" : "text-gray-400"}`}
-                    >
-                      {formatDate(m.createdAt)}
-                    </p>
-                  </div>
-                </div>
-              );
-            })
+            <div className="border-t border-gray-100 p-4 text-center">
+              <p className="text-xs text-gray-500 flex items-center justify-center gap-1.5">
+                <Lock size={12} /> This ticket is closed
+              </p>
+            </div>
           )}
         </div>
+      </div>
 
-        {/* Reply + actions */}
-        {ticket?.status === "OPEN" ? (
-          <div className="border-t border-gray-100 p-4 space-y-2">
-            <textarea
-              value={reply}
-              onChange={(e) => setReply(e.target.value)}
-              rows={3}
-              placeholder={
-                isPlatform
-                  ? "Reply to SchoolPay Support..."
-                  : "Reply to this parent... (they'll get an SMS)"
-              }
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
-            />
-            <div className="flex items-center justify-between gap-2">
-              {closeEndpoint && (
-                <button
-                  onClick={closeTicket}
-                  disabled={closing}
-                  className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-red-600 disabled:opacity-50"
-                >
-                  <Lock size={12} /> {closing ? "Closing..." : "Close Ticket"}
-                </button>
-              )}
-              <div className="flex-1" />
+      {/* 🎯 Custom Close Confirmation Modal */}
+      {confirmClose && (
+        <div
+          className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"
+          onClick={() => !closing && setConfirmClose(false)}
+        >
+          <div
+            className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
+              <Lock size={22} className="text-red-600" />
+            </div>
+            <h3 className="text-base font-bold text-gray-900 text-center mb-2">
+              Close this ticket?
+            </h3>
+            <p className="text-sm text-gray-500 text-center mb-5 leading-relaxed">
+              The other party won&apos;t be able to reply after you close it.
+              They&apos;ll still see the full conversation.
+            </p>
+            <div className="flex gap-3">
               <button
-                onClick={sendReply}
-                disabled={sending || !reply.trim()}
-                className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                onClick={() => setConfirmClose(false)}
+                disabled={closing}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 disabled:opacity-40"
               >
-                {sending ? (
+                Cancel
+              </button>
+              <button
+                onClick={doClose}
+                disabled={closing}
+                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+              >
+                {closing ? (
                   <Loader2 size={14} className="animate-spin" />
                 ) : (
-                  <Send size={14} />
+                  <Lock size={14} />
                 )}
-                {sending ? "Sending..." : "Send Reply"}
+                {closing ? "Closing..." : "Yes, Close"}
               </button>
             </div>
           </div>
-        ) : (
-          <div className="border-t border-gray-100 p-4 text-center">
-            <p className="text-xs text-gray-500 flex items-center justify-center gap-1.5">
-              <Lock size={12} /> This ticket is closed
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
+        </div>
+      )}
+    </>
   );
 }
 
@@ -573,8 +627,8 @@ function NewPlatformTicketModal({
           </button>
         </div>
         <p className="text-xs text-gray-500 mb-4">
-          Our team usually replies within 24 hours. You'll receive an email
-          notification when there's a new reply.
+          Our team usually replies within 24 hours. You&apos;ll receive an email
+          notification when there&apos;s a new reply.
         </p>
 
         {error && (

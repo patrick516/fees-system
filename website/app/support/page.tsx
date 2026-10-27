@@ -10,6 +10,7 @@ import {
   ArrowLeft,
   ChevronRight,
   Lock,
+  AlertCircle,
 } from "lucide-react";
 import api from "../../lib/axios";
 import { useAuthStore } from "../../store/authStore";
@@ -375,6 +376,7 @@ function TicketDetailModal({
   const [loading, setLoading] = useState(true);
   const [reply, setReply] = useState("");
   const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
 
   const load = async () => {
     setLoading(true);
@@ -396,6 +398,7 @@ function TicketDetailModal({
   const sendReply = async () => {
     if (!reply.trim()) return;
     setSending(true);
+    setError("");
     try {
       await api.post(`/parent/support/${ticketId}/reply`, {
         message: reply.trim(),
@@ -403,7 +406,7 @@ function TicketDetailModal({
       setReply("");
       await load();
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to send reply");
+      setError(err.response?.data?.message || "Failed to send reply");
     } finally {
       setSending(false);
     }
@@ -486,6 +489,12 @@ function TicketDetailModal({
         {/* Reply box */}
         {ticket?.status === "OPEN" ? (
           <div className="border-t border-gray-100 p-4 space-y-2">
+            {error && (
+              <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
             <textarea
               value={reply}
               onChange={(e) => setReply(e.target.value)}
