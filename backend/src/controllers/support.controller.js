@@ -5,7 +5,7 @@ const { sendSupportReplyEmail } = require("../lib/mailer");
 const PARENT_PORTAL_URL =
   process.env.PARENT_PORTAL_URL || "https://fees-system-8z3u.vercel.app";
 
-// ==================== PARENT SIDE ====================
+//  PARENT SIDE
 
 // GET /api/parent/support
 const listParentTickets = async (req, res) => {
@@ -91,10 +91,19 @@ const getParentTicket = async (req, res) => {
         .status(404)
         .json({ success: false, message: "Ticket not found" });
 
+    // Mark staff replies as read
     await prisma.supportMessage.updateMany({
       where: { ticketId: ticket.id, senderType: "RESPONDER", isRead: false },
       data: { isRead: true },
     });
+
+    // 🎯 If last reply was from staff, reset lastReplyBy so the badge clears
+    if (ticket.lastReplyBy === "RESPONDER") {
+      await prisma.supportTicket.update({
+        where: { id: ticket.id },
+        data: { lastReplyBy: null },
+      });
+    }
 
     return res.json({ success: true, data: ticket });
   } catch (err) {
@@ -123,12 +132,10 @@ const replyAsParent = async (req, res) => {
       },
     });
     if (!ticket)
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "Ticket not found or already closed",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "Ticket not found or already closed",
+      });
 
     const parentName = req.student.parentName || req.student.fullName;
 
@@ -230,6 +237,14 @@ const getSchoolTicket = async (req, res) => {
       where: { ticketId: ticket.id, senderType: "CREATOR", isRead: false },
       data: { isRead: true },
     });
+
+    //  If last reply was from parent, reset lastReplyBy so the badge clears
+    if (ticket.lastReplyBy === "CREATOR") {
+      await prisma.supportTicket.update({
+        where: { id: ticket.id },
+        data: { lastReplyBy: null },
+      });
+    }
 
     return res.json({ success: true, data: ticket });
   } catch (err) {
@@ -584,6 +599,47 @@ const closeAsPlatform = async (req, res) => {
   }
 };
 
+// // PUT /api/support/tickets/:ticketId/mark-read
+// // Marks all messages in a ticket as read for the current user (parent or staff)
+// const markTicketAsRead = async (req, res) => {
+//   try {
+//     const { ticketId } = req.params;
+
+//     // Verify the ticket belongs to this school
+//     const ticket = await prisma.supportTicket.findFirst({
+//       where: { id: ticketId, schoolId: req.schoolId || req.student?.schoolId },
+//     });
+
+//     if (!ticket) {
+//       return res
+//         .status(404)
+//         .json({ success: false, message: "Ticket not found" });
+//     }
+
+//     // Mark messages as read based on who is viewing
+//     // If parent is viewing, mark STAFF messages as read
+//     // If staff is viewing, mark CREATOR (parent) messages as read
+//     const viewerType = req.staff ? "STAFF" : "CREATOR";
+//     const senderTypesToMark =
+//       viewerType === "CREATOR" ? ["STAFF"] : ["CREATOR"];
+
+//     await prisma.supportMessage.updateMany({
+//       where: {
+//         ticketId,
+//         senderType: { in: senderTypesToMark },
+//         isRead: false,
+//       },
+//       data: { isRead: true },
+//     });
+
+//     return res.json({ success: true, message: "Marked as read" });
+//   } catch (err) {
+//     console.error("markTicketAsRead error:", err);
+//     return res
+//       .status(500)
+//       .json({ success: false, message: "Failed to mark as read" });
+//   }
+// };
 module.exports = {
   // Parent
   listParentTickets,
