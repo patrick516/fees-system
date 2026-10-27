@@ -225,7 +225,14 @@ export default function LoginPage() {
               <input
                 type="text"
                 value={studentCode}
-                onChange={(e) => setStudentCode(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  const clean = e.target.value
+                    .toUpperCase()
+                    .replace(/[\u2010-\u2015]/g, "-")
+                    .replace(/\s+/g, "")
+                    .replace(/[^\w\-]/g, "");
+                  setStudentCode(clean);
+                }}
                 placeholder="eg. SPP-F3-2026-001"
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm font-mono text-gray-900 placeholder-gray-400 outline-none transition-all duration-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"

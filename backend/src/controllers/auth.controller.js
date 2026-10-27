@@ -738,8 +738,16 @@ const parentLoginWithStudentId = async (req, res) => {
       });
     }
 
+    // 🎯 Normalize the student code: handle smart hyphens, spaces, and casing
+    const normalizedCode = String(studentCode)
+      .toUpperCase()
+      .replace(/[\u2010-\u2015]/g, "-")
+      .replace(/\s+/g, "")
+      .replace(/[^\w\-]/g, "")
+      .trim();
+
     const student = await prisma.student.findFirst({
-      where: { studentCode: studentCode.toUpperCase().trim() },
+      where: { studentCode: normalizedCode },
       include: {
         school: {
           select: {
