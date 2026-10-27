@@ -329,7 +329,10 @@ export default function PayPage() {
                     Required
                   </p>
                   <p className="text-sm font-bold text-gray-900 mt-1">
-                    MWK {termStatus.termStatus.requiredAmount?.toLocaleString()}
+                    MWK{" "}
+                    {Number(
+                      termStatus.termStatus.requiredAmount || 0,
+                    ).toLocaleString()}
                   </p>
                 </div>
 
@@ -343,7 +346,9 @@ export default function PayPage() {
                   </p>
                   <p className="text-sm font-bold text-gray-900 mt-1">
                     MWK{" "}
-                    {termStatus.termStatus.totalPaidThisTerm.toLocaleString()}
+                    {Number(
+                      termStatus.termStatus.totalPaidThisTerm || 0,
+                    ).toLocaleString()}
                   </p>
                 </div>
 
@@ -357,7 +362,9 @@ export default function PayPage() {
                   </p>
                   <p className="text-sm font-bold text-gray-900 mt-1">
                     MWK{" "}
-                    {termStatus.termStatus.balanceRemaining?.toLocaleString()}
+                    {Number(
+                      termStatus.termStatus.balanceRemaining || 0,
+                    ).toLocaleString()}
                   </p>
                 </div>
               </div>

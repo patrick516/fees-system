@@ -161,7 +161,7 @@ export default function DashboardPage() {
   const summaryCards = [
     {
       label: "Required",
-      value: `MWK ${requiredAmount.toLocaleString()}`,
+      value: `MWK ${Number(requiredAmount).toLocaleString()}`,
       icon: FileText,
       box: "bg-blue-50 border-blue-100",
       circle: "bg-blue-100 text-blue-700",
@@ -169,7 +169,7 @@ export default function DashboardPage() {
     },
     {
       label: "Paid",
-      value: `MWK ${paidThisTerm.toLocaleString()}`,
+      value: `MWK ${Number(paidThisTerm).toLocaleString()}`,
       icon: Check,
       box: "bg-emerald-50 border-emerald-100",
       circle: "bg-emerald-100 text-emerald-700",
@@ -177,7 +177,9 @@ export default function DashboardPage() {
     },
     {
       label: "Balance",
-      value: isClear ? "✓ Clear" : `MWK ${balanceRemaining.toLocaleString()}`,
+      value: isClear
+        ? "✓ Clear"
+        : `MWK ${Number(balanceRemaining).toLocaleString()}`,
       icon: Wallet,
       box: isClear
         ? "bg-emerald-50 border-emerald-100"
@@ -404,7 +406,7 @@ export default function DashboardPage() {
                     <p className="text-sm text-amber-900">
                       Outstanding balance of{" "}
                       <span className="font-bold">
-                        MWK {balanceRemaining.toLocaleString()}
+                        MWK {Number(balanceRemaining).toLocaleString()}
                       </span>
                       . Please pay soon.
                     </p>
@@ -424,8 +426,9 @@ export default function DashboardPage() {
                   <div className="flex items-center gap-3 bg-purple-50 border border-purple-200 rounded-xl p-3.5">
                     <Star size={18} className="text-purple-600 shrink-0" />
                     <p className="text-sm text-purple-900">
-                      Credit balance: MWK {creditBalance.toLocaleString()} —
-                      will apply to next term
+                      Credit balance: MWK{" "}
+                      {Number(creditBalance).toLocaleString()} — will apply to
+                      next term
                     </p>
                   </div>
                 )}
