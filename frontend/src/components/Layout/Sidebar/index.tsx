@@ -188,10 +188,9 @@ const Sidebar = () => {
   const close = () => setOpen(false);
 
   const sidebarContent = (
-    // 🎯 Removed md:rounded-2xl to make it flush
-    <div className="w-64 bg-[var(--color-primary)] text-white flex flex-col h-full shadow-xl overflow-hidden">
+    <div className="w-64 bg-slate-900 text-white flex flex-col h-full shadow-xl overflow-hidden">
       {/* Logo */}
-      <div className="p-6 border-b border-white/10">
+      <div className="p-6 border-b border-slate-800">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center overflow-hidden">
             {staff?.school?.logo ? (
@@ -205,8 +204,8 @@ const Sidebar = () => {
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="font-bold text-sm">SchoolPay</p>
-            <p className="text-white/70 text-xs truncate">
+            <p className="font-bold text-sm text-white">SchoolPay</p>
+            <p className="text-slate-400 text-xs truncate">
               {staff?.school?.name}
             </p>
           </div>
@@ -233,7 +232,7 @@ const Sidebar = () => {
 
           return (
             <div key={section.title}>
-              <h3 className="px-3 text-[10px] font-bold text-white/40 uppercase tracking-widest mb-2">
+              <h3 className="px-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-2">
                 {section.title}
               </h3>
               <div className="space-y-1">
@@ -246,8 +245,8 @@ const Sidebar = () => {
                     className={({ isActive }) =>
                       `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                         isActive
-                          ? "bg-white/15 text-white font-medium"
-                          : "text-white/70 hover:bg-white/10 hover:text-white"
+                          ? "bg-[var(--color-primary)] text-white font-semibold shadow-sm"
+                          : "text-slate-200 hover:bg-white/10 hover:text-white"
                       }`
                     }
                   >
@@ -272,21 +271,23 @@ const Sidebar = () => {
       </nav>
 
       {/* User info and logout */}
-      <div className="p-4 border-t border-white/10 bg-black/10">
+      <div className="p-4 border-t border-slate-800 bg-slate-950/50">
         <div className="flex items-center gap-3 mb-3 px-2">
           <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold shrink-0">
             {staff?.fullName?.charAt(0) || "?"}
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium truncate">{staff?.fullName}</p>
-            <p className="text-white/70 text-xs truncate">
+            <p className="text-sm font-semibold text-white truncate">
+              {staff?.fullName}
+            </p>
+            <p className="text-slate-400 text-xs truncate">
               {staff?.role?.name || "—"}
             </p>
           </div>
         </div>
         <button
           onClick={handleLogout}
-          className="flex items-center gap-3 w-full px-4 py-2 text-white/70 hover:bg-white/10 hover:text-white rounded-lg text-sm transition-colors"
+          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-white/10 hover:text-white rounded-lg text-sm transition-colors"
         >
           <LogOut size={16} />
           Logout
@@ -298,7 +299,7 @@ const Sidebar = () => {
   return (
     <>
       {/* ── Mobile top bar ── */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center h-14 px-4 bg-[var(--color-primary)] border-b border-white/10 text-white">
+      <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center h-14 px-4 bg-slate-900 border-b border-slate-800 text-white">
         <button
           onClick={() => setOpen(true)}
           className="p-1 rounded-md text-white/70 hover:text-white hover:bg-white/10 transition-colors"
