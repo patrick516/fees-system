@@ -1304,7 +1304,10 @@ const ClassesPage = () => {
                 </p>
                 <button
                   type="button"
-                  onClick={() => setShowAddBank(true)}
+                  onClick={() => {
+                    setIsEditingPayment(true);
+                    setShowAddBank(true);
+                  }}
                   className="flex items-center gap-1.5 text-sm text-blue-600 font-medium hover:text-blue-800"
                 >
                   <Plus size={14} />
