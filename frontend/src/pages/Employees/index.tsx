@@ -8,6 +8,8 @@ import {
   Users,
   Wallet,
   X,
+  Eye,
+  Pencil,
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { Employee, Department } from "../../types";
@@ -27,7 +29,6 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const HONORIFICS = ["Mr", "Mrs", "Ms", "Dr", "Rev", "Prof", "Chief"];
-
 const formatMWK = (n: number) => `MWK ${Number(n || 0).toLocaleString()}`;
 
 const computeGross = (e: Employee) =>
@@ -93,14 +94,12 @@ export default function EmployeesPage() {
 
   useEffect(() => {
     load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, statusFilter, departmentFilter]);
 
   const openCreate = () => {
     setEditing(null);
     setShowModal(true);
   };
-
   const openEdit = (e: Employee, ev: React.MouseEvent) => {
     ev.stopPropagation();
     setEditing(e);
@@ -256,11 +255,7 @@ export default function EmployeesPage() {
               </thead>
               <tbody className="divide-y divide-gray-50">
                 {employees.map((emp) => (
-                  <tr
-                    key={emp.id}
-                    onClick={() => navigate(`/employees/${emp.id}`)}
-                    className="hover:bg-gray-50 cursor-pointer"
-                  >
+                  <tr key={emp.id} className="hover:bg-gray-50">
                     <td className="px-5 py-3">
                       <div className="flex items-center gap-3">
                         <div className="w-9 h-9 rounded-full bg-[var(--color-primary-light)] text-[var(--color-primary)] flex items-center justify-center text-sm font-bold shrink-0">
@@ -299,12 +294,22 @@ export default function EmployeesPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <button
-                        onClick={(ev) => openEdit(emp, ev)}
-                        className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
-                      >
-                        Edit
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => navigate(`/employees/${emp.id}`)}
+                          className="p-1.5 text-gray-400 hover:text-[var(--color-primary)] hover:bg-gray-100 rounded-lg transition-colors"
+                          title="View Details"
+                        >
+                          <Eye size={16} />
+                        </button>
+                        <button
+                          onClick={(ev) => openEdit(emp, ev)}
+                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          title="Edit"
+                        >
+                          <Pencil size={16} />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -344,18 +349,24 @@ function EmployeeModal({
 }) {
   const isEdit = !!employee;
 
-  const initialPayePercent = employee
-    ? (() => {
-        const g =
-          Number(employee.basicSalary) +
-          Number(employee.housingAllowance) +
-          Number(employee.transportAllowance) +
-          Number(employee.otherAllowances);
-        const p = Number(employee.payeTax);
-        if (g > 0 && p > 0) return ((p / g) * 100).toFixed(1);
-        return "16.5";
-      })()
-    : "16.5";
+  // Calculate existing PAYE to guess if it was percentage or fixed
+  const initialPaye = (() => {
+    if (!employee) return { val: "16.5", type: "PERCENT" };
+    const g =
+      Number(employee.basicSalary) +
+      Number(employee.housingAllowance) +
+      Number(employee.transportAllowance) +
+      Number(employee.otherAllowances);
+    const p = Number(employee.payeTax);
+    if (g > 0 && p > 0) {
+      const pct = (p / g) * 100;
+      // If the percentage is a clean number (e.g., 16.5) and less than 100, assume it was %
+      if (pct < 100 && Number.isFinite(pct)) {
+        return { val: pct.toFixed(1), type: "PERCENT" };
+      }
+    }
+    return { val: String(p), type: "FIXED" };
+  })();
 
   const [form, setForm] = useState({
     honorific: (employee as any)?.honorific || "",
@@ -375,7 +386,8 @@ function EmployeeModal({
     housingAllowance: String(employee?.housingAllowance ?? 0),
     transportAllowance: String(employee?.transportAllowance ?? 0),
     otherAllowances: String(employee?.otherAllowances ?? 0),
-    payePercent: initialPayePercent, // 🎯 %
+    payeInput: initialPaye.val, // 🎯 Holds either % or MWK
+    payeType: initialPaye.type as "PERCENT" | "FIXED", // 🎯 The toggle
     pensionDeduction: String(employee?.pensionDeduction ?? 0),
     otherDeductions: String(employee?.otherDeductions ?? 0),
     status: employee?.status || "ACTIVE",
@@ -393,8 +405,11 @@ function EmployeeModal({
     Number(form.transportAllowance) +
     Number(form.otherAllowances);
 
-  // 🎯 Compute PAYE from %
-  const payeAmount = (gross * (Number(form.payePercent) || 0)) / 100;
+  // 🎯 Live calculation in frontend for the preview block
+  const payeAmount =
+    form.payeType === "PERCENT"
+      ? (gross * (Number(form.payeInput) || 0)) / 100
+      : Number(form.payeInput) || 0;
 
   const deductions =
     payeAmount + Number(form.pensionDeduction) + Number(form.otherDeductions);
@@ -421,7 +436,8 @@ function EmployeeModal({
         housingAllowance: Number(form.housingAllowance) || 0,
         transportAllowance: Number(form.transportAllowance) || 0,
         otherAllowances: Number(form.otherAllowances) || 0,
-        payePercent: Number(form.payePercent) || 0, // 🎯 send %
+        payePercent: Number(form.payeInput) || 0, // 🎯 send value
+        payeType: form.payeType, // 🎯 send type (PERCENT or FIXED)
         pensionDeduction: Number(form.pensionDeduction) || 0,
         otherDeductions: Number(form.otherDeductions) || 0,
         status: form.status,
@@ -498,7 +514,6 @@ function EmployeeModal({
                   </SelectContent>
                 </Select>
               </div>
-
               <div className="col-span-2 sm:col-span-1">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Gender
@@ -517,7 +532,6 @@ function EmployeeModal({
                   </SelectContent>
                 </Select>
               </div>
-
               <input
                 required
                 value={form.firstName}
@@ -595,7 +609,6 @@ function EmployeeModal({
                   className="w-full"
                 />
               </div>
-
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Hire Date
@@ -661,18 +674,23 @@ function EmployeeModal({
             </p>
             <div className="grid grid-cols-3 gap-3">
               <label className="text-xs text-gray-600">
-                PAYE Tax (%)
-                <div className="mt-1 relative">
+                PAYE Tax
+                <div className="mt-1 flex rounded-lg border border-gray-200 overflow-hidden focus-within:ring-2 focus-within:ring-[var(--color-primary)]">
                   <input
                     type="number"
                     step="0.1"
-                    value={form.payePercent}
-                    onChange={(e) => set("payePercent", e.target.value)}
-                    className="w-full px-3 py-2 pr-8 border border-gray-200 rounded-lg text-sm font-mono"
+                    value={form.payeInput}
+                    onChange={(e) => set("payeInput", e.target.value)}
+                    className="w-full px-3 py-2 text-sm font-mono focus:outline-none"
                   />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
-                    %
-                  </span>
+                  <select
+                    value={form.payeType}
+                    onChange={(e) => set("payeType", e.target.value)}
+                    className="bg-gray-50 border-l border-gray-200 text-xs px-2 focus:outline-none"
+                  >
+                    <option value="PERCENT">%</option>
+                    <option value="FIXED">MWK</option>
+                  </select>
                 </div>
                 <p className="text-[10px] text-gray-400 mt-0.5">
                   = {formatMWK(payeAmount)}

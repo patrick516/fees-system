@@ -10,7 +10,6 @@ import {
   IdCard,
   Calendar,
   Wallet,
-  //   Pencil,
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { Employee } from "../../types";
@@ -45,13 +44,12 @@ export default function EmployeeDetail() {
       .finally(() => setLoading(false));
   }, [id, navigate]);
 
-  if (loading) {
+  if (loading)
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 size={24} className="animate-spin text-gray-300" />
       </div>
     );
-  }
   if (!employee) return null;
 
   const gross =
@@ -95,7 +93,7 @@ export default function EmployeeDetail() {
               {employee.fullName}
             </h3>
             <p className="text-sm text-gray-500 mt-0.5">
-              {employee.title || "No title"}
+              {(employee as any).jobTitle || "No title"}
             </p>
             <div className="mt-3 flex justify-center">
               <span

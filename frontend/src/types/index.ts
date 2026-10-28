@@ -235,6 +235,8 @@ export interface AuditLog {
 
 //  EMPLOYEES
 
+//  EMPLOYEES
+
 export type EmployeeStatus = "ACTIVE" | "ON_LEAVE" | "TERMINATED";
 
 export interface Employee {
@@ -243,7 +245,8 @@ export interface Employee {
   lastName: string;
   fullName: string;
   gender?: "MALE" | "FEMALE" | null;
-  title?: string | null;
+  title?: string | null; // legacy
+  jobTitle?: string | null; // 🎯 Added this
   phone?: string | null;
   email?: string | null;
   nationalId?: string | null;
@@ -274,7 +277,7 @@ export interface Employee {
   updatedAt: string;
 }
 
-// ==================== PAYROLL ====================
+//  PAYROLL
 
 export type PayrollStatus = "PENDING" | "PAID";
 

@@ -3,11 +3,14 @@ const prisma = require("../config/db");
 const buildFullName = (firstName, lastName) =>
   [firstName, lastName].filter(Boolean).join(" ").trim();
 
-// 🎯 Compute PAYE amount from percentage of gross salary
-const computePayeFromPercent = (grossSalary, payePercent) => {
-  const pct = Number(payePercent) || 0;
-  if (pct <= 0) return 0;
-  return Number(((Number(grossSalary) || 0) * pct) / 100).toFixed(2);
+// 🎯 Compute PAYE amount based on type
+const computePaye = (grossSalary, payeInput, payeType) => {
+  const val = Number(payeInput) || 0;
+  if (val <= 0) return 0;
+  if (payeType === "PERCENT") {
+    return Number(((Number(grossSalary) || 0) * val) / 100).toFixed(2);
+  }
+  return Number(val).toFixed(2); // FIXED
 };
 
 // ==================== LIST ====================
@@ -23,7 +26,7 @@ const listEmployees = async (req, res) => {
         { fullName: { contains: search, mode: "insensitive" } },
         { firstName: { contains: search, mode: "insensitive" } },
         { lastName: { contains: search, mode: "insensitive" } },
-        { jobTitle: { contains: search, mode: "insensitive" } }, // 🎯 jobTitle
+        { jobTitle: { contains: search, mode: "insensitive" } },
         { phone: { contains: search } },
         { nationalId: { contains: search, mode: "insensitive" } },
       ];
@@ -100,7 +103,7 @@ const createEmployee = async (req, res) => {
       firstName,
       lastName,
       gender,
-      title, // frontend field name — mapped to jobTitle
+      title,
       departmentId,
       phone,
       email,
@@ -112,8 +115,9 @@ const createEmployee = async (req, res) => {
       housingAllowance,
       transportAllowance,
       otherAllowances,
-      payePercent, // 🎯 percentage
-      payeTax, // legacy fallback
+      payePercent,
+      payeType,
+      payeTax,
       pensionDeduction,
       otherDeductions,
       status,
@@ -132,11 +136,17 @@ const createEmployee = async (req, res) => {
       (Number(transportAllowance) || 0) +
       (Number(otherAllowances) || 0);
 
-    // 🎯 Prefer percentage; fall back to fixed MWK
-    const finalPayeTax =
-      payePercent !== undefined
-        ? computePayeFromPercent(grossForPaye, payePercent)
-        : Number(payeTax) || 0;
+    // 🎯 Calculate Final PAYE
+    let finalPayeTax = 0;
+    if (payePercent !== undefined) {
+      finalPayeTax = computePaye(
+        grossForPaye,
+        payePercent,
+        payeType || "PERCENT",
+      );
+    } else if (payeTax !== undefined) {
+      finalPayeTax = Number(payeTax) || 0;
+    }
 
     const employee = await prisma.employee.create({
       data: {
@@ -146,7 +156,7 @@ const createEmployee = async (req, res) => {
         lastName: lastName.trim(),
         fullName: buildFullName(firstName, lastName),
         gender: gender || null,
-        jobTitle: title?.trim() || null, // 🎯 jobTitle
+        jobTitle: title?.trim() || null,
         departmentId: departmentId || null,
         phone: phone?.trim() || null,
         email: email?.trim() || null,
@@ -177,7 +187,6 @@ const createEmployee = async (req, res) => {
         changes: {
           fullName: employee.fullName,
           jobTitle: employee.jobTitle,
-          payePercent: payePercent ?? null,
           payeTax: finalPayeTax,
         },
       },
@@ -217,7 +226,7 @@ const updateEmployee = async (req, res) => {
       );
     }
     if (b.gender !== undefined) data.gender = b.gender || null;
-    if (b.title !== undefined) data.jobTitle = b.title?.trim() || null; // 🎯 jobTitle
+    if (b.title !== undefined) data.jobTitle = b.title?.trim() || null;
     if (b.departmentId !== undefined)
       data.departmentId = b.departmentId || null;
     if (b.phone !== undefined) data.phone = b.phone?.trim() || null;
@@ -241,14 +250,14 @@ const updateEmployee = async (req, res) => {
       if (b[f] !== undefined) data[f] = Number(b[f]) || 0;
     });
 
-    // 🎯 PAYE: from % (recompute), or explicit MWK
+    // 🎯 Recompute PAYE based on type
     if (b.payePercent !== undefined) {
       const gross =
         (Number(b.basicSalary ?? existing.basicSalary) || 0) +
         (Number(b.housingAllowance ?? existing.housingAllowance) || 0) +
         (Number(b.transportAllowance ?? existing.transportAllowance) || 0) +
         (Number(b.otherAllowances ?? existing.otherAllowances) || 0);
-      data.payeTax = computePayeFromPercent(gross, b.payePercent);
+      data.payeTax = computePaye(gross, b.payePercent, b.payeType || "PERCENT");
     } else if (b.payeTax !== undefined) {
       data.payeTax = Number(b.payeTax) || 0;
     }
@@ -286,7 +295,7 @@ const updateEmployee = async (req, res) => {
   }
 };
 
-// ==================== DELETE (soft) ====================
+// ==================== DELETE ====================
 const terminateEmployee = async (req, res) => {
   try {
     const existing = await prisma.employee.findFirst({
