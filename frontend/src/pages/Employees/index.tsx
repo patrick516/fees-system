@@ -30,19 +30,20 @@ const HONORIFICS = ["Mr", "Mrs", "Ms", "Dr", "Rev", "Prof", "Chief"];
 
 const formatMWK = (n: number) => `MWK ${Number(n || 0).toLocaleString()}`;
 
+const computeGross = (e: Employee) =>
+  Number(e.basicSalary) +
+  Number(e.housingAllowance) +
+  Number(e.transportAllowance) +
+  Number(e.otherAllowances);
+
 const computeNet = (e: Employee) => {
-  const gross =
-    Number(e.basicSalary) +
-    Number(e.housingAllowance) +
-    Number(e.transportAllowance) +
-    Number(e.otherAllowances);
   const deductions =
     Number(e.payeTax) + Number(e.pensionDeduction) + Number(e.otherDeductions);
-  return gross - deductions;
+  return computeGross(e) - deductions;
 };
 
 const displayName = (e: Employee) =>
-  [e.honorific, e.firstName, e.lastName].filter(Boolean).join(" ");
+  [(e as any).honorific, e.firstName, e.lastName].filter(Boolean).join(" ");
 
 export default function EmployeesPage() {
   const navigate = useNavigate();
@@ -55,12 +56,10 @@ export default function EmployeesPage() {
   });
   const [loading, setLoading] = useState(true);
 
-  // Filters
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [departmentFilter, setDepartmentFilter] = useState("");
 
-  // Modal
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
 
@@ -110,7 +109,6 @@ export default function EmployeesPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
@@ -129,7 +127,6 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      {/* Summary cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-2">
@@ -166,7 +163,6 @@ export default function EmployeesPage() {
         </div>
       </div>
 
-      {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4 flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
           <Search
@@ -176,11 +172,10 @@ export default function EmployeesPage() {
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search by name, phone, ID, or title..."
+            placeholder="Search by name, phone, ID, or job title..."
             className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
           />
         </div>
-
         <Select
           value={statusFilter || "ALL"}
           onValueChange={(v) => setStatusFilter(v === "ALL" ? "" : v)}
@@ -195,7 +190,6 @@ export default function EmployeesPage() {
             <SelectItem value="TERMINATED">Terminated</SelectItem>
           </SelectContent>
         </Select>
-
         <Select
           value={departmentFilter || "ALL"}
           onValueChange={(v) => setDepartmentFilter(v === "ALL" ? "" : v)}
@@ -214,7 +208,6 @@ export default function EmployeesPage() {
         </Select>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-48">
@@ -284,7 +277,7 @@ export default function EmployeesPage() {
                       </div>
                     </td>
                     <td className="px-5 py-3 text-sm text-gray-600">
-                      {emp.title || "—"}
+                      {(emp as any).jobTitle || "—"}
                     </td>
                     <td className="px-5 py-3 text-sm text-gray-600">
                       {emp.department?.name || "—"}
@@ -321,7 +314,6 @@ export default function EmployeesPage() {
         )}
       </div>
 
-      {/* Modal */}
       {showModal && (
         <EmployeeModal
           employee={editing}
@@ -337,7 +329,7 @@ export default function EmployeesPage() {
   );
 }
 
-// ==================== MODAL COMPONENT ====================
+// ==================== MODAL ====================
 
 function EmployeeModal({
   employee,
@@ -351,12 +343,26 @@ function EmployeeModal({
   onSaved: () => void;
 }) {
   const isEdit = !!employee;
+
+  const initialPayePercent = employee
+    ? (() => {
+        const g =
+          Number(employee.basicSalary) +
+          Number(employee.housingAllowance) +
+          Number(employee.transportAllowance) +
+          Number(employee.otherAllowances);
+        const p = Number(employee.payeTax);
+        if (g > 0 && p > 0) return ((p / g) * 100).toFixed(1);
+        return "16.5";
+      })()
+    : "16.5";
+
   const [form, setForm] = useState({
     honorific: (employee as any)?.honorific || "",
     firstName: employee?.firstName || "",
     lastName: employee?.lastName || "",
     gender: (employee as any)?.gender || "",
-    title: employee?.title || "",
+    title: (employee as any)?.jobTitle || "",
     departmentId: employee?.departmentId || "",
     phone: employee?.phone || "",
     email: employee?.email || "",
@@ -369,7 +375,7 @@ function EmployeeModal({
     housingAllowance: String(employee?.housingAllowance ?? 0),
     transportAllowance: String(employee?.transportAllowance ?? 0),
     otherAllowances: String(employee?.otherAllowances ?? 0),
-    payeTax: String(employee?.payeTax ?? 0),
+    payePercent: initialPayePercent, // 🎯 %
     pensionDeduction: String(employee?.pensionDeduction ?? 0),
     otherDeductions: String(employee?.otherDeductions ?? 0),
     status: employee?.status || "ACTIVE",
@@ -386,10 +392,12 @@ function EmployeeModal({
     Number(form.housingAllowance) +
     Number(form.transportAllowance) +
     Number(form.otherAllowances);
+
+  // 🎯 Compute PAYE from %
+  const payeAmount = (gross * (Number(form.payePercent) || 0)) / 100;
+
   const deductions =
-    Number(form.payeTax) +
-    Number(form.pensionDeduction) +
-    Number(form.otherDeductions);
+    payeAmount + Number(form.pensionDeduction) + Number(form.otherDeductions);
   const net = gross - deductions;
 
   const submit = async (e: React.FormEvent) => {
@@ -413,7 +421,7 @@ function EmployeeModal({
         housingAllowance: Number(form.housingAllowance) || 0,
         transportAllowance: Number(form.transportAllowance) || 0,
         otherAllowances: Number(form.otherAllowances) || 0,
-        payeTax: Number(form.payeTax) || 0,
+        payePercent: Number(form.payePercent) || 0, // 🎯 send %
         pensionDeduction: Number(form.pensionDeduction) || 0,
         otherDeductions: Number(form.otherDeductions) || 0,
         status: form.status,
@@ -464,25 +472,24 @@ function EmployeeModal({
             </div>
           )}
 
-          {/* Personal */}
           <section>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
               Personal Info
             </p>
             <div className="grid grid-cols-2 gap-3">
-              {/* Honorific */}
               <div className="col-span-2 sm:col-span-1">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Title
                 </label>
                 <Select
-                  value={form.honorific}
-                  onValueChange={(v) => set("honorific", v)}
+                  value={form.honorific || "NONE"}
+                  onValueChange={(v) => set("honorific", v === "NONE" ? "" : v)}
                 >
                   <SelectTrigger className="w-full bg-white border-gray-200 rounded-lg text-sm h-[38px]">
                     <SelectValue placeholder="Select title" />
                   </SelectTrigger>
                   <SelectContent className="bg-white">
+                    <SelectItem value="NONE">None</SelectItem>
                     {HONORIFICS.map((h) => (
                       <SelectItem key={h} value={h}>
                         {h}
@@ -492,19 +499,19 @@ function EmployeeModal({
                 </Select>
               </div>
 
-              {/* Gender */}
               <div className="col-span-2 sm:col-span-1">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Gender
                 </label>
                 <Select
-                  value={form.gender}
-                  onValueChange={(v) => set("gender", v)}
+                  value={form.gender || "NONE"}
+                  onValueChange={(v) => set("gender", v === "NONE" ? "" : v)}
                 >
                   <SelectTrigger className="w-full bg-white border-gray-200 rounded-lg text-sm h-[38px]">
                     <SelectValue placeholder="Select gender" />
                   </SelectTrigger>
                   <SelectContent className="bg-white">
+                    <SelectItem value="NONE">Not specified</SelectItem>
                     <SelectItem value="MALE">Male</SelectItem>
                     <SelectItem value="FEMALE">Female</SelectItem>
                   </SelectContent>
@@ -532,7 +539,6 @@ function EmployeeModal({
                 className="col-span-2 px-3 py-2 border border-gray-200 rounded-lg text-sm"
               />
 
-              {/* Department */}
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Department
@@ -576,8 +582,7 @@ function EmployeeModal({
                 className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
               />
 
-              {/* Date of Birth */}
-              <div>
+              <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Date of Birth
                 </label>
@@ -586,11 +591,11 @@ function EmployeeModal({
                   onChange={(v) => set("dateOfBirth", v)}
                   placeholder="Pick date of birth"
                   clearable
+                  birthdateMode
                   className="w-full"
                 />
               </div>
 
-              {/* Hire Date */}
               <div className="col-span-2">
                 <label className="block text-xs font-medium text-gray-600 mb-1">
                   Hire Date
@@ -606,7 +611,6 @@ function EmployeeModal({
             </div>
           </section>
 
-          {/* Salary additions */}
           <section>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
               Salary — Additions
@@ -651,20 +655,28 @@ function EmployeeModal({
             </div>
           </section>
 
-          {/* Deductions */}
           <section>
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">
               Salary — Deductions
             </p>
             <div className="grid grid-cols-3 gap-3">
               <label className="text-xs text-gray-600">
-                PAYE Tax
-                <input
-                  type="number"
-                  value={form.payeTax}
-                  onChange={(e) => set("payeTax", e.target.value)}
-                  className="mt-1 w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono"
-                />
+                PAYE Tax (%)
+                <div className="mt-1 relative">
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={form.payePercent}
+                    onChange={(e) => set("payePercent", e.target.value)}
+                    className="w-full px-3 py-2 pr-8 border border-gray-200 rounded-lg text-sm font-mono"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-gray-400">
+                    %
+                  </span>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-0.5">
+                  = {formatMWK(payeAmount)}
+                </p>
               </label>
               <label className="text-xs text-gray-600">
                 Pension
@@ -687,7 +699,6 @@ function EmployeeModal({
             </div>
           </section>
 
-          {/* Net preview */}
           <section className="bg-slate-50 rounded-xl p-4 border border-slate-100">
             <div className="flex items-center justify-between text-sm">
               <span className="text-gray-500">Gross:</span>
@@ -709,7 +720,6 @@ function EmployeeModal({
             </div>
           </section>
 
-          {/* Status + notes */}
           <section className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">

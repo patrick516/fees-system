@@ -233,7 +233,7 @@ export interface AuditLog {
   createdAt: string;
 }
 
-// ==================== EMPLOYEES ====================
+//  EMPLOYEES
 
 export type EmployeeStatus = "ACTIVE" | "ON_LEAVE" | "TERMINATED";
 

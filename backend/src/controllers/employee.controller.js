@@ -3,8 +3,14 @@ const prisma = require("../config/db");
 const buildFullName = (firstName, lastName) =>
   [firstName, lastName].filter(Boolean).join(" ").trim();
 
+// 🎯 Compute PAYE amount from percentage of gross salary
+const computePayeFromPercent = (grossSalary, payePercent) => {
+  const pct = Number(payePercent) || 0;
+  if (pct <= 0) return 0;
+  return Number(((Number(grossSalary) || 0) * pct) / 100).toFixed(2);
+};
+
 // ==================== LIST ====================
-// GET /api/employees?search=&status=&departmentId=
 const listEmployees = async (req, res) => {
   try {
     const { search, status, departmentId } = req.query;
@@ -17,7 +23,7 @@ const listEmployees = async (req, res) => {
         { fullName: { contains: search, mode: "insensitive" } },
         { firstName: { contains: search, mode: "insensitive" } },
         { lastName: { contains: search, mode: "insensitive" } },
-        { title: { contains: search, mode: "insensitive" } },
+        { jobTitle: { contains: search, mode: "insensitive" } }, // 🎯 jobTitle
         { phone: { contains: search } },
         { nationalId: { contains: search, mode: "insensitive" } },
       ];
@@ -32,7 +38,6 @@ const listEmployees = async (req, res) => {
       orderBy: { fullName: "asc" },
     });
 
-    // Compute monthly totals
     const activeEmployees = employees.filter((e) => e.status === "ACTIVE");
     const monthlyTotal = activeEmployees.reduce((sum, e) => {
       const gross =
@@ -65,7 +70,6 @@ const listEmployees = async (req, res) => {
 };
 
 // ==================== GET ONE ====================
-// GET /api/employees/:id
 const getEmployee = async (req, res) => {
   try {
     const employee = await prisma.employee.findFirst({
@@ -88,8 +92,7 @@ const getEmployee = async (req, res) => {
   }
 };
 
-//  CREATE
-// POST /api/employees
+// ==================== CREATE ====================
 const createEmployee = async (req, res) => {
   try {
     const {
@@ -97,7 +100,7 @@ const createEmployee = async (req, res) => {
       firstName,
       lastName,
       gender,
-      title,
+      title, // frontend field name — mapped to jobTitle
       departmentId,
       phone,
       email,
@@ -109,7 +112,8 @@ const createEmployee = async (req, res) => {
       housingAllowance,
       transportAllowance,
       otherAllowances,
-      payeTax,
+      payePercent, // 🎯 percentage
+      payeTax, // legacy fallback
       pensionDeduction,
       otherDeductions,
       status,
@@ -122,6 +126,18 @@ const createEmployee = async (req, res) => {
         .json({ success: false, message: "First and last name are required" });
     }
 
+    const grossForPaye =
+      (Number(basicSalary) || 0) +
+      (Number(housingAllowance) || 0) +
+      (Number(transportAllowance) || 0) +
+      (Number(otherAllowances) || 0);
+
+    // 🎯 Prefer percentage; fall back to fixed MWK
+    const finalPayeTax =
+      payePercent !== undefined
+        ? computePayeFromPercent(grossForPaye, payePercent)
+        : Number(payeTax) || 0;
+
     const employee = await prisma.employee.create({
       data: {
         schoolId: req.schoolId,
@@ -130,7 +146,7 @@ const createEmployee = async (req, res) => {
         lastName: lastName.trim(),
         fullName: buildFullName(firstName, lastName),
         gender: gender || null,
-        title: title?.trim() || null,
+        jobTitle: title?.trim() || null, // 🎯 jobTitle
         departmentId: departmentId || null,
         phone: phone?.trim() || null,
         email: email?.trim() || null,
@@ -142,7 +158,7 @@ const createEmployee = async (req, res) => {
         housingAllowance: Number(housingAllowance) || 0,
         transportAllowance: Number(transportAllowance) || 0,
         otherAllowances: Number(otherAllowances) || 0,
-        payeTax: Number(payeTax) || 0,
+        payeTax: finalPayeTax,
         pensionDeduction: Number(pensionDeduction) || 0,
         otherDeductions: Number(otherDeductions) || 0,
         status: status || "ACTIVE",
@@ -158,7 +174,12 @@ const createEmployee = async (req, res) => {
         action: "EMPLOYEE_ADDED",
         entity: "Employee",
         entityId: employee.id,
-        changes: { fullName: employee.fullName, title: employee.title },
+        changes: {
+          fullName: employee.fullName,
+          jobTitle: employee.jobTitle,
+          payePercent: payePercent ?? null,
+          payeTax: finalPayeTax,
+        },
       },
     });
 
@@ -172,7 +193,6 @@ const createEmployee = async (req, res) => {
 };
 
 // ==================== UPDATE ====================
-// PUT /api/employees/:id
 const updateEmployee = async (req, res) => {
   try {
     const existing = await prisma.employee.findFirst({
@@ -197,7 +217,7 @@ const updateEmployee = async (req, res) => {
       );
     }
     if (b.gender !== undefined) data.gender = b.gender || null;
-    if (b.title !== undefined) data.title = b.title?.trim() || null;
+    if (b.title !== undefined) data.jobTitle = b.title?.trim() || null; // 🎯 jobTitle
     if (b.departmentId !== undefined)
       data.departmentId = b.departmentId || null;
     if (b.phone !== undefined) data.phone = b.phone?.trim() || null;
@@ -215,12 +235,23 @@ const updateEmployee = async (req, res) => {
       "housingAllowance",
       "transportAllowance",
       "otherAllowances",
-      "payeTax",
       "pensionDeduction",
       "otherDeductions",
     ].forEach((f) => {
       if (b[f] !== undefined) data[f] = Number(b[f]) || 0;
     });
+
+    // 🎯 PAYE: from % (recompute), or explicit MWK
+    if (b.payePercent !== undefined) {
+      const gross =
+        (Number(b.basicSalary ?? existing.basicSalary) || 0) +
+        (Number(b.housingAllowance ?? existing.housingAllowance) || 0) +
+        (Number(b.transportAllowance ?? existing.transportAllowance) || 0) +
+        (Number(b.otherAllowances ?? existing.otherAllowances) || 0);
+      data.payeTax = computePayeFromPercent(gross, b.payePercent);
+    } else if (b.payeTax !== undefined) {
+      data.payeTax = Number(b.payeTax) || 0;
+    }
 
     if (b.status !== undefined) data.status = b.status;
     if (b.terminationDate !== undefined)
@@ -255,8 +286,7 @@ const updateEmployee = async (req, res) => {
   }
 };
 
-// ==================== DELETE (soft — sets TERMINATED) ====================
-// DELETE /api/employees/:id
+// ==================== DELETE (soft) ====================
 const terminateEmployee = async (req, res) => {
   try {
     const existing = await prisma.employee.findFirst({
