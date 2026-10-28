@@ -267,7 +267,7 @@ export default function PayrollPage() {
                         {r.employee?.fullName}
                       </p>
                       <p className="text-xs text-gray-400">
-                        {r.employee?.title || "—"}
+                        {r.employee?.jobTitle || "—"}
                         {r.employee?.department
                           ? ` · ${r.employee.department.name}`
                           : ""}

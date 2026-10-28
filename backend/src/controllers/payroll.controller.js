@@ -130,7 +130,7 @@ const listPayroll = async (req, res) => {
           select: {
             id: true,
             fullName: true,
-            title: true,
+            jobTitle: true,
             department: { select: { name: true } },
           },
         },

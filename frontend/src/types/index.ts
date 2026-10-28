@@ -312,7 +312,7 @@ export interface PayrollRecord {
   employee?: {
     id: string;
     fullName: string;
-    title?: string | null;
+    jobTitle?: string | null;
     department?: { name: string } | null;
   };
 
