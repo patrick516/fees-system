@@ -50,6 +50,8 @@ export default function EmployeesPage() {
   const navigate = useNavigate();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
+
+  // 🎯 We will calculate this directly from the employees array
   const [summary, setSummary] = useState({
     totalEmployees: 0,
     activeCount: 0,
@@ -57,6 +59,7 @@ export default function EmployeesPage() {
     totalDeductions: 0,
     monthlyNetPayroll: 0,
   });
+
   const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState("");
@@ -78,15 +81,37 @@ export default function EmployeesPage() {
         api.get(`/employees?${params}`),
         api.get("/departments"),
       ]);
-      setEmployees(empRes.data.data || []);
-      setSummary(
-        empRes.data.summary || {
-          totalEmployees: 0,
-          activeCount: 0,
-          monthlyNetPayroll: 0,
-        },
-      );
+
+      const fetchedEmployees: Employee[] = empRes.data.data || [];
+      setEmployees(fetchedEmployees);
       setDepartments(deptRes.data.data || []);
+
+      // 🎯 CALCULATE SUMMARY DIRECTLY FROM THE ARRAY (Guaranteed to match table)
+      const activeEmployees = fetchedEmployees.filter(
+        (e) => e.status === "ACTIVE",
+      );
+      let gross = 0;
+      let deductions = 0;
+      let net = 0;
+
+      activeEmployees.forEach((e) => {
+        const g = computeGross(e);
+        const d =
+          Number(e.payeTax) +
+          Number(e.pensionDeduction) +
+          Number(e.otherDeductions);
+        gross += g;
+        deductions += d;
+        net += g - d;
+      });
+
+      setSummary({
+        totalEmployees: fetchedEmployees.length,
+        activeCount: activeEmployees.length,
+        grossPayroll: gross,
+        totalDeductions: deductions,
+        monthlyNetPayroll: net,
+      });
     } catch (err) {
       console.error("Load employees error:", err);
     } finally {
@@ -322,7 +347,6 @@ export default function EmployeesPage() {
                     </td>
                     <td className="px-5 py-3 text-right">
                       <div className="flex items-center justify-end gap-3">
-                        {/*  EYE ICON - View Details */}
                         <button
                           onClick={(ev) => {
                             ev.stopPropagation();
@@ -333,8 +357,6 @@ export default function EmployeesPage() {
                         >
                           <Eye size={18} />
                         </button>
-
-                        {/*  PENCIL ICON - Edit */}
                         <button
                           onClick={(ev) => openEdit(emp, ev)}
                           className="text-gray-600 hover:text-blue-600 hover:scale-110 transition-all"
@@ -368,7 +390,7 @@ export default function EmployeesPage() {
 }
 
 // ==================== MODAL ====================
-
+// (Keep the EmployeeModal exactly as it is in your file, it is correct)
 function EmployeeModal({
   employee,
   departments,
@@ -382,7 +404,6 @@ function EmployeeModal({
 }) {
   const isEdit = !!employee;
 
-  // Calculate existing PAYE to guess if it was percentage or fixed
   const initialPaye = (() => {
     if (!employee) return { val: "16.5", type: "PERCENT" };
     const g =
@@ -393,7 +414,6 @@ function EmployeeModal({
     const p = Number(employee.payeTax);
     if (g > 0 && p > 0) {
       const pct = (p / g) * 100;
-      // If the percentage is a clean number (e.g., 16.5) and less than 100, assume it was %
       if (pct < 100 && Number.isFinite(pct)) {
         return { val: pct.toFixed(1), type: "PERCENT" };
       }
@@ -419,8 +439,8 @@ function EmployeeModal({
     housingAllowance: String(employee?.housingAllowance ?? 0),
     transportAllowance: String(employee?.transportAllowance ?? 0),
     otherAllowances: String(employee?.otherAllowances ?? 0),
-    payeInput: initialPaye.val, // 🎯 Holds either % or MWK
-    payeType: initialPaye.type as "PERCENT" | "FIXED", // 🎯 The toggle
+    payeInput: initialPaye.val,
+    payeType: initialPaye.type as "PERCENT" | "FIXED",
     pensionDeduction: String(employee?.pensionDeduction ?? 0),
     otherDeductions: String(employee?.otherDeductions ?? 0),
     status: employee?.status || "ACTIVE",
@@ -438,7 +458,6 @@ function EmployeeModal({
     Number(form.transportAllowance) +
     Number(form.otherAllowances);
 
-  // 🎯 Live calculation in frontend for the preview block
   const payeAmount =
     form.payeType === "PERCENT"
       ? (gross * (Number(form.payeInput) || 0)) / 100
@@ -469,8 +488,8 @@ function EmployeeModal({
         housingAllowance: Number(form.housingAllowance) || 0,
         transportAllowance: Number(form.transportAllowance) || 0,
         otherAllowances: Number(form.otherAllowances) || 0,
-        payePercent: Number(form.payeInput) || 0, // 🎯 send value
-        payeType: form.payeType, // 🎯 send type (PERCENT or FIXED)
+        payePercent: Number(form.payeInput) || 0,
+        payeType: form.payeType,
         pensionDeduction: Number(form.pensionDeduction) || 0,
         otherDeductions: Number(form.otherDeductions) || 0,
         status: form.status,
