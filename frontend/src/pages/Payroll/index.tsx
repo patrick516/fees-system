@@ -9,6 +9,7 @@ import {
   Trash2,
   Printer,
   CheckSquare,
+  Lock,
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { PayrollRecord } from "../../types";
@@ -60,13 +61,12 @@ export default function PayrollPage() {
   );
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
-  // 🎯 State for bulk selection
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkProcessing, setBulkProcessing] = useState(false);
 
   const load = async () => {
     setLoading(true);
-    setSelectedIds([]); // Reset selection on load
+    setSelectedIds([]);
     try {
       const res = await api.get(`/payroll?month=${month}`);
       setRecords(res.data.data || []);
@@ -110,12 +110,10 @@ export default function PayrollPage() {
     }
   };
 
-  // 🎯 Bulk Mark Paid Logic
   const markSelectedPaid = async () => {
     if (selectedIds.length === 0) return;
     setBulkProcessing(true);
     try {
-      // Process in parallel
       await Promise.all(
         selectedIds.map((id) => api.put(`/payroll/${id}`, { status: "PAID" })),
       );
@@ -148,7 +146,6 @@ export default function PayrollPage() {
     }
   };
 
-  // 🎯 Checkbox toggle helpers
   const toggleSelect = (id: string) => {
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
@@ -156,7 +153,6 @@ export default function PayrollPage() {
   };
 
   const toggleSelectAll = () => {
-    // Only select PENDING records. Paid records shouldn't be altered.
     const pendingIds = records
       .filter((r) => r.status !== "PAID")
       .map((r) => r.id);
@@ -167,10 +163,8 @@ export default function PayrollPage() {
     }
   };
 
-  // ==================== EXPORT PDF ====================
   const exportToPDF = () => {
     if (records.length === 0) return;
-
     const brand = settings?.primaryColor || "#1e3a5f";
     const logoUrl = settings?.logo
       ? settings.logo.startsWith("http") || settings.logo.startsWith("data:")
@@ -398,11 +392,7 @@ export default function PayrollPage() {
 
       {message && (
         <div
-          className={`flex items-start gap-2 px-4 py-3 rounded-lg text-sm ${
-            message.kind === "success"
-              ? "bg-green-50 border border-green-200 text-green-800"
-              : "bg-red-50 border border-red-200 text-red-800"
-          }`}
+          className={`flex items-start gap-2 px-4 py-3 rounded-lg text-sm ${message.kind === "success" ? "bg-green-50 border border-green-200 text-green-800" : "bg-red-50 border border-red-200 text-red-800"}`}
         >
           {message.kind === "success" ? (
             <CheckCircle2 size={16} />
@@ -458,7 +448,6 @@ export default function PayrollPage() {
           </span>
         </div>
 
-        {/* 🎯 Bulk Action Button */}
         {selectedIds.length > 0 && (
           <button
             onClick={markSelectedPaid}
@@ -496,7 +485,6 @@ export default function PayrollPage() {
             <table className="w-full min-w-[900px]">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
-                  {/* 🎯 Select All Checkbox */}
                   <th className="px-5 py-3 w-10 text-center">
                     {pendingRecords.length > 0 && (
                       <input
@@ -536,7 +524,6 @@ export default function PayrollPage() {
               <tbody className="divide-y divide-gray-50">
                 {records.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
-                    {/* 🎯 Row Checkbox */}
                     <td className="px-5 py-3 text-center">
                       {r.status !== "PAID" && (
                         <input
@@ -578,20 +565,29 @@ export default function PayrollPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3 text-right space-x-3">
-                      <button
-                        onClick={() => setEditingRecord(r)}
-                        className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
-                      >
-                        Edit
-                      </button>
-                      {/* 🎯 Removed "Unmark" button. Once Paid, it's locked. */}
-                      {r.status !== "PAID" && (
-                        <button
-                          onClick={() => setDeletingId(r.id)}
-                          className="text-xs text-red-600 hover:underline"
+                      {/* 🎯 LOCKED IF PAID */}
+                      {r.status === "PAID" ? (
+                        <span
+                          className="inline-flex items-center gap-1 text-xs font-medium text-gray-400 cursor-not-allowed"
+                          title="Paid records are locked for auditing"
                         >
-                          Delete
-                        </button>
+                          <Lock size={12} /> Locked
+                        </span>
+                      ) : (
+                        <>
+                          <button
+                            onClick={() => setEditingRecord(r)}
+                            className="text-xs font-semibold text-[var(--color-primary)] hover:underline"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => setDeletingId(r.id)}
+                            className="text-xs text-red-600 hover:underline"
+                          >
+                            Delete
+                          </button>
+                        </>
                       )}
                     </td>
                   </tr>
@@ -624,7 +620,6 @@ export default function PayrollPage() {
 }
 
 // ==================== EDIT MODAL ====================
-
 function EditPayrollModal({
   record,
   onClose,
@@ -654,6 +649,7 @@ function EditPayrollModal({
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (record.status === "PAID") return; // Safety check
     setSaving(true);
     try {
       await api.put(`/payroll/${record.id}`, {
@@ -690,7 +686,6 @@ function EditPayrollModal({
             <X size={18} />
           </button>
         </div>
-
         <form onSubmit={save} className="space-y-3">
           <div className="bg-slate-50 rounded-lg p-3 text-sm space-y-1">
             <div className="flex justify-between">
@@ -704,7 +699,6 @@ function EditPayrollModal({
               </span>
             </div>
           </div>
-
           <div className="grid grid-cols-2 gap-3">
             <label className="text-xs text-gray-600">
               Bonus
@@ -743,12 +737,10 @@ function EditPayrollModal({
               />
             </label>
           </div>
-
           <div className="bg-purple-50 border border-purple-100 rounded-lg p-3 flex justify-between text-base font-bold">
             <span className="text-purple-800">New Net:</span>
             <span className="font-mono text-purple-700">{formatMWK(net)}</span>
           </div>
-
           <div className="flex gap-3 pt-2">
             <button
               type="button"
