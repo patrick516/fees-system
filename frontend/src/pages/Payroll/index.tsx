@@ -8,7 +8,11 @@ import {
   X,
   Trash2,
   Printer,
+  CheckSquare,
 } from "lucide-react";
+import api from "../../lib/axios";
+import type { PayrollRecord } from "../../types";
+import { useSchoolSettings } from "../../hooks/useSchoolSettings";
 import {
   Select,
   SelectContent,
@@ -17,9 +21,6 @@ import {
   SelectValue,
 } from "../../components/ui/select";
 import { Calendar as CalendarIcon } from "lucide-react";
-import api from "../../lib/axios";
-import type { PayrollRecord } from "../../types";
-import { useSchoolSettings } from "../../hooks/useSchoolSettings";
 
 const formatMWK = (n: number) => `MWK ${Number(n || 0).toLocaleString()}`;
 const currentMonth = () => {
@@ -59,8 +60,13 @@ export default function PayrollPage() {
   );
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
+  // 🎯 State for bulk selection
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+
   const load = async () => {
     setLoading(true);
+    setSelectedIds([]); // Reset selection on load
     try {
       const res = await api.get(`/payroll?month=${month}`);
       setRecords(res.data.data || []);
@@ -104,17 +110,27 @@ export default function PayrollPage() {
     }
   };
 
-  const markPaid = async (r: PayrollRecord) => {
+  // 🎯 Bulk Mark Paid Logic
+  const markSelectedPaid = async () => {
+    if (selectedIds.length === 0) return;
+    setBulkProcessing(true);
     try {
-      await api.put(`/payroll/${r.id}`, {
-        status: r.status === "PAID" ? "PENDING" : "PAID",
+      // Process in parallel
+      await Promise.all(
+        selectedIds.map((id) => api.put(`/payroll/${id}`, { status: "PAID" })),
+      );
+      setMessage({
+        kind: "success",
+        text: `Successfully marked ${selectedIds.length} record(s) as Paid.`,
       });
       load();
     } catch (err: any) {
       setMessage({
         kind: "error",
-        text: err.response?.data?.message || "Failed",
+        text: "Failed to mark some records as paid.",
       });
+    } finally {
+      setBulkProcessing(false);
     }
   };
 
@@ -129,6 +145,25 @@ export default function PayrollPage() {
         kind: "error",
         text: err.response?.data?.message || "Failed to delete",
       });
+    }
+  };
+
+  // 🎯 Checkbox toggle helpers
+  const toggleSelect = (id: string) => {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
+    );
+  };
+
+  const toggleSelectAll = () => {
+    // Only select PENDING records. Paid records shouldn't be altered.
+    const pendingIds = records
+      .filter((r) => r.status !== "PAID")
+      .map((r) => r.id);
+    if (selectedIds.length === pendingIds.length && pendingIds.length > 0) {
+      setSelectedIds([]);
+    } else {
+      setSelectedIds(pendingIds);
     }
   };
 
@@ -154,10 +189,10 @@ export default function PayrollPage() {
       <tr>
         <td><div style="font-weight:600;color:#334155;">${r.employee?.fullName}</div><div style="font-size:8px;color:#94a3b8;">${r.employee?.jobTitle || "—"}</div></td>
         <td class="right">${formatMWK(r.basicSalary)}</td>
-        <td class="right">${formatMWK(r.housingAllowance + r.transportAllowance + r.otherAllowances)}</td>
+        <td class="right">${formatMWK(Number(r.housingAllowance) + Number(r.transportAllowance) + Number(r.otherAllowances))}</td>
         <td class="right bold">${formatMWK(r.grossSalary)}</td>
         <td class="right red">- ${formatMWK(r.payeTax)}</td>
-        <td class="right red">- ${formatMWK(r.pensionDeduction + r.otherDeductions + r.extraDeduction)}</td>
+        <td class="right red">- ${formatMWK(Number(r.pensionDeduction) + Number(r.otherDeductions) + Number(r.extraDeduction || 0))}</td>
         <td class="right green">+ ${formatMWK(r.bonus)}</td>
         <td class="right bold purple">${formatMWK(r.netSalary)}</td>
         <td class="center">${r.status === "PAID" ? "PAID" : "PENDING"}</td>
@@ -175,7 +210,6 @@ export default function PayrollPage() {
     @page { size: A4 landscape; margin: 12mm; }
     * { margin: 0; padding: 0; box-sizing: border-box; }
     body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 9px; color: #1e293b; line-height: 1.4; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    
     .header { display: flex; align-items: center; gap: 16px; padding-bottom: 14px; border-bottom: 3px solid ${brand}; margin-bottom: 18px; }
     .header-logo { width: 60px; height: 60px; object-fit: contain; flex-shrink: 0; }
     .header-logo-placeholder { width: 60px; height: 60px; background: #f1f5f9; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 9px; font-weight: 600; flex-shrink: 0; }
@@ -185,7 +219,6 @@ export default function PayrollPage() {
     .report-title { font-size: 11px; font-weight: 600; color: #334155; margin-top: 6px; text-transform: uppercase; letter-spacing: 1px; }
     .header-meta { text-align: right; font-size: 9px; color: #64748b; line-height: 1.6; white-space: nowrap; }
     .header-meta strong { color: ${brand}; font-weight: 700; }
-    
     .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
     .stat-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; background: #ffffff; }
     .stat-label { font-size: 8px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
@@ -194,7 +227,6 @@ export default function PayrollPage() {
     .stat-value.red { color: #dc2626; }
     .stat-value.blue { color: ${brand}; }
     .stat-value.purple { color: #7e22ce; }
-
     table { width: 100%; border-collapse: collapse; font-size: 8.5px; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
     thead th { background: ${brand}; color: #ffffff; font-size: 8px; font-weight: 700; text-transform: uppercase; padding: 8px 6px; text-align: left; white-space: nowrap; }
     thead th.right { text-align: right; }
@@ -207,7 +239,6 @@ export default function PayrollPage() {
     tbody td.green { color: #16a34a; }
     tbody td.red { color: #dc2626; }
     tbody td.purple { color: #7e22ce; }
-    
     .footer { margin-top: 30px; padding-top: 15px; border-top: 1px dashed #cbd5e1; display: flex; justify-content: space-between; align-items: flex-end; }
     .signature-block { text-align: center; width: 200px; }
     .signature-line { border-bottom: 1px solid #64748b; height: 30px; margin-bottom: 5px; }
@@ -229,14 +260,12 @@ export default function PayrollPage() {
       <div><strong>${today}</strong></div>
     </div>
   </div>
-
   <div class="stats-grid">
     <div class="stat-card"><div class="stat-label">Total Employees</div><div class="stat-value blue">${records.length}</div></div>
     <div class="stat-card"><div class="stat-label">Total Gross</div><div class="stat-value blue">${formatMWK(summary.gross)}</div></div>
     <div class="stat-card"><div class="stat-label">Total Deductions</div><div class="stat-value red">- ${formatMWK(summary.deductions)}</div></div>
     <div class="stat-card"><div class="stat-label">Total Net Payable</div><div class="stat-value purple">${formatMWK(summary.net)}</div></div>
   </div>
-
   <table>
     <thead>
       <tr>
@@ -255,20 +284,11 @@ export default function PayrollPage() {
       ${rowsHtml}
     </tbody>
   </table>
-
   <div class="footer">
-    <div>
-      <p style="font-size:8px;color:#94a3b8;">This is a system-generated report. Valid without signature.</p>
-    </div>
+    <div><p style="font-size:8px;color:#94a3b8;">This is a system-generated report. Valid without signature.</p></div>
     <div style="display:flex;gap:40px;">
-      <div class="signature-block">
-        <div class="signature-line"></div>
-        <div class="signature-label">Prepared By (Bursar)</div>
-      </div>
-      <div class="signature-block">
-        <div class="signature-line"></div>
-        <div class="signature-label">Approved By (Headmaster)</div>
-      </div>
+      <div class="signature-block"><div class="signature-line"></div><div class="signature-label">Prepared By (Bursar)</div></div>
+      <div class="signature-block"><div class="signature-line"></div><div class="signature-label">Approved By (Headmaster)</div></div>
     </div>
   </div>
 </body>
@@ -283,6 +303,8 @@ export default function PayrollPage() {
       printWindow.print();
     }, 600);
   };
+
+  const pendingRecords = records.filter((r) => r.status !== "PAID");
 
   return (
     <div className="space-y-6">
@@ -300,7 +322,6 @@ export default function PayrollPage() {
             <div className="pl-2 text-gray-400">
               <CalendarIcon size={16} />
             </div>
-            {/* Month Selector */}
             <Select
               value={month.split("-")[1]}
               onValueChange={(val) => setMonth(`${month.split("-")[0]}-${val}`)}
@@ -329,8 +350,6 @@ export default function PayrollPage() {
                 ))}
               </SelectContent>
             </Select>
-
-            {/* Year Selector */}
             <Select
               value={month.split("-")[0]}
               onValueChange={(val) => setMonth(`${val}-${month.split("-")[1]}`)}
@@ -350,6 +369,7 @@ export default function PayrollPage() {
               </SelectContent>
             </Select>
           </div>
+
           {records.length > 0 ? (
             <button
               onClick={exportToPDF}
@@ -393,7 +413,6 @@ export default function PayrollPage() {
         </div>
       )}
 
-      {/* Summary cards */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-4">
           <p className="text-[11px] font-semibold text-gray-500 uppercase tracking-wide mb-1">
@@ -429,17 +448,33 @@ export default function PayrollPage() {
         </div>
       </div>
 
-      {/* Status counters */}
-      <div className="flex items-center gap-3 text-sm">
-        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 text-green-800 rounded-lg font-medium">
-          <CheckCircle2 size={14} /> {summary.paid} Paid
-        </span>
-        <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg font-medium">
-          <Clock size={14} /> {summary.pending} Pending
-        </span>
+      <div className="flex items-center justify-between text-sm">
+        <div className="flex items-center gap-3">
+          <span className="flex items-center gap-1.5 px-3 py-1.5 bg-green-50 border border-green-200 text-green-800 rounded-lg font-medium">
+            <CheckCircle2 size={14} /> {summary.paid} Paid
+          </span>
+          <span className="flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 border border-amber-200 text-amber-800 rounded-lg font-medium">
+            <Clock size={14} /> {summary.pending} Pending
+          </span>
+        </div>
+
+        {/* 🎯 Bulk Action Button */}
+        {selectedIds.length > 0 && (
+          <button
+            onClick={markSelectedPaid}
+            disabled={bulkProcessing}
+            className="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50 transition-colors animate-in fade-in slide-in-from-top-2"
+          >
+            {bulkProcessing ? (
+              <Loader2 size={16} className="animate-spin" />
+            ) : (
+              <CheckSquare size={16} />
+            )}
+            Mark {selectedIds.length} Selected as Paid
+          </button>
+        )}
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         {loading ? (
           <div className="flex items-center justify-center h-48">
@@ -461,6 +496,20 @@ export default function PayrollPage() {
             <table className="w-full min-w-[900px]">
               <thead className="bg-gray-50 border-b border-gray-100">
                 <tr>
+                  {/* 🎯 Select All Checkbox */}
+                  <th className="px-5 py-3 w-10 text-center">
+                    {pendingRecords.length > 0 && (
+                      <input
+                        type="checkbox"
+                        checked={
+                          selectedIds.length === pendingRecords.length &&
+                          pendingRecords.length > 0
+                        }
+                        onChange={toggleSelectAll}
+                        className="w-4 h-4 text-[var(--color-primary)] rounded border-gray-300 focus:ring-[var(--color-primary)] cursor-pointer"
+                      />
+                    )}
+                  </th>
                   <th className="text-left px-5 py-3 text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
                     Employee
                   </th>
@@ -487,6 +536,17 @@ export default function PayrollPage() {
               <tbody className="divide-y divide-gray-50">
                 {records.map((r) => (
                   <tr key={r.id} className="hover:bg-gray-50">
+                    {/* 🎯 Row Checkbox */}
+                    <td className="px-5 py-3 text-center">
+                      {r.status !== "PAID" && (
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(r.id)}
+                          onChange={() => toggleSelect(r.id)}
+                          className="w-4 h-4 text-[var(--color-primary)] rounded border-gray-300 focus:ring-[var(--color-primary)] cursor-pointer"
+                        />
+                      )}
+                    </td>
                     <td className="px-5 py-3">
                       <p className="text-sm font-medium text-gray-800">
                         {r.employee?.fullName}
@@ -524,12 +584,7 @@ export default function PayrollPage() {
                       >
                         Edit
                       </button>
-                      <button
-                        onClick={() => markPaid(r)}
-                        className="text-xs font-semibold text-gray-600 hover:underline"
-                      >
-                        {r.status === "PAID" ? "Unmark" : "Mark Paid"}
-                      </button>
+                      {/* 🎯 Removed "Unmark" button. Once Paid, it's locked. */}
                       {r.status !== "PAID" && (
                         <button
                           onClick={() => setDeletingId(r.id)}
