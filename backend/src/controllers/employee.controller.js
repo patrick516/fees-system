@@ -3,7 +3,7 @@ const prisma = require("../config/db");
 const buildFullName = (firstName, lastName) =>
   [firstName, lastName].filter(Boolean).join(" ").trim();
 
-// 🎯 Compute PAYE amount based on type
+//  Compute PAYE amount based on type
 const computePaye = (grossSalary, payeInput, payeType) => {
   const val = Number(payeInput) || 0;
   if (val <= 0) return 0;
@@ -14,6 +14,7 @@ const computePaye = (grossSalary, payeInput, payeType) => {
 };
 
 // ==================== LIST ====================
+
 const listEmployees = async (req, res) => {
   try {
     const { search, status, departmentId } = req.query;
@@ -41,19 +42,29 @@ const listEmployees = async (req, res) => {
       orderBy: { fullName: "asc" },
     });
 
+    // 🎯 Calculate Summaries
     const activeEmployees = employees.filter((e) => e.status === "ACTIVE");
-    const monthlyTotal = activeEmployees.reduce((sum, e) => {
+
+    let grossPayroll = 0;
+    let totalDeductions = 0;
+    let netPayroll = 0;
+
+    activeEmployees.forEach((e) => {
       const gross =
         Number(e.basicSalary) +
         Number(e.housingAllowance) +
         Number(e.transportAllowance) +
         Number(e.otherAllowances);
+
       const deductions =
         Number(e.payeTax) +
         Number(e.pensionDeduction) +
         Number(e.otherDeductions);
-      return sum + (gross - deductions);
-    }, 0);
+
+      grossPayroll += gross;
+      totalDeductions += deductions;
+      netPayroll += gross - deductions;
+    });
 
     return res.json({
       success: true,
@@ -61,7 +72,9 @@ const listEmployees = async (req, res) => {
       summary: {
         totalEmployees: employees.length,
         activeCount: activeEmployees.length,
-        monthlyNetPayroll: monthlyTotal,
+        grossPayroll,
+        totalDeductions,
+        monthlyNetPayroll: netPayroll,
       },
     });
   } catch (err) {
@@ -71,7 +84,6 @@ const listEmployees = async (req, res) => {
       .json({ success: false, message: "Failed to load employees" });
   }
 };
-
 // ==================== GET ONE ====================
 const getEmployee = async (req, res) => {
   try {

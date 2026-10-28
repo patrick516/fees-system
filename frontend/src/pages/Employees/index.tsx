@@ -53,6 +53,8 @@ export default function EmployeesPage() {
   const [summary, setSummary] = useState({
     totalEmployees: 0,
     activeCount: 0,
+    grossPayroll: 0,
+    totalDeductions: 0,
     monthlyNetPayroll: 0,
   });
   const [loading, setLoading] = useState(true);
@@ -126,7 +128,9 @@ export default function EmployeesPage() {
         </button>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      {/* 🎯 New 4-Card Layout */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Employees */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
@@ -137,28 +141,51 @@ export default function EmployeesPage() {
           <p className="text-2xl font-bold text-gray-800">
             {summary.totalEmployees}
           </p>
-        </div>
-        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-          <div className="flex items-center justify-between mb-2">
-            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              Active
-            </p>
-            <Users size={16} className="text-green-600" />
-          </div>
-          <p className="text-2xl font-bold text-green-600">
-            {summary.activeCount}
+          <p className="text-xs text-green-600 mt-1">
+            {summary.activeCount} active
           </p>
         </div>
+
+        {/* Gross Payroll */}
         <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
           <div className="flex items-center justify-between mb-2">
             <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
-              Monthly Net Payroll
+              Gross Payroll
+            </p>
+            <Wallet size={16} className="text-blue-600" />
+          </div>
+          <p className="text-xl font-bold text-gray-800">
+            {formatMWK(summary.grossPayroll)}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">Before deductions</p>
+        </div>
+
+        {/* Total Deductions */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              Total Deductions
+            </p>
+            <Wallet size={16} className="text-red-500" />
+          </div>
+          <p className="text-xl font-bold text-red-600">
+            {formatMWK(summary.totalDeductions)}
+          </p>
+          <p className="text-xs text-gray-400 mt-1">PAYE, Pension, etc.</p>
+        </div>
+
+        {/* Monthly Net Payroll */}
+        <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">
+              Net Payroll
             </p>
             <Wallet size={16} className="text-purple-600" />
           </div>
-          <p className="text-2xl font-bold text-purple-700">
+          <p className="text-xl font-bold text-purple-700">
             {formatMWK(summary.monthlyNetPayroll)}
           </p>
+          <p className="text-xs text-gray-400 mt-1">Take-home pay</p>
         </div>
       </div>
 
