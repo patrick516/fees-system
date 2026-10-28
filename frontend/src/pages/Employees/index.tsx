@@ -735,14 +735,20 @@ function EmployeeModal({
                     onChange={(e) => set("payeInput", e.target.value)}
                     className="w-full px-3 py-2 text-sm font-mono focus:outline-none"
                   />
-                  <select
-                    value={form.payeType}
-                    onChange={(e) => set("payeType", e.target.value)}
-                    className="bg-gray-50 border-l border-gray-200 text-xs px-2 focus:outline-none"
-                  >
-                    <option value="PERCENT">%</option>
-                    <option value="FIXED">MWK</option>
-                  </select>
+                  <div className="border-l border-gray-200 bg-gray-50 w-[70px]">
+                    <Select
+                      value={form.payeType}
+                      onValueChange={(v) => set("payeType", v)}
+                    >
+                      <SelectTrigger className="h-full border-0 bg-transparent text-xs rounded-none focus:ring-0 px-2">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent className="bg-white">
+                        <SelectItem value="PERCENT">%</SelectItem>
+                        <SelectItem value="FIXED">MWK</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
                 <p className="text-[10px] text-gray-400 mt-0.5">
                   = {formatMWK(payeAmount)}

@@ -9,6 +9,13 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface DatePickerProps {
   /** ISO date string (YYYY-MM-DD) */
@@ -75,7 +82,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     return matchers.length > 0 ? matchers : undefined;
   }, [min, max]);
 
-  // 🎯 Birthdate mode — three plain selects
+  // 🎯 Birthdate mode — three Shadcn selects
   if (birthdateMode) {
     const currentYear = new Date().getFullYear();
     const years = Array.from({ length: 100 }, (_, i) => currentYear - i);
@@ -93,46 +100,63 @@ export const DatePicker: React.FC<DatePickerProps> = ({
     };
 
     return (
-      <div className={cn("flex gap-1.5", className)}>
-        <select
-          value={d || ""}
-          onChange={(e) => setPart("d", Number(e.target.value))}
+      <div className={cn("flex gap-2", className)}>
+        {/* Day Select */}
+        <Select
+          value={d ? String(d) : "NONE"}
+          onValueChange={(v) => setPart("d", v === "NONE" ? 0 : Number(v))}
           disabled={disabled}
-          className="flex-1 min-w-0 px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         >
-          <option value="">Day</option>
-          {days.map((dd) => (
-            <option key={dd} value={dd}>
-              {dd}
-            </option>
-          ))}
-        </select>
-        <select
-          value={m || ""}
-          onChange={(e) => setPart("m", Number(e.target.value))}
+          <SelectTrigger className="flex-1 min-w-0 bg-white border-gray-300 rounded-lg text-sm h-[38px]">
+            <SelectValue placeholder="Day" />
+          </SelectTrigger>
+          <SelectContent className="bg-white max-h-[200px]">
+            <SelectItem value="NONE">Day</SelectItem>
+            {days.map((dd) => (
+              <SelectItem key={dd} value={String(dd)}>
+                {dd}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Month Select */}
+        <Select
+          value={m ? String(m) : "NONE"}
+          onValueChange={(v) => setPart("m", v === "NONE" ? 0 : Number(v))}
           disabled={disabled}
-          className="flex-[1.5] min-w-0 px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         >
-          <option value="">Month</option>
-          {MONTHS.map((name, i) => (
-            <option key={i} value={i + 1}>
-              {name}
-            </option>
-          ))}
-        </select>
-        <select
-          value={y || ""}
-          onChange={(e) => setPart("y", Number(e.target.value))}
+          <SelectTrigger className="flex-[1.5] min-w-0 bg-white border-gray-300 rounded-lg text-sm h-[38px]">
+            <SelectValue placeholder="Month" />
+          </SelectTrigger>
+          <SelectContent className="bg-white max-h-[200px]">
+            <SelectItem value="NONE">Month</SelectItem>
+            {MONTHS.map((name, i) => (
+              <SelectItem key={i} value={String(i + 1)}>
+                {name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+
+        {/* Year Select */}
+        <Select
+          value={y ? String(y) : "NONE"}
+          onValueChange={(v) => setPart("y", v === "NONE" ? 0 : Number(v))}
           disabled={disabled}
-          className="w-[90px] px-2 py-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
         >
-          <option value="">Year</option>
-          {years.map((yy) => (
-            <option key={yy} value={yy}>
-              {yy}
-            </option>
-          ))}
-        </select>
+          <SelectTrigger className="w-[90px] bg-white border-gray-300 rounded-lg text-sm h-[38px]">
+            <SelectValue placeholder="Year" />
+          </SelectTrigger>
+          <SelectContent className="bg-white max-h-[200px]">
+            <SelectItem value="NONE">Year</SelectItem>
+            {years.map((yy) => (
+              <SelectItem key={yy} value={String(yy)}>
+                {yy}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
     );
   }
