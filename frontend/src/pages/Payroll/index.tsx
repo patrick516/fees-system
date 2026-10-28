@@ -9,6 +9,14 @@ import {
   Trash2,
   Printer,
 } from "lucide-react";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../../components/ui/select";
+import { Calendar as CalendarIcon } from "lucide-react";
 import api from "../../lib/axios";
 import type { PayrollRecord } from "../../types";
 import { useSchoolSettings } from "../../hooks/useSchoolSettings";
@@ -288,12 +296,60 @@ export default function PayrollPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <input
-            type="month"
-            value={month}
-            onChange={(e) => setMonth(e.target.value)}
-            className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-          />
+          <div className="flex items-center gap-2 bg-white border border-gray-200 rounded-lg p-1">
+            <div className="pl-2 text-gray-400">
+              <CalendarIcon size={16} />
+            </div>
+            {/* Month Selector */}
+            <Select
+              value={month.split("-")[1]}
+              onValueChange={(val) => setMonth(`${month.split("-")[0]}-${val}`)}
+            >
+              <SelectTrigger className="w-[120px] border-0 bg-transparent shadow-none focus:ring-0 h-8 text-sm font-medium">
+                <SelectValue placeholder="Month" />
+              </SelectTrigger>
+              <SelectContent className="bg-white">
+                {[
+                  { v: "01", l: "January" },
+                  { v: "02", l: "February" },
+                  { v: "03", l: "March" },
+                  { v: "04", l: "April" },
+                  { v: "05", l: "May" },
+                  { v: "06", l: "June" },
+                  { v: "07", l: "July" },
+                  { v: "08", l: "August" },
+                  { v: "09", l: "September" },
+                  { v: "10", l: "October" },
+                  { v: "11", l: "November" },
+                  { v: "12", l: "December" },
+                ].map((m) => (
+                  <SelectItem key={m.v} value={m.v}>
+                    {m.l}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Year Selector */}
+            <Select
+              value={month.split("-")[0]}
+              onValueChange={(val) => setMonth(`${val}-${month.split("-")[1]}`)}
+            >
+              <SelectTrigger className="w-[90px] border-0 bg-transparent shadow-none focus:ring-0 h-8 text-sm font-medium">
+                <SelectValue placeholder="Year" />
+              </SelectTrigger>
+              <SelectContent className="bg-white max-h-[200px]">
+                {Array.from(
+                  { length: 5 },
+                  (_, i) => new Date().getFullYear() - 2 + i,
+                ).map((y) => (
+                  <SelectItem key={y} value={String(y)}>
+                    {y}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           {records.length > 0 ? (
             <button
               onClick={exportToPDF}
