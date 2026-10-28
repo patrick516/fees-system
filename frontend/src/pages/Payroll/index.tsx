@@ -2,16 +2,16 @@ import { useEffect, useState } from "react";
 import {
   Wallet,
   Loader2,
-  //   Plus,
   Play,
   CheckCircle2,
   Clock,
-  //   TrendingUp,
   X,
   Trash2,
+  Printer,
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { PayrollRecord } from "../../types";
+import { useSchoolSettings } from "../../hooks/useSchoolSettings";
 
 const formatMWK = (n: number) => `MWK ${Number(n || 0).toLocaleString()}`;
 const currentMonth = () => {
@@ -19,7 +19,15 @@ const currentMonth = () => {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 };
 
+const monthLabel = (m: string) => {
+  if (!m) return "";
+  const [y, mm] = m.split("-");
+  const date = new Date(parseInt(y), parseInt(mm) - 1, 1);
+  return date.toLocaleDateString("en-GB", { month: "long", year: "numeric" });
+};
+
 export default function PayrollPage() {
+  const { settings } = useSchoolSettings();
   const [month, setMonth] = useState(currentMonth());
   const [records, setRecords] = useState<PayrollRecord[]>([]);
   const [summary, setSummary] = useState<any>({
@@ -116,6 +124,158 @@ export default function PayrollPage() {
     }
   };
 
+  // ==================== EXPORT PDF ====================
+  const exportToPDF = () => {
+    if (records.length === 0) return;
+
+    const brand = settings?.primaryColor || "#1e3a5f";
+    const logoUrl = settings?.logo
+      ? settings.logo.startsWith("http") || settings.logo.startsWith("data:")
+        ? settings.logo
+        : `${(import.meta.env.VITE_API_URL || "").replace(/\/api\/?$/, "")}${settings.logo}`
+      : null;
+    const today = new Date().toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "long",
+      year: "numeric",
+    });
+
+    const rowsHtml = records
+      .map(
+        (r) => `
+      <tr>
+        <td><div style="font-weight:600;color:#334155;">${r.employee?.fullName}</div><div style="font-size:8px;color:#94a3b8;">${r.employee?.jobTitle || "—"}</div></td>
+        <td class="right">${formatMWK(r.basicSalary)}</td>
+        <td class="right">${formatMWK(r.housingAllowance + r.transportAllowance + r.otherAllowances)}</td>
+        <td class="right bold">${formatMWK(r.grossSalary)}</td>
+        <td class="right red">- ${formatMWK(r.payeTax)}</td>
+        <td class="right red">- ${formatMWK(r.pensionDeduction + r.otherDeductions + r.extraDeduction)}</td>
+        <td class="right green">+ ${formatMWK(r.bonus)}</td>
+        <td class="right bold purple">${formatMWK(r.netSalary)}</td>
+        <td class="center">${r.status === "PAID" ? "PAID" : "PENDING"}</td>
+      </tr>`,
+      )
+      .join("");
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>${settings?.name || "School"} — Payroll Report</title>
+  <style>
+    @page { size: A4 landscape; margin: 12mm; }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; font-size: 9px; color: #1e293b; line-height: 1.4; background: white; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    
+    .header { display: flex; align-items: center; gap: 16px; padding-bottom: 14px; border-bottom: 3px solid ${brand}; margin-bottom: 18px; }
+    .header-logo { width: 60px; height: 60px; object-fit: contain; flex-shrink: 0; }
+    .header-logo-placeholder { width: 60px; height: 60px; background: #f1f5f9; border-radius: 10px; display: flex; align-items: center; justify-content: center; color: #94a3b8; font-size: 9px; font-weight: 600; flex-shrink: 0; }
+    .header-content { flex: 1; min-width: 0; }
+    .school-name { font-size: 18px; font-weight: 800; color: ${brand}; line-height: 1.15; }
+    .school-motto { font-size: 10px; color: #64748b; font-style: italic; margin-top: 2px; }
+    .report-title { font-size: 11px; font-weight: 600; color: #334155; margin-top: 6px; text-transform: uppercase; letter-spacing: 1px; }
+    .header-meta { text-align: right; font-size: 9px; color: #64748b; line-height: 1.6; white-space: nowrap; }
+    .header-meta strong { color: ${brand}; font-weight: 700; }
+    
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-bottom: 18px; }
+    .stat-card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 14px; background: #ffffff; }
+    .stat-label { font-size: 8px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
+    .stat-value { font-size: 16px; font-weight: 800; line-height: 1; }
+    .stat-value.green { color: #16a34a; }
+    .stat-value.red { color: #dc2626; }
+    .stat-value.blue { color: ${brand}; }
+    .stat-value.purple { color: #7e22ce; }
+
+    table { width: 100%; border-collapse: collapse; font-size: 8.5px; border-radius: 8px; overflow: hidden; border: 1px solid #e2e8f0; }
+    thead th { background: ${brand}; color: #ffffff; font-size: 8px; font-weight: 700; text-transform: uppercase; padding: 8px 6px; text-align: left; white-space: nowrap; }
+    thead th.right { text-align: right; }
+    thead th.center { text-align: center; }
+    tbody td { padding: 6px; border-top: 1px solid #f1f5f9; vertical-align: middle; }
+    tbody tr:nth-child(even) td { background: #f8fafc; }
+    tbody td.right { text-align: right; }
+    tbody td.center { text-align: center; font-weight: 600; font-size: 7.5px; }
+    tbody td.bold { font-weight: 700; color: #1e293b; }
+    tbody td.green { color: #16a34a; }
+    tbody td.red { color: #dc2626; }
+    tbody td.purple { color: #7e22ce; }
+    
+    .footer { margin-top: 30px; padding-top: 15px; border-top: 1px dashed #cbd5e1; display: flex; justify-content: space-between; align-items: flex-end; }
+    .signature-block { text-align: center; width: 200px; }
+    .signature-line { border-bottom: 1px solid #64748b; height: 30px; margin-bottom: 5px; }
+    .signature-label { font-size: 9px; font-weight: 600; color: #64748b; text-transform: uppercase; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    ${logoUrl ? `<img src="${logoUrl}" alt="Logo" class="header-logo" />` : `<div class="header-logo-placeholder">LOGO</div>`}
+    <div class="header-content">
+      <div class="school-name">${settings?.name || "School Name"}</div>
+      ${settings?.motto ? `<div class="school-motto">"${settings.motto}"</div>` : ""}
+      <div class="report-title">Monthly Payroll Report</div>
+    </div>
+    <div class="header-meta">
+      <div>Payroll Month</div>
+      <div><strong>${monthLabel(month)}</strong></div>
+      <div style="margin-top:6px;">Generated On</div>
+      <div><strong>${today}</strong></div>
+    </div>
+  </div>
+
+  <div class="stats-grid">
+    <div class="stat-card"><div class="stat-label">Total Employees</div><div class="stat-value blue">${records.length}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Gross</div><div class="stat-value blue">${formatMWK(summary.gross)}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Deductions</div><div class="stat-value red">- ${formatMWK(summary.deductions)}</div></div>
+    <div class="stat-card"><div class="stat-label">Total Net Payable</div><div class="stat-value purple">${formatMWK(summary.net)}</div></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Employee Name</th>
+        <th class="right">Basic Salary</th>
+        <th class="right">Allowances</th>
+        <th class="right">Gross Pay</th>
+        <th class="right">PAYE Tax</th>
+        <th class="right">Other Deductions</th>
+        <th class="right">Bonus</th>
+        <th class="right">Net Pay</th>
+        <th class="center">Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${rowsHtml}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    <div>
+      <p style="font-size:8px;color:#94a3b8;">This is a system-generated report. Valid without signature.</p>
+    </div>
+    <div style="display:flex;gap:40px;">
+      <div class="signature-block">
+        <div class="signature-line"></div>
+        <div class="signature-label">Prepared By (Bursar)</div>
+      </div>
+      <div class="signature-block">
+        <div class="signature-line"></div>
+        <div class="signature-label">Approved By (Headmaster)</div>
+      </div>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    setTimeout(() => {
+      printWindow.print();
+    }, 600);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between gap-4 flex-wrap">
@@ -134,19 +294,28 @@ export default function PayrollPage() {
             onChange={(e) => setMonth(e.target.value)}
             className="px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
           />
-          {records.length === 0 && !loading && (
+          {records.length > 0 ? (
             <button
-              onClick={generate}
-              disabled={generating}
-              className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+              onClick={exportToPDF}
+              className="flex items-center gap-2 bg-gray-800 text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-900 transition-colors"
             >
-              {generating ? (
-                <Loader2 size={16} className="animate-spin" />
-              ) : (
-                <Play size={16} />
-              )}
-              {generating ? "Generating..." : "Generate Payroll"}
+              <Printer size={16} /> Export PDF
             </button>
+          ) : (
+            !loading && (
+              <button
+                onClick={generate}
+                disabled={generating}
+                className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+              >
+                {generating ? (
+                  <Loader2 size={16} className="animate-spin" />
+                ) : (
+                  <Play size={16} />
+                )}
+                {generating ? "Generating..." : "Generate Payroll"}
+              </button>
+            )
           )}
         </div>
       </div>
