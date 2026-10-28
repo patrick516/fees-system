@@ -294,17 +294,23 @@ export default function EmployeesPage() {
                       </span>
                     </td>
                     <td className="px-5 py-3 text-right">
-                      <div className="flex items-center justify-end gap-2">
+                      <div className="flex items-center justify-end gap-3">
+                        {/*  EYE ICON - View Details */}
                         <button
-                          onClick={() => navigate(`/employees/${emp.id}`)}
-                          className="p-1.5 text-gray-400 hover:text-[var(--color-primary)] hover:bg-gray-100 rounded-lg transition-colors"
+                          onClick={(ev) => {
+                            ev.stopPropagation();
+                            navigate(`/employees/${emp.id}`);
+                          }}
+                          className="text-gray-600 hover:text-[var(--color-primary)] hover:scale-110 transition-all"
                           title="View Details"
                         >
-                          <Eye size={16} />
+                          <Eye size={18} />
                         </button>
+
+                        {/*  PENCIL ICON - Edit */}
                         <button
                           onClick={(ev) => openEdit(emp, ev)}
-                          className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                          className="text-gray-600 hover:text-blue-600 hover:scale-110 transition-all"
                           title="Edit"
                         >
                           <Pencil size={16} />
