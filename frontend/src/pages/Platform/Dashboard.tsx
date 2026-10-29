@@ -20,6 +20,26 @@ import platformApi from "../../lib/platformApi";
 import type { PlatformSchool } from "../../types/platform";
 import InviteSchoolModal from "../../components/Platform/InviteSchoolModal";
 
+// 🎯 Custom Tooltip Wrapper
+function Tooltip({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="relative group/tip flex items-center">
+      {children}
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-800 text-white text-[11px] font-medium rounded-md whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 pointer-events-none z-20 shadow-lg">
+        {label}
+        {/* Small arrow */}
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+      </div>
+    </div>
+  );
+}
+
 const StatusBadge = ({ s }: { s: PlatformSchool }) => {
   if (!s.isActive)
     return (
@@ -51,7 +71,6 @@ export default function PlatformDashboard() {
   const [error, setError] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
 
-  // New: delete + resend state
   const [deletingSchool, setDeletingSchool] = useState<PlatformSchool | null>(
     null,
   );
@@ -62,7 +81,6 @@ export default function PlatformDashboard() {
     text: string;
   } | null>(null);
 
-  // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 15;
 
@@ -85,7 +103,6 @@ export default function PlatformDashboard() {
     load();
   }, []);
 
-  // Auto-dismiss toast
   useEffect(() => {
     if (toast) {
       const t = setTimeout(() => setToast(null), 4000);
@@ -134,7 +151,6 @@ export default function PlatformDashboard() {
 
   const totalStudents = schools.reduce((s, x) => s + x.studentCount, 0);
   const activeCount = schools.filter((s) => s.isActive).length;
-
   const totalPages = Math.ceil(schools.length / ITEMS_PER_PAGE);
   const paginatedSchools = schools.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -188,7 +204,6 @@ export default function PlatformDashboard() {
           </div>
         )}
 
-        {/* ==================== 1. REVENUE & COLLECTION ==================== */}
         {analytics && (
           <div className="mb-8">
             <h2 className="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">
@@ -270,7 +285,6 @@ export default function PlatformDashboard() {
           </div>
         )}
 
-        {/* ==================== 2. OUTSTANDING BALANCES ==================== */}
         {analytics?.partialSchools?.length > 0 && (
           <div className="mb-8">
             <h2 className="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">
@@ -328,7 +342,6 @@ export default function PlatformDashboard() {
           </div>
         )}
 
-        {/* ==================== 3. PLATFORM STATS ==================== */}
         <div className="mb-8">
           <h2 className="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">
             Platform Stats
@@ -376,7 +389,6 @@ export default function PlatformDashboard() {
           </div>
         </div>
 
-        {/* ==================== 4. YOUR SCHOOLS ==================== */}
         <div>
           <h2 className="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">
             Your Schools
@@ -407,29 +419,31 @@ export default function PlatformDashboard() {
                       key={s.id}
                       className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col hover:shadow-md transition-shadow duration-200 relative group"
                     >
-                      {/* Hover action buttons (top right) */}
-                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      {/* Hover action buttons */}
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                         {invitePending && (
-                          <button
-                            onClick={() => handleResend(s)}
-                            disabled={resendingId === s.id}
-                            title="Resend invitation email"
-                            className="p-1.5 bg-white border border-slate-200 rounded-lg text-blue-600 hover:bg-blue-50 hover:border-blue-300 shadow-sm disabled:opacity-50"
-                          >
-                            {resendingId === s.id ? (
-                              <Loader2 size={12} className="animate-spin" />
-                            ) : (
-                              <Mail size={12} />
-                            )}
-                          </button>
+                          <Tooltip label="Resend invitation email">
+                            <button
+                              onClick={() => handleResend(s)}
+                              disabled={resendingId === s.id}
+                              className="p-1.5 bg-white border border-slate-200 rounded-lg text-blue-600 hover:bg-blue-50 hover:border-blue-300 shadow-sm disabled:opacity-50 transition-colors"
+                            >
+                              {resendingId === s.id ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <Mail size={12} />
+                              )}
+                            </button>
+                          </Tooltip>
                         )}
-                        <button
-                          onClick={() => setDeletingSchool(s)}
-                          title="Delete school"
-                          className="p-1.5 bg-white border border-slate-200 rounded-lg text-red-600 hover:bg-red-50 hover:border-red-300 shadow-sm"
-                        >
-                          <Trash2 size={12} />
-                        </button>
+                        <Tooltip label="Delete school permanently">
+                          <button
+                            onClick={() => setDeletingSchool(s)}
+                            className="p-1.5 bg-white border border-slate-200 rounded-lg text-red-600 hover:bg-red-50 hover:border-red-300 shadow-sm transition-colors"
+                          >
+                            <Trash2 size={12} />
+                          </button>
+                        </Tooltip>
                       </div>
 
                       <div className="flex flex-col items-center text-center mb-3 mt-4">
@@ -499,7 +513,6 @@ export default function PlatformDashboard() {
                 })}
               </div>
 
-              {/* PAGINATION FOOTER */}
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-8 bg-white border border-slate-200 rounded-xl px-5 py-3">
                   <span className="text-xs text-slate-500">
