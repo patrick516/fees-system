@@ -901,9 +901,18 @@ const ResultsPage = () => {
               <h3 className="font-medium text-gray-800">
                 {selectedClassObj?.name} Rankings — Best to Worst
               </h3>
-              <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-1 rounded">
-                {resultsGradingSystem === "LETTER" ? "Letter Grades" : "Points"}
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-gray-400 italic">
+                  {resultsGradingSystem === "LETTER"
+                    ? "Ties broken by aggregate (lower is better)"
+                    : "Ties broken by equal points = shared rank"}
+                </span>
+                <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-1 rounded">
+                  {resultsGradingSystem === "LETTER"
+                    ? "Letter Grades"
+                    : "Points"}
+                </span>
+              </div>
             </div>
 
             <div className="overflow-hidden rounded-lg border border-gray-100">
@@ -918,6 +927,7 @@ const ResultsPage = () => {
                     {resultsGradingSystem === "LETTER" ? (
                       <>
                         <th className="px-4 py-2 font-medium">Average %</th>
+                        <th className="px-4 py-2 font-medium">Aggregate</th>
                         <th className="px-4 py-2 font-medium">Overall Grade</th>
                       </>
                     ) : (
@@ -961,6 +971,9 @@ const ResultsPage = () => {
                             <td className="px-4 py-2 text-gray-600">
                               {row.averageMark}%
                             </td>
+                            <td className="px-4 py-2 text-gray-600 font-mono">
+                              {row.aggregate ?? "—"}
+                            </td>
                             <td className="px-4 py-2 font-semibold text-[var(--color-primary)]">
                               {row.overallGrade}
                               <span className="ml-2 text-xs text-gray-400">
@@ -980,7 +993,7 @@ const ResultsPage = () => {
                       {expandedStudent === row.studentId && (
                         <tr className="bg-gray-50">
                           <td
-                            colSpan={resultsGradingSystem === "LETTER" ? 7 : 6}
+                            colSpan={resultsGradingSystem === "LETTER" ? 8 : 6}
                             className="px-4 py-3"
                           >
                             <div className="grid grid-cols-2 md:grid-cols-3 gap-2">

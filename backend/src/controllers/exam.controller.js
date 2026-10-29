@@ -4,7 +4,7 @@ const { uploadToCloudinary } = require("../lib/cloudinary");
 
 // Look up the grade (point and/or label) for a given percentage mark
 const resolveGrade = (mark, boundaries) => {
-  //  Add +0.99 to the maxPercent to handle decimals (e.g., 69.9%)
+  // 🎯 Add +0.99 to the maxPercent to handle decimals (e.g., 69.9%)
   const match = boundaries.find(
     (b) => mark >= b.minPercent && mark <= b.maxPercent + 0.99,
   );
@@ -12,6 +12,12 @@ const resolveGrade = (mark, boundaries) => {
     gradePoint: match ? match.gradePoint : null,
     gradeLabel: match ? match.gradeLabel : null,
   };
+};
+
+// 🎯 Map Letter grades to Aggregate Points for tie-breaking
+const letterToAggregate = (label) => {
+  const map = { A: 1, B: 2, C: 3, D: 4, F: 5 };
+  return map[label] || 5; // Default to 5 for unknowns
 };
 
 // POST /api/exams/periods
@@ -66,7 +72,6 @@ const listExamPeriods = async (req, res) => {
 };
 
 // PUT /api/exams/periods/:id/activate
-// Toggles whether parents can view this period's results
 const toggleExamPeriodActive = async (req, res) => {
   try {
     const { isActive } = req.body;
@@ -100,7 +105,6 @@ const toggleExamPeriodActive = async (req, res) => {
 
 // ==================== SUBJECTS ====================
 
-// GET /api/exams/subjects?classId=
 const getSubjects = async (req, res) => {
   try {
     const { classId } = req.query;
@@ -117,7 +121,6 @@ const getSubjects = async (req, res) => {
   }
 };
 
-// POST /api/exams/subjects
 const createSubject = async (req, res) => {
   try {
     const { classId, name, code } = req.body;
@@ -147,7 +150,7 @@ const createSubject = async (req, res) => {
 };
 
 // ==================== GRADE BOUNDARIES ====================
-// GET /api/exams/grade-boundaries?system=POINTS|LETTER
+
 const getGradeBoundaries = async (req, res) => {
   try {
     const system = req.query.system === "LETTER" ? "LETTER" : "POINTS";
@@ -163,9 +166,6 @@ const getGradeBoundaries = async (req, res) => {
   }
 };
 
-// PUT /api/exams/grade-boundaries
-// Body: { system: "POINTS"|"LETTER", boundaries: [{ minPercent, maxPercent, gradePoint?, gradeLabel? }, ...] }
-// Replaces the whole set for this school, for that system only
 const setGradeBoundaries = async (req, res) => {
   try {
     const { boundaries, system } = req.body;
@@ -209,6 +209,8 @@ const setGradeBoundaries = async (req, res) => {
   }
 };
 
+// ==================== UPLOAD RESULTS ====================
+
 const uploadResults = async (req, res) => {
   try {
     if (!req.file) {
@@ -224,7 +226,6 @@ const uploadResults = async (req, res) => {
       });
     }
 
-    //  Verify the exam period exists in the database before proceeding
     const examPeriod = await prisma.examPeriod.findFirst({
       where: { id: examPeriodId, schoolId: req.schoolId },
     });
@@ -284,7 +285,6 @@ const uploadResults = async (req, res) => {
     let idCol = idColIdx !== -1 ? columns[idColIdx] : null;
     let nameCol = nameColIdx !== -1 ? columns[nameColIdx] : null;
 
-    // Backward compatibility: no recognizable header at all — assume first column is ID
     if (!idCol && !nameCol) {
       idCol = columns[0];
     }
@@ -292,7 +292,6 @@ const uploadResults = async (req, res) => {
     const excludedCols = new Set([idCol, nameCol].filter(Boolean));
     const subjectColumns = columns.filter((c) => !excludedCols.has(c));
 
-    // Ensure a Subject record exists for each column, for this class
     const subjectMap = {};
     for (const rawSubjectName of subjectColumns) {
       const subjectName = String(rawSubjectName).trim();
@@ -318,7 +317,6 @@ const uploadResults = async (req, res) => {
     for (const row of rows) {
       let student = null;
 
-      // Try ID first — it's the trusted key
       if (idCol && row[idCol]) {
         const studentCode = String(row[idCol]).trim();
         student = await prisma.student.findFirst({
@@ -352,7 +350,6 @@ const uploadResults = async (req, res) => {
         if (matches.length === 1) {
           student = matches[0];
         } else {
-          // Ambiguous — store the marks for later manual resolution instead of guessing
           const marksBySubjectId = {};
           for (const subjectName of subjectColumns) {
             const rawMark = row[subjectName];
@@ -448,9 +445,8 @@ const uploadResults = async (req, res) => {
   }
 };
 
-// ==================== PENDING NAME MATCHES
+// ==================== PENDING NAME MATCHES ====================
 
-// GET /api/exams/pending-rows?classId=&examPeriodId=
 const getPendingRows = async (req, res) => {
   try {
     const { classId, examPeriodId } = req.query;
@@ -463,7 +459,6 @@ const getPendingRows = async (req, res) => {
       orderBy: { createdAt: "desc" },
     });
 
-    // Attach candidate student details and subject names for display
     const result = [];
     for (const row of pending) {
       const candidates = await prisma.student.findMany({
@@ -501,8 +496,6 @@ const getPendingRows = async (req, res) => {
   }
 };
 
-// POST /api/exams/pending-rows/:id/resolve
-// Body: { studentId }
 const resolvePendingRow = async (req, res) => {
   try {
     const { studentId } = req.body;
@@ -577,7 +570,6 @@ const resolvePendingRow = async (req, res) => {
   }
 };
 
-// DELETE /api/exams/pending-rows/:id — discard without assigning to anyone
 const discardPendingRow = async (req, res) => {
   try {
     const pending = await prisma.pendingExamRow.findFirst({
@@ -594,6 +586,8 @@ const discardPendingRow = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to discard" });
   }
 };
+
+// ==================== STUDENT RESULTS ====================
 
 const getStudentResults = async (req, res) => {
   try {
@@ -633,7 +627,6 @@ const getStudentResults = async (req, res) => {
       });
     }
 
-    // ============ THIS STUDENT'S MARKS ============
     const results = await prisma.examResult.findMany({
       where: { studentId, examPeriodId: period.id },
       include: { subject: { select: { name: true } } },
@@ -643,8 +636,7 @@ const getStudentResults = async (req, res) => {
     const totalMarks = results.reduce((sum, r) => sum + r.mark, 0);
     const gradingSystem = student.class.gradingSystem;
 
-    // ============ CLASS RANKING ============
-    // Pull every active classmate, compute their ranking metric, sort, find this student.
+    // 🎯 Compute class ranking with tie-breaker
     const classMates = await prisma.student.findMany({
       where: {
         schoolId: req.student.schoolId,
@@ -654,24 +646,29 @@ const getStudentResults = async (req, res) => {
       select: { id: true, fullName: true },
     });
 
-    const metrics = []; // [{ studentId, fullName, metric, displayValue }]
+    const metrics = [];
 
     for (const s of classMates) {
       const rs = await prisma.examResult.findMany({
         where: { studentId: s.id, examPeriodId: period.id },
       });
-      if (rs.length === 0) continue; // only rank students who sat the exam
+      if (rs.length === 0) continue;
 
       if (gradingSystem === "LETTER") {
         const avg = rs.reduce((sum, r) => sum + r.mark, 0) / rs.length;
+        // Aggregate = sum of points for all subjects (A=1, B=2, etc.)
+        const aggregate = rs.reduce(
+          (sum, r) => sum + letterToAggregate(r.gradeLabel),
+          0,
+        );
         metrics.push({
           studentId: s.id,
           fullName: s.fullName,
-          metric: avg,
+          averageMark: avg,
+          aggregate,
           displayValue: Math.round(avg * 10) / 10,
         });
       } else {
-        // POINTS — best 6 subjects, lower total = better
         const withPoints = rs.filter((r) => r.gradePoint != null);
         const sorted = [...withPoints].sort(
           (a, b) => a.gradePoint - b.gradePoint,
@@ -681,31 +678,52 @@ const getStudentResults = async (req, res) => {
         metrics.push({
           studentId: s.id,
           fullName: s.fullName,
-          metric: total,
+          totalPoints: total,
           displayValue: total,
         });
       }
     }
 
-    // Sort — LETTER: higher avg = better; POINTS: lower total = better
+    // 🎯 Sort & Assign Ranks
     if (gradingSystem === "LETTER") {
-      metrics.sort((a, b) => b.metric - a.metric);
+      // Primary: Higher Average. Secondary: Lower Aggregate (more consistent)
+      metrics.sort((a, b) => {
+        if (b.averageMark !== a.averageMark) {
+          return b.averageMark - a.averageMark;
+        }
+        return a.aggregate - b.aggregate;
+      });
     } else {
-      metrics.sort((a, b) => a.metric - b.metric);
+      // Primary: Lower Total Points
+      metrics.sort((a, b) => a.totalPoints - b.totalPoints);
     }
 
-    const myIndex = metrics.findIndex((m) => m.studentId === studentId);
-    const position = myIndex >= 0 ? myIndex + 1 : null;
+    // 🎯 Standard Competition Ranking (1, 1, 3)
+    metrics.forEach((m, index) => {
+      if (index === 0) {
+        m.position = 1;
+      } else {
+        const prev = metrics[index - 1];
+        const isTie =
+          gradingSystem === "LETTER"
+            ? prev.averageMark === m.averageMark &&
+              prev.aggregate === m.aggregate
+            : prev.totalPoints === m.totalPoints;
+        m.position = isTie ? prev.position : index + 1;
+      }
+    });
+
+    const myMetric = metrics.find((m) => m.studentId === studentId);
+    const position = myMetric ? myMetric.position : null;
     const classSize = metrics.length;
 
-    const topThree = metrics.slice(0, 3).map((m, i) => ({
-      position: i + 1,
+    const topThree = metrics.slice(0, 3).map((m) => ({
+      position: m.position,
       fullName: m.fullName,
       value: m.displayValue,
       isCurrentStudent: m.studentId === studentId,
     }));
 
-    // "Top X% of the class" — position 1 of 42 = top 2%, position 21 of 42 = top 50%
     const percentile =
       position && classSize > 0
         ? Math.max(1, Math.round((position / classSize) * 100))
@@ -755,7 +773,7 @@ const getStudentResults = async (req, res) => {
       });
     }
 
-    // POINTS — best 6
+    // POINTS
     const withPoints = results.filter(
       (r) => r.gradePoint !== null && r.gradePoint !== undefined,
     );
@@ -786,7 +804,8 @@ const getStudentResults = async (req, res) => {
   }
 };
 
-//  PARENT VIEW
+// ==================== CLASS RESULTS ====================
+
 const getClassResults = async (req, res) => {
   try {
     const { classId, examPeriodId } = req.query;
@@ -839,7 +858,7 @@ const getClassResults = async (req, res) => {
         orderBy: { subject: { name: "asc" } },
       });
 
-      if (results.length === 0) continue; // skip students with no results uploaded yet
+      if (results.length === 0) continue;
 
       const totalMarks = results.reduce((sum, r) => sum + r.mark, 0);
 
@@ -849,6 +868,11 @@ const getClassResults = async (req, res) => {
           average,
           letterBoundaries,
         );
+        // Aggregate = sum of points for all subjects (A=1, B=2, etc.)
+        const aggregate = results.reduce(
+          (sum, r) => sum + letterToAggregate(r.gradeLabel),
+          0,
+        );
         rows.push({
           studentId: student.id,
           studentCode: student.studentCode,
@@ -857,6 +881,7 @@ const getClassResults = async (req, res) => {
           totalMarks,
           averageMark: Math.round(average * 10) / 10,
           overallGrade,
+          aggregate, // 🎯 Added for tie-breaker display
           subjects: results.map((r) => ({
             subject: r.subject.name,
             mark: r.mark,
@@ -889,15 +914,33 @@ const getClassResults = async (req, res) => {
       }
     }
 
+    // 🎯 Sort & Assign Ranks
     if (cls.gradingSystem === "LETTER") {
-      // Descending by average mark — higher mark = better performance = ranked first
-      rows.sort((a, b) => b.averageMark - a.averageMark);
+      // Primary: Higher Average. Secondary: Lower Aggregate (more consistent)
+      rows.sort((a, b) => {
+        if (b.averageMark !== a.averageMark) {
+          return b.averageMark - a.averageMark;
+        }
+        return a.aggregate - b.aggregate;
+      });
     } else {
-      // Ascending by total points — lower points = better performance = ranked first
+      // Primary: Lower Total Points
       rows.sort((a, b) => a.totalPoints - b.totalPoints);
     }
+
+    // 🎯 Standard Competition Ranking (1, 1, 3)
     rows.forEach((row, index) => {
-      row.position = index + 1;
+      if (index === 0) {
+        row.position = 1;
+      } else {
+        const prev = rows[index - 1];
+        const isTie =
+          cls.gradingSystem === "LETTER"
+            ? prev.averageMark === row.averageMark &&
+              prev.aggregate === row.aggregate
+            : prev.totalPoints === row.totalPoints;
+        row.position = isTie ? prev.position : index + 1;
+      }
     });
 
     res.json({ success: true, data: rows, gradingSystem: cls.gradingSystem });
@@ -909,7 +952,8 @@ const getClassResults = async (req, res) => {
   }
 };
 
-// GET /api/exams/active-period (public-ish, for parent to check if button should show)
+// ==================== ACTIVE PERIOD ====================
+
 const getActivePeriod = async (req, res) => {
   try {
     const period = await prisma.examPeriod.findFirst({
@@ -924,7 +968,8 @@ const getActivePeriod = async (req, res) => {
   }
 };
 
-// PUT /api/exams/classes/:classId/grading-system
+// ==================== UPDATE GRADING SYSTEM ====================
+
 const updateClassGradingSystem = async (req, res) => {
   try {
     const { gradingSystem } = req.body;
@@ -953,7 +998,8 @@ const updateClassGradingSystem = async (req, res) => {
       .json({ success: false, message: "Failed to update grading system" });
   }
 };
-// GET /api/exams/uploads-summary?examPeriodId=
+
+// ==================== UPLOAD SUMMARY ====================
 
 const getUploadSummary = async (req, res) => {
   try {
@@ -971,7 +1017,6 @@ const getUploadSummary = async (req, res) => {
 
     const summary = [];
     for (const cls of classes) {
-      // 🎯 Count UNIQUE students (not subject rows)
       const uniqueStudents = await prisma.examResult.findMany({
         where: {
           examPeriodId,
@@ -983,7 +1028,6 @@ const getUploadSummary = async (req, res) => {
       });
       const count = uniqueStudents.length;
 
-      // 🎯 Get the latest upload timestamp for this class + period
       let lastUploadedAt = null;
       let sourceFileUrl = null;
       if (count > 0) {
@@ -1003,7 +1047,6 @@ const getUploadSummary = async (req, res) => {
         }
       }
 
-      // AUTO-ENFORCE grading system
       const isLowerForm =
         cls.level <= 2 ||
         cls.name.toLowerCase().includes("form 1") ||
@@ -1034,6 +1077,7 @@ const getUploadSummary = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to get summary" });
   }
 };
+
 module.exports = {
   createExamPeriod,
   listExamPeriods,
