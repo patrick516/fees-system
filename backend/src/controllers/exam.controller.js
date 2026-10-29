@@ -20,6 +20,47 @@ const letterToAggregate = (label) => {
   return map[label] || 5; // Default to 5 for unknowns
 };
 
+// 🎯 Helper: Check if a subject is English
+const isEnglish = (subjectName) => {
+  return subjectName.toLowerCase().trim().includes("english");
+};
+
+// 🎯 Helper: Compute Best 6 with English compulsory (for POINTS system)
+// Returns { best6, totalPoints, englishIncluded }
+const computeBest6 = (results) => {
+  if (results.length === 0) {
+    return { best6: [], totalPoints: 0, englishIncluded: false };
+  }
+
+  // Filter only subjects with valid gradePoint
+  const withPoints = results.filter(
+    (r) => r.gradePoint !== null && r.gradePoint !== undefined,
+  );
+
+  // Find the English subject
+  const englishResult = withPoints.find((r) => isEnglish(r.subject.name || ""));
+
+  // Sort all by gradePoint ascending (lower is better)
+  const sorted = [...withPoints].sort((a, b) => a.gradePoint - b.gradePoint);
+
+  let best6 = [];
+  let englishIncluded = false;
+
+  if (englishResult) {
+    // 🎯 English is compulsory: start with English, then take best 5 of the rest
+    englishIncluded = true;
+    const others = sorted.filter((r) => r.id !== englishResult.id);
+    best6 = [englishResult, ...others.slice(0, 5)];
+  } else {
+    // 🎯 No English found: fall back to pure best 6
+    best6 = sorted.slice(0, 6);
+  }
+
+  const totalPoints = best6.reduce((sum, r) => sum + r.gradePoint, 0);
+
+  return { best6, totalPoints, englishIncluded };
+};
+
 // POST /api/exams/periods
 const createExamPeriod = async (req, res) => {
   try {
@@ -292,6 +333,9 @@ const uploadResults = async (req, res) => {
     const excludedCols = new Set([idCol, nameCol].filter(Boolean));
     const subjectColumns = columns.filter((c) => !excludedCols.has(c));
 
+    // 🎯 Warn if no English column is found in the upload
+    const hasEnglishColumn = subjectColumns.some((c) => isEnglish(String(c)));
+
     const subjectMap = {};
     for (const rawSubjectName of subjectColumns) {
       const subjectName = String(rawSubjectName).trim();
@@ -428,14 +472,27 @@ const uploadResults = async (req, res) => {
           pendingCount,
           errors,
           sourceFileUrl,
+          englishIncluded: hasEnglishColumn, // 🎯 Track for audit
         },
       },
     });
 
+    // 🎯 Warn in the response if English was missing
+    const warningMessage =
+      !hasEnglishColumn && cls.gradingSystem === "POINTS"
+        ? " ⚠️ Note: English column was not found in this upload. Best-6 will use pure top subjects without the English requirement."
+        : "";
+
     res.json({
       success: true,
-      message: `Processed ${processed} student(s)${pendingCount ? `, ${pendingCount} pending manual match(es)` : ""}${errors.length ? `, ${errors.length} issue(s)` : ""}`,
-      data: { processed, pendingCount, errors, sourceFileUrl },
+      message: `Processed ${processed} student(s)${pendingCount ? `, ${pendingCount} pending manual match(es)` : ""}${errors.length ? `, ${errors.length} issue(s)` : ""}${warningMessage}`,
+      data: {
+        processed,
+        pendingCount,
+        errors,
+        sourceFileUrl,
+        englishIncluded: hasEnglishColumn, // 🎯 Frontend can show warning
+      },
     });
   } catch (err) {
     console.error(err);
@@ -651,12 +708,12 @@ const getStudentResults = async (req, res) => {
     for (const s of classMates) {
       const rs = await prisma.examResult.findMany({
         where: { studentId: s.id, examPeriodId: period.id },
+        include: { subject: { select: { name: true } } }, // 🎯 Need name for English check
       });
       if (rs.length === 0) continue;
 
       if (gradingSystem === "LETTER") {
         const avg = rs.reduce((sum, r) => sum + r.mark, 0) / rs.length;
-        // Aggregate = sum of points for all subjects (A=1, B=2, etc.)
         const aggregate = rs.reduce(
           (sum, r) => sum + letterToAggregate(r.gradeLabel),
           0,
@@ -669,24 +726,19 @@ const getStudentResults = async (req, res) => {
           displayValue: Math.round(avg * 10) / 10,
         });
       } else {
-        const withPoints = rs.filter((r) => r.gradePoint != null);
-        const sorted = [...withPoints].sort(
-          (a, b) => a.gradePoint - b.gradePoint,
-        );
-        const best6 = sorted.slice(0, 6);
-        const total = best6.reduce((sum, r) => sum + r.gradePoint, 0);
+        // 🎯 Use the new Best 6 with English compulsory
+        const { totalPoints } = computeBest6(rs);
         metrics.push({
           studentId: s.id,
           fullName: s.fullName,
-          totalPoints: total,
-          displayValue: total,
+          totalPoints,
+          displayValue: totalPoints,
         });
       }
     }
 
     // 🎯 Sort & Assign Ranks
     if (gradingSystem === "LETTER") {
-      // Primary: Higher Average. Secondary: Lower Aggregate (more consistent)
       metrics.sort((a, b) => {
         if (b.averageMark !== a.averageMark) {
           return b.averageMark - a.averageMark;
@@ -694,7 +746,6 @@ const getStudentResults = async (req, res) => {
         return a.aggregate - b.aggregate;
       });
     } else {
-      // Primary: Lower Total Points
       metrics.sort((a, b) => a.totalPoints - b.totalPoints);
     }
 
@@ -773,16 +824,9 @@ const getStudentResults = async (req, res) => {
       });
     }
 
-    // POINTS
-    const withPoints = results.filter(
-      (r) => r.gradePoint !== null && r.gradePoint !== undefined,
-    );
-    const sortedByBest = [...withPoints].sort(
-      (a, b) => a.gradePoint - b.gradePoint,
-    );
-    const bestSix = sortedByBest.slice(0, 6);
-    const bestSixIds = new Set(bestSix.map((r) => r.id));
-    const totalPoints = bestSix.reduce((sum, r) => sum + r.gradePoint, 0);
+    // 🎯 POINTS — Best 6 with English compulsory
+    const { best6, totalPoints, englishIncluded } = computeBest6(results);
+    const bestSixIds = new Set(best6.map((r) => r.id));
 
     res.json({
       success: true,
@@ -793,9 +837,11 @@ const getStudentResults = async (req, res) => {
           mark: r.mark,
           gradePoint: r.gradePoint,
           countedInTotal: bestSixIds.has(r.id),
+          isEnglish: isEnglish(r.subject.name || ""), // 🎯 Highlight English
         })),
         totalPoints,
-        subjectsCounted: bestSix.length,
+        subjectsCounted: best6.length,
+        englishIncluded, // 🎯 Flag for frontend
       },
     });
   } catch (err) {
@@ -868,7 +914,6 @@ const getClassResults = async (req, res) => {
           average,
           letterBoundaries,
         );
-        // Aggregate = sum of points for all subjects (A=1, B=2, etc.)
         const aggregate = results.reduce(
           (sum, r) => sum + letterToAggregate(r.gradeLabel),
           0,
@@ -881,7 +926,7 @@ const getClassResults = async (req, res) => {
           totalMarks,
           averageMark: Math.round(average * 10) / 10,
           overallGrade,
-          aggregate, // 🎯 Added for tie-breaker display
+          aggregate,
           subjects: results.map((r) => ({
             subject: r.subject.name,
             mark: r.mark,
@@ -889,14 +934,9 @@ const getClassResults = async (req, res) => {
           })),
         });
       } else {
-        const withPoints = results.filter(
-          (r) => r.gradePoint !== null && r.gradePoint !== undefined,
-        );
-        const sortedByBest = [...withPoints].sort(
-          (a, b) => a.gradePoint - b.gradePoint,
-        );
-        const bestSix = sortedByBest.slice(0, 6);
-        const totalPoints = bestSix.reduce((sum, r) => sum + r.gradePoint, 0);
+        // 🎯 Use the new Best 6 with English compulsory
+        const { best6, totalPoints, englishIncluded } = computeBest6(results);
+        const bestSixIds = new Set(best6.map((r) => r.id));
 
         rows.push({
           studentId: student.id,
@@ -905,10 +945,13 @@ const getClassResults = async (req, res) => {
           subjectsSat: results.length,
           totalMarks,
           totalPoints,
+          englishIncluded, // 🎯 Flag
           subjects: results.map((r) => ({
             subject: r.subject.name,
             mark: r.mark,
             gradePoint: r.gradePoint,
+            countedInTotal: bestSixIds.has(r.id),
+            isEnglish: isEnglish(r.subject.name || ""),
           })),
         });
       }
@@ -916,7 +959,6 @@ const getClassResults = async (req, res) => {
 
     // 🎯 Sort & Assign Ranks
     if (cls.gradingSystem === "LETTER") {
-      // Primary: Higher Average. Secondary: Lower Aggregate (more consistent)
       rows.sort((a, b) => {
         if (b.averageMark !== a.averageMark) {
           return b.averageMark - a.averageMark;
@@ -924,7 +966,6 @@ const getClassResults = async (req, res) => {
         return a.aggregate - b.aggregate;
       });
     } else {
-      // Primary: Lower Total Points
       rows.sort((a, b) => a.totalPoints - b.totalPoints);
     }
 
