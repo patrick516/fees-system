@@ -115,6 +115,7 @@ const getParentTicket = async (req, res) => {
 };
 
 // POST /api/parent/support/:id/reply
+// 🎯 Auto-reopens the ticket if closed
 const replyAsParent = async (req, res) => {
   try {
     const { message } = req.body;
@@ -128,33 +129,57 @@ const replyAsParent = async (req, res) => {
         id: req.params.id,
         schoolId: req.student.schoolId,
         creatorId: req.student.id,
-        status: "OPEN",
       },
     });
     if (!ticket)
-      return res.status(404).json({
-        success: false,
-        message: "Ticket not found or already closed",
-      });
+      return res.status(404).json({ success: false, message: "Not found" });
 
+    const wasClosed = ticket.status === "CLOSED";
     const parentName = req.student.parentName || req.student.fullName;
 
-    await prisma.$transaction([
-      prisma.supportMessage.create({
+    await prisma.$transaction(async (tx) => {
+      await tx.supportMessage.create({
         data: {
           ticketId: ticket.id,
           senderType: "CREATOR",
           senderName: parentName,
           message: message.trim(),
         },
-      }),
-      prisma.supportTicket.update({
-        where: { id: ticket.id },
-        data: { lastReplyBy: "CREATOR", lastReplyAt: new Date() },
-      }),
-    ]);
+      });
 
-    return res.json({ success: true, message: "Reply sent" });
+      await tx.supportTicket.update({
+        where: { id: ticket.id },
+        data: {
+          status: "OPEN",
+          lastReplyBy: "CREATOR",
+          lastReplyAt: new Date(),
+        },
+      });
+
+      // 🎯 Notify school admin when parent reopens
+      if (wasClosed) {
+        const platform = await tx.platform.findFirst();
+        if (platform) {
+          await tx.notification.create({
+            data: {
+              platformId: platform.id,
+              schoolId: ticket.schoolId,
+              type: "TICKET_REOPENED",
+              title: "Parent ticket reopened",
+              message: `${parentName} reopened: "${ticket.subject}"`,
+              payload: { ticketId: ticket.id, subject: ticket.subject },
+              actorName: parentName,
+            },
+          });
+        }
+      }
+    });
+
+    return res.json({
+      success: true,
+      message: wasClosed ? "Reply sent. Ticket reopened." : "Reply sent",
+      reopened: wasClosed,
+    });
   } catch (err) {
     console.error("replyAsParent error:", err);
     return res.status(500).json({ success: false, message: "Failed to reply" });
@@ -253,7 +278,7 @@ const getSchoolTicket = async (req, res) => {
   }
 };
 
-// POST /api/support/:id/reply  (sends SMS to parent)
+// POST /api/support/:id/reply  (school admin replies to parent)
 const replyAsAdmin = async (req, res) => {
   try {
     const { message } = req.body;
@@ -267,13 +292,12 @@ const replyAsAdmin = async (req, res) => {
         id: req.params.id,
         schoolId: req.schoolId,
         ticketType: "SCHOOL_SUPPORT",
-        status: "OPEN",
       },
     });
     if (!ticket)
-      return res
-        .status(404)
-        .json({ success: false, message: "Not found or closed" });
+      return res.status(404).json({ success: false, message: "Not found" });
+
+    const wasClosed = ticket.status === "CLOSED";
 
     await prisma.$transaction([
       prisma.supportMessage.create({
@@ -286,7 +310,11 @@ const replyAsAdmin = async (req, res) => {
       }),
       prisma.supportTicket.update({
         where: { id: ticket.id },
-        data: { lastReplyBy: "RESPONDER", lastReplyAt: new Date() },
+        data: {
+          status: "OPEN",
+          lastReplyBy: "RESPONDER",
+          lastReplyAt: new Date(),
+        },
       }),
     ]);
 
@@ -300,14 +328,16 @@ const replyAsAdmin = async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Reply sent. Parent notified by SMS.",
+      message: wasClosed
+        ? "Reply sent. Ticket reopened."
+        : "Reply sent. Parent notified by SMS.",
+      reopened: wasClosed,
     });
   } catch (err) {
     console.error("replyAsAdmin error:", err);
     return res.status(500).json({ success: false, message: "Failed to reply" });
   }
 };
-
 // POST /api/support/:id/close
 const closeAsAdmin = async (req, res) => {
   try {
@@ -417,6 +447,7 @@ const getMyPlatformTicket = async (req, res) => {
 };
 
 // POST /api/support/platform/:id/reply  (admin replies to SchoolPay)
+// 🎯 Auto-reopens the ticket if it was closed
 const replyToPlatform = async (req, res) => {
   try {
     const { message } = req.body;
@@ -430,35 +461,63 @@ const replyToPlatform = async (req, res) => {
         id: req.params.id,
         schoolId: req.schoolId,
         ticketType: "PLATFORM_SUPPORT",
-        status: "OPEN",
       },
     });
     if (!ticket)
-      return res
-        .status(404)
-        .json({ success: false, message: "Not found or closed" });
+      return res.status(404).json({ success: false, message: "Not found" });
 
-    await prisma.$transaction([
-      prisma.supportMessage.create({
+    // 🎯 Detect if we need to reopen
+    const wasClosed = ticket.status === "CLOSED";
+    const newStatus = "OPEN"; // Always goes back to OPEN
+
+    await prisma.$transaction(async (tx) => {
+      await tx.supportMessage.create({
         data: {
           ticketId: ticket.id,
           senderType: "CREATOR",
           senderName: req.staff.fullName,
           message: message.trim(),
         },
-      }),
-      prisma.supportTicket.update({
-        where: { id: ticket.id },
-        data: { lastReplyBy: "CREATOR", lastReplyAt: new Date() },
-      }),
-    ]);
+      });
 
-    return res.json({ success: true, message: "Reply sent" });
+      await tx.supportTicket.update({
+        where: { id: ticket.id },
+        data: {
+          status: newStatus,
+          lastReplyBy: "CREATOR",
+          lastReplyAt: new Date(),
+        },
+      });
+
+      // 🎯 Notify platform owner when a closed ticket is reopened
+      if (wasClosed) {
+        const platform = await tx.platform.findFirst();
+        if (platform) {
+          await tx.notification.create({
+            data: {
+              platformId: platform.id,
+              schoolId: ticket.schoolId,
+              type: "TICKET_REOPENED",
+              title: "Ticket reopened",
+              message: `${req.staff.fullName} reopened a ticket: "${ticket.subject}"`,
+              payload: { ticketId: ticket.id, subject: ticket.subject },
+              actorName: req.staff.fullName,
+            },
+          });
+        }
+      }
+    });
+
+    return res.json({
+      success: true,
+      message: wasClosed ? "Reply sent. Ticket reopened." : "Reply sent",
+      reopened: wasClosed,
+    });
   } catch (err) {
+    console.error("replyToPlatform error:", err);
     return res.status(500).json({ success: false, message: "Failed" });
   }
 };
-
 // ==================== PLATFORM OWNER SIDE ====================
 
 // GET /api/platform/support

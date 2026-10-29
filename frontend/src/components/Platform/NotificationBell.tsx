@@ -1,7 +1,7 @@
 // frontend/src/components/Platform/NotificationBell.tsx
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
-import { Bell, Check, X, Loader2 } from "lucide-react";
+import { Bell, Check, X, Loader2, RefreshCw } from "lucide-react";
 import platformApi from "../../lib/platformApi";
 import { toast } from "../../lib/toast";
 
@@ -75,6 +75,11 @@ export default function NotificationBell() {
       await platformApi.post(`/platform/notifications/${id}/resolve`, {
         action,
       });
+      toast.success(
+        action === "approve"
+          ? "Settlement change approved"
+          : "Settlement change rejected",
+      );
       await Promise.all([fetchList(), fetchUnread()]);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || "Failed");
@@ -124,78 +129,101 @@ export default function NotificationBell() {
           )}
 
           {!loading &&
-            list.map((n) => (
-              <div
-                key={n.id}
-                className={`p-4 border-b border-slate-100 last:border-0 ${
-                  n.status === "UNREAD" ? "bg-blue-50/40" : ""
-                }`}
-              >
-                <div className="flex items-start gap-2">
-                  <div
-                    className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
-                      n.status === "UNREAD" ? "bg-blue-600" : "bg-slate-300"
-                    }`}
-                  />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900">
-                      {n.title}
-                    </p>
-                    <p className="text-xs text-slate-600 mt-0.5">{n.message}</p>
-                    {n.actorName && (
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        From {n.actorName}
-                      </p>
+            list.map((n) => {
+              const isReopened = n.type === "TICKET_REOPENED";
+              return (
+                <div
+                  key={n.id}
+                  className={`p-4 border-b border-slate-100 last:border-0 ${
+                    n.status === "UNREAD" ? "bg-blue-50/40" : ""
+                  }`}
+                >
+                  <div className="flex items-start gap-2">
+                    {isReopened ? (
+                      <RefreshCw
+                        size={14}
+                        className="text-amber-600 shrink-0 mt-0.5"
+                      />
+                    ) : (
+                      <div
+                        className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
+                          n.status === "UNREAD" ? "bg-blue-600" : "bg-slate-300"
+                        }`}
+                      />
                     )}
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className={`text-sm font-semibold ${isReopened ? "text-amber-900" : "text-slate-900"}`}
+                      >
+                        {n.title}
+                      </p>
+                      <p className="text-xs text-slate-600 mt-0.5">
+                        {n.message}
+                      </p>
+                      {n.actorName && (
+                        <p className="text-[11px] text-slate-400 mt-1">
+                          From {n.actorName}
+                        </p>
+                      )}
 
-                    {n.type === "SETTLEMENT_CHANGE_REQUEST" && n.payload && (
-                      <div className="mt-2 text-[11px] bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono text-slate-700 leading-relaxed">
-                        <div>Bank: {n.payload.bankName}</div>
-                        <div>Name: {n.payload.accountName}</div>
-                        <div>Acct: {n.payload.accountNumber}</div>
-                        {n.payload.branch && (
-                          <div>Branch: {n.payload.branch}</div>
+                      {n.type === "SETTLEMENT_CHANGE_REQUEST" && n.payload && (
+                        <div className="mt-2 text-[11px] bg-slate-50 border border-slate-200 rounded-lg p-2 font-mono text-slate-700 leading-relaxed">
+                          <div>Bank: {n.payload.bankName}</div>
+                          <div>Name: {n.payload.accountName}</div>
+                          <div>Acct: {n.payload.accountNumber}</div>
+                          {n.payload.branch && (
+                            <div>Branch: {n.payload.branch}</div>
+                          )}
+                          {n.payload.reason && (
+                            <div className="mt-1 not-italic font-sans text-slate-500">
+                              Reason: {n.payload.reason}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      <div className="flex items-center gap-2 mt-3">
+                        {n.type === "SETTLEMENT_CHANGE_REQUEST" && (
+                          <>
+                            <button
+                              disabled={acting === n.id}
+                              onClick={() => resolve(n.id, "approve")}
+                              className="flex items-center gap-1 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 rounded px-2 py-1"
+                            >
+                              <Check size={12} /> Approve
+                            </button>
+                            <button
+                              disabled={acting === n.id}
+                              onClick={() => resolve(n.id, "reject")}
+                              className="flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded px-2 py-1"
+                            >
+                              <X size={12} /> Reject
+                            </button>
+                          </>
                         )}
-                        {n.payload.reason && (
-                          <div className="mt-1 not-italic font-sans text-slate-500">
-                            Reason: {n.payload.reason}
-                          </div>
+                        {isReopened && n.payload?.ticketId && (
+                          <Link
+                            to="/platform/support"
+                            onClick={() => setOpen(false)}
+                            className="text-[11px] text-amber-700 hover:underline font-medium ml-auto"
+                          >
+                            View ticket →
+                          </Link>
+                        )}
+                        {!isReopened && n.school && (
+                          <Link
+                            to={`/platform/schools/${n.school.id}`}
+                            className="text-[11px] text-blue-700 hover:underline ml-auto"
+                          >
+                            View school →
+                          </Link>
                         )}
                       </div>
-                    )}
-
-                    <div className="flex items-center gap-2 mt-3">
-                      {n.type === "SETTLEMENT_CHANGE_REQUEST" && (
-                        <>
-                          <button
-                            disabled={acting === n.id}
-                            onClick={() => resolve(n.id, "approve")}
-                            className="flex items-center gap-1 text-xs font-semibold text-white bg-green-600 hover:bg-green-700 disabled:opacity-60 rounded px-2 py-1"
-                          >
-                            <Check size={12} /> Approve
-                          </button>
-                          <button
-                            disabled={acting === n.id}
-                            onClick={() => resolve(n.id, "reject")}
-                            className="flex items-center gap-1 text-xs font-semibold text-red-700 bg-red-50 hover:bg-red-100 border border-red-200 rounded px-2 py-1"
-                          >
-                            <X size={12} /> Reject
-                          </button>
-                        </>
-                      )}
-                      {n.school && (
-                        <Link
-                          to={`/platform/schools/${n.school.id}`}
-                          className="text-[11px] text-blue-700 hover:underline ml-auto"
-                        >
-                          View school →
-                        </Link>
-                      )}
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
         </div>
       )}
     </div>

@@ -8,9 +8,11 @@ import {
   Lock,
   AlertCircle,
   Building2,
+  RefreshCw,
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { SupportTicket, SupportMessage } from "../../types";
+import { toast } from "../../lib/toast";
 
 type Tab = "parent" | "platform";
 
@@ -377,11 +379,22 @@ function TicketModal({
     setSending(true);
     setError("");
     try {
-      await api.post(replyEndpoint, { message: reply.trim() });
+      const res = await api.post(replyEndpoint, { message: reply.trim() });
       setReply("");
+      if (res.data.reopened) {
+        toast.success("Reply sent. Ticket reopened.");
+      } else {
+        toast.success(
+          isPlatform
+            ? "Reply sent to SchoolPay Support"
+            : "Reply sent. Parent notified.",
+        );
+      }
       await load();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to send reply");
+      const msg = err.response?.data?.message || "Failed to send reply";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSending(false);
     }
@@ -393,15 +406,20 @@ function TicketModal({
     setError("");
     try {
       await api.post(closeEndpoint);
+      toast.success("Ticket closed");
       setConfirmClose(false);
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to close");
+      const msg = err.response?.data?.message || "Failed to close";
+      setError(msg);
+      toast.error(msg);
       setConfirmClose(false);
     } finally {
       setClosing(false);
     }
   };
+
+  const isClosed = ticket?.status === "CLOSED";
 
   return (
     <>
@@ -475,62 +493,83 @@ function TicketModal({
             )}
           </div>
 
-          {/* Reply + actions */}
-          {ticket?.status === "OPEN" ? (
-            <div className="border-t border-gray-100 p-4 space-y-2">
-              {error && (
-                <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
-                  <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                  <span>{error}</span>
-                </div>
-              )}
-              <textarea
-                value={reply}
-                onChange={(e) => setReply(e.target.value)}
-                rows={3}
-                placeholder={
-                  isPlatform
+          {/* 🎯 Reply box — always available, even for closed tickets */}
+          <div className="border-t border-gray-100 p-4 space-y-2">
+            {isClosed && (
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                <RefreshCw size={12} className="text-amber-600 shrink-0" />
+                <p className="text-[11px] text-amber-800">
+                  This ticket is closed. Sending a reply will{" "}
+                  <strong>reopen it</strong>.
+                </p>
+              </div>
+            )}
+
+            {error && (
+              <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
+                <AlertCircle size={14} className="shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <textarea
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              rows={3}
+              placeholder={
+                isClosed
+                  ? "Reopen and reply..."
+                  : isPlatform
                     ? "Reply to SchoolPay Support..."
                     : "Reply to this parent... (they'll get an SMS)"
-                }
-                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
-              />
-              <div className="flex items-center justify-between gap-2">
-                {closeEndpoint && (
-                  <button
-                    onClick={() => setConfirmClose(true)}
-                    disabled={closing}
-                    className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-red-600 disabled:opacity-50"
-                  >
-                    <Lock size={12} /> Close Ticket
-                  </button>
-                )}
-                <div className="flex-1" />
+              }
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
+            />
+            <div className="flex items-center justify-between gap-2">
+              {!isClosed && closeEndpoint ? (
                 <button
-                  onClick={sendReply}
-                  disabled={sending || !reply.trim()}
-                  className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-[var(--color-primary-dark)] disabled:opacity-50"
+                  onClick={() => setConfirmClose(true)}
+                  disabled={closing}
+                  className="flex items-center gap-1.5 text-xs font-medium text-gray-500 hover:text-red-600 disabled:opacity-50"
                 >
-                  {sending ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Send size={14} />
-                  )}
-                  {sending ? "Sending..." : "Send Reply"}
+                  <Lock size={12} /> Close Ticket
                 </button>
-              </div>
+              ) : isClosed ? (
+                <span className="text-[11px] text-gray-400 flex items-center gap-1.5">
+                  <Lock size={12} /> Closed
+                </span>
+              ) : (
+                <div />
+              )}
+              <div className="flex-1" />
+              <button
+                onClick={sendReply}
+                disabled={sending || !reply.trim()}
+                className={`flex items-center gap-2 text-white px-5 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 ${
+                  isClosed
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)]"
+                }`}
+              >
+                {sending ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : isClosed ? (
+                  <RefreshCw size={14} />
+                ) : (
+                  <Send size={14} />
+                )}
+                {sending
+                  ? "Sending..."
+                  : isClosed
+                    ? "Reopen & Reply"
+                    : "Send Reply"}
+              </button>
             </div>
-          ) : (
-            <div className="border-t border-gray-100 p-4 text-center">
-              <p className="text-xs text-gray-500 flex items-center justify-center gap-1.5">
-                <Lock size={12} /> This ticket is closed
-              </p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* 🎯 Custom Close Confirmation Modal */}
+      {/* Close Confirmation Modal */}
       {confirmClose && (
         <div
           className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4"
@@ -547,8 +586,8 @@ function TicketModal({
               Close this ticket?
             </h3>
             <p className="text-sm text-gray-500 text-center mb-5 leading-relaxed">
-              The other party won&apos;t be able to reply after you close it.
-              They&apos;ll still see the full conversation.
+              If the other party writes back later, the ticket will
+              automatically reopen. Nothing is lost.
             </p>
             <div className="flex gap-3">
               <button
@@ -598,9 +637,12 @@ function NewPlatformTicketModal({
     setError("");
     try {
       await api.post("/support/platform", { subject, message });
+      toast.success("Ticket sent to SchoolPay Support");
       onCreated();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to create ticket");
+      const msg = err.response?.data?.message || "Failed to create ticket";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }

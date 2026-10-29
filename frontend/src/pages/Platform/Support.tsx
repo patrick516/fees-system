@@ -6,10 +6,10 @@ import {
   X,
   Lock,
   Building2,
-  AlertTriangle,
-  CheckCircle2,
+  RefreshCw,
 } from "lucide-react";
 import platformApi from "../../lib/platformApi";
+import { toast } from "../../lib/toast";
 
 interface SupportTicket {
   id: string;
@@ -176,8 +176,6 @@ export default function PlatformSupportPage() {
   );
 }
 
-// ==================== TICKET MODAL ====================
-
 function PlatformTicketModal({
   ticketId,
   onClose,
@@ -191,8 +189,6 @@ function PlatformTicketModal({
   const [sending, setSending] = useState(false);
   const [closing, setClosing] = useState(false);
   const [showCloseConfirm, setShowCloseConfirm] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -209,30 +205,23 @@ function PlatformTicketModal({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticketId]);
 
-  // Auto-dismiss success/error after 4s
-  useEffect(() => {
-    if (error || success) {
-      const t = setTimeout(() => {
-        setError(null);
-        setSuccess(null);
-      }, 4000);
-      return () => clearTimeout(t);
-    }
-  }, [error, success]);
-
   const sendReply = async () => {
     if (!reply.trim()) return;
     setSending(true);
-    setError(null);
     try {
-      await platformApi.post(`/platform/support/${ticketId}/reply`, {
-        message: reply.trim(),
-      });
+      const res = await platformApi.post(
+        `/platform/support/${ticketId}/reply`,
+        { message: reply.trim() },
+      );
       setReply("");
-      setSuccess("Reply sent successfully. School admin notified by email.");
+      if (res.data.reopened) {
+        toast.success("Reply sent. Ticket reopened.");
+      } else {
+        toast.success("Reply sent. School admin notified by email.");
+      }
       await load();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to send reply");
+      toast.error(err.response?.data?.message || "Failed to send reply");
     } finally {
       setSending(false);
     }
@@ -240,16 +229,18 @@ function PlatformTicketModal({
 
   const closeTicket = async () => {
     setClosing(true);
-    setError(null);
     try {
       await platformApi.post(`/platform/support/${ticketId}/close`);
+      toast.success("Ticket closed");
       setShowCloseConfirm(false);
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Failed to close ticket");
+      toast.error(err.response?.data?.message || "Failed to close ticket");
       setClosing(false);
     }
   };
+
+  const isClosed = ticket?.status === "CLOSED";
 
   return (
     <>
@@ -261,7 +252,6 @@ function PlatformTicketModal({
           className="bg-white w-full max-w-2xl rounded-t-2xl sm:rounded-2xl shadow-xl flex flex-col max-h-[90vh] sm:max-h-[85vh]"
           onClick={(e) => e.stopPropagation()}
         >
-          {/* Header */}
           <div className="flex items-start justify-between px-5 py-4 border-b border-slate-100">
             <div className="min-w-0">
               <h3 className="text-base font-semibold text-slate-900 truncate">
@@ -282,33 +272,6 @@ function PlatformTicketModal({
             </button>
           </div>
 
-          {/* 🎯 Toast-like feedback banners */}
-          {error && (
-            <div className="mx-5 mt-3 flex items-start gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-xs text-red-700">
-              <AlertTriangle size={14} className="shrink-0 mt-0.5" />
-              <span className="flex-1">{error}</span>
-              <button
-                onClick={() => setError(null)}
-                className="text-red-500 hover:text-red-700"
-              >
-                <X size={12} />
-              </button>
-            </div>
-          )}
-          {success && (
-            <div className="mx-5 mt-3 flex items-start gap-2 bg-green-50 border border-green-200 rounded-lg px-3 py-2 text-xs text-green-700">
-              <CheckCircle2 size={14} className="shrink-0 mt-0.5" />
-              <span className="flex-1">{success}</span>
-              <button
-                onClick={() => setSuccess(null)}
-                className="text-green-500 hover:text-green-700"
-              >
-                <X size={12} />
-              </button>
-            </div>
-          )}
-
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto p-5 space-y-4 bg-slate-50">
             {loading ? (
               <div className="flex items-center justify-center h-32">
@@ -349,17 +312,31 @@ function PlatformTicketModal({
             )}
           </div>
 
-          {/* Footer */}
-          {ticket?.status === "OPEN" ? (
-            <div className="border-t border-slate-100 p-4 space-y-2">
-              <textarea
-                value={reply}
-                onChange={(e) => setReply(e.target.value)}
-                rows={3}
-                placeholder="Reply to the school admin... (they'll get an email)"
-                className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
-              />
-              <div className="flex items-center justify-between gap-2">
+          {/* 🎯 Reply box always available — even for closed tickets */}
+          <div className="border-t border-slate-100 p-4 space-y-2">
+            {isClosed && (
+              <div className="flex items-center gap-2 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-2">
+                <RefreshCw size={12} className="text-amber-600 shrink-0" />
+                <p className="text-[11px] text-amber-800">
+                  This ticket is closed. Sending a reply will{" "}
+                  <strong>reopen it</strong>.
+                </p>
+              </div>
+            )}
+
+            <textarea
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              rows={3}
+              placeholder={
+                isClosed
+                  ? "Reopen and reply..."
+                  : "Reply to the school admin... (they'll get an email)"
+              }
+              className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 resize-none"
+            />
+            <div className="flex items-center justify-between gap-2">
+              {!isClosed ? (
                 <button
                   onClick={() => setShowCloseConfirm(true)}
                   disabled={closing}
@@ -367,32 +344,40 @@ function PlatformTicketModal({
                 >
                   <Lock size={12} /> {closing ? "Closing..." : "Close Ticket"}
                 </button>
-                <div className="flex-1" />
-                <button
-                  onClick={sendReply}
-                  disabled={sending || !reply.trim()}
-                  className="flex items-center gap-2 bg-blue-700 text-white px-5 py-2.5 rounded-lg text-sm font-semibold hover:bg-blue-800 disabled:opacity-50"
-                >
-                  {sending ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <Send size={14} />
-                  )}
-                  {sending ? "Sending..." : "Send Reply"}
-                </button>
-              </div>
+              ) : (
+                <span className="text-[11px] text-slate-400 flex items-center gap-1.5">
+                  <Lock size={12} /> Closed
+                </span>
+              )}
+              <div className="flex-1" />
+              <button
+                onClick={sendReply}
+                disabled={sending || !reply.trim()}
+                className={`flex items-center gap-2 text-white px-5 py-2.5 rounded-lg text-sm font-semibold disabled:opacity-50 ${
+                  isClosed
+                    ? "bg-amber-600 hover:bg-amber-700"
+                    : "bg-blue-700 hover:bg-blue-800"
+                }`}
+              >
+                {sending ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : isClosed ? (
+                  <RefreshCw size={14} />
+                ) : (
+                  <Send size={14} />
+                )}
+                {sending
+                  ? "Sending..."
+                  : isClosed
+                    ? "Reopen & Reply"
+                    : "Send Reply"}
+              </button>
             </div>
-          ) : (
-            <div className="border-t border-slate-100 p-4 text-center">
-              <p className="text-xs text-slate-500 flex items-center justify-center gap-1.5">
-                <Lock size={12} /> This ticket is closed
-              </p>
-            </div>
-          )}
+          </div>
         </div>
       </div>
 
-      {/* 🎯 Beautiful Close Confirmation Modal */}
+      {/* Close confirmation modal */}
       {showCloseConfirm && (
         <div
           className="fixed inset-0 z-[60] bg-black/60 flex items-center justify-center p-4"
@@ -410,8 +395,8 @@ function PlatformTicketModal({
                 Close this ticket?
               </h3>
               <p className="text-sm text-slate-500 mb-4">
-                The school admin won't be able to reply after closing. You can
-                re-open it later if needed.
+                The school admin won't be able to reply after closing. If they
+                do write back later, it will reopen automatically.
               </p>
               <div className="flex gap-3">
                 <button
