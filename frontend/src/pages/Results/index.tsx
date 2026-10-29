@@ -12,6 +12,7 @@ import {
   Eye,
   FileSpreadsheet,
   Star,
+  RefreshCw,
 } from "lucide-react";
 import { useExamResults } from "../../hooks/useExamResults";
 import { useClasses } from "../../hooks/useStudents";
@@ -70,6 +71,7 @@ const ResultsPage = () => {
   );
 
   const [reuploadMode, setReuploadMode] = useState(false);
+  const [showReuploadConfirm, setShowReuploadConfirm] = useState(false);
 
   // Summary of all classes for selected period
   const [uploadSummary, setUploadSummary] = useState<any[]>([]);
@@ -101,7 +103,7 @@ const ResultsPage = () => {
   const [pendingRows, setPendingRows] = useState<any[]>([]);
   const [resolvingRowId, setResolvingRowId] = useState<string | null>(null);
 
-  // 🎯 New state: warn if English was missing from upload
+  // 🎯 Warn if English was missing from upload
   const [englishMissingWarning, setEnglishMissingWarning] = useState(false);
 
   const boundaries =
@@ -254,7 +256,7 @@ const ResultsPage = () => {
   const handleViewClass = async (classId: string) => {
     setSelectedClass(classId);
     setReuploadMode(false);
-    setEnglishMissingWarning(false); // 🎯 Reset warning when switching classes
+    setEnglishMissingWarning(false);
     setLoadingResults(true);
     setExpandedStudent(null);
 
@@ -275,6 +277,15 @@ const ResultsPage = () => {
 
     loadPendingRows(classId);
   };
+
+  // 🎯 Confirms re-upload after showing beautiful modal
+  const confirmReupload = () => {
+    setShowReuploadConfirm(false);
+    setReuploadMode(true);
+  };
+
+  // 🎯 Get current class summary for reupload modal
+  const currentSummary = uploadSummary.find((s) => s.classId === selectedClass);
 
   return (
     <div className="space-y-4">
@@ -575,7 +586,7 @@ const ResultsPage = () => {
           )}
         </div>
 
-        {/* 🎯 English Warning Banner (appears if any student is missing English) */}
+        {/* English Warning Banner */}
         {englishMissingWarning && resultsGradingSystem === "POINTS" && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
             <AlertTriangle
@@ -731,9 +742,6 @@ const ResultsPage = () => {
                   <div className="space-y-4">
                     {/* Upload form OR "Already uploaded" card */}
                     {(() => {
-                      const currentSummary = uploadSummary.find(
-                        (s) => s.classId === selectedClass,
-                      );
                       const alreadyUploaded =
                         currentSummary?.hasResults === true;
 
@@ -781,19 +789,12 @@ const ResultsPage = () => {
                               <p className="text-[11px] text-green-700">
                                 Re-uploading will overwrite existing results.
                               </p>
+                              {/* 🎯 Opens the beautiful confirmation modal */}
                               <button
-                                onClick={() => {
-                                  if (
-                                    window.confirm(
-                                      `Are you sure you want to re-upload results for ${selectedClassObj?.name}? This will overwrite ${currentSummary.studentsUploaded} existing record(s).`,
-                                    )
-                                  ) {
-                                    setReuploadMode(true);
-                                  }
-                                }}
-                                className="text-xs font-semibold text-red-600 hover:text-red-800 px-3 py-1.5 rounded-lg border border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors"
+                                onClick={() => setShowReuploadConfirm(true)}
+                                className="text-xs font-semibold text-red-600 hover:text-red-800 px-3 py-1.5 rounded-lg border border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors flex items-center gap-1.5"
                               >
-                                🔄 Re-upload (overwrites)
+                                <RefreshCw size={12} /> Re-upload (overwrites)
                               </button>
                             </div>
                           </div>
@@ -1103,6 +1104,52 @@ const ResultsPage = () => {
           </div>
         )}
       </div>
+
+      {/* 🎯 Beautiful Re-upload Confirmation Modal */}
+      {showReuploadConfirm && currentSummary && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => setShowReuploadConfirm(false)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center">
+              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertTriangle size={24} className="text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                Re-upload results for {selectedClassObj?.name}?
+              </h3>
+              <p className="text-sm text-slate-500 mb-4">
+                This will overwrite the existing{" "}
+                <strong>{currentSummary.studentsUploaded}</strong> student
+                record{currentSummary.studentsUploaded === 1 ? "" : "s"} already
+                uploaded for this class.
+              </p>
+              <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 mb-4 text-left">
+                ⚠️ All existing marks for this class will be replaced. This
+                cannot be undone.
+              </div>
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowReuploadConfirm(false)}
+                  className="flex-1 border border-slate-300 text-slate-700 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={confirmReupload}
+                  className="flex-1 bg-red-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-red-700"
+                >
+                  Yes, Re-upload
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

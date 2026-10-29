@@ -25,6 +25,7 @@ import {
   Activity,
 } from "lucide-react";
 import api from "../../lib/axios";
+import { toast } from "../../lib/toast";
 import {
   Select,
   SelectContent,
@@ -383,7 +384,7 @@ const AuditPage = () => {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch {
-      alert("Failed to export");
+      toast.error("Failed to export");
     } finally {
       setExporting(false);
     }

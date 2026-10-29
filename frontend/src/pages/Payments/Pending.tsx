@@ -3,6 +3,7 @@ import { CheckCircle, XCircle, Eye, Clock } from "lucide-react";
 import api from "../../lib/axios";
 import type { Payment } from "../../types";
 import { usePermission } from "../../hooks/usePermission";
+import { toast } from "../../lib/toast";
 
 const PendingPayments = () => {
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -34,7 +35,7 @@ const PendingPayments = () => {
       await api.patch(`/payments/${id}/verify`);
       setPayments((prev) => prev.filter((p) => p.id !== id));
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to verify");
+      toast.error(err.response?.data?.message || "Failed to verify");
     } finally {
       setActionLoading(null);
     }
@@ -49,7 +50,7 @@ const PendingPayments = () => {
       setRejectId(null);
       setRejectReason("");
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to reject");
+      toast.error(err.response?.data?.message || "Failed to reject");
     } finally {
       setActionLoading(null);
     }

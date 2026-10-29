@@ -19,6 +19,7 @@ import InviteStaffModal from "../../components/Staff/InviteStaffModal";
 import EditStaffModal from "../../components/Staff/EditStaffModal";
 import { useAuthStore } from "../../store/authStore";
 import type { Staff, Department } from "../../types";
+import { toast } from "../../lib/toast";
 
 const StaffPage = () => {
   const { staff: currentUser } = useAuthStore();
@@ -63,7 +64,7 @@ const StaffPage = () => {
       await fetchAll();
       setSelectedMember(null);
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to resend");
+      toast.error(err.response?.data?.message || "Failed to resend");
     } finally {
       setBusyId(null);
     }
@@ -79,7 +80,7 @@ const StaffPage = () => {
       setConfirmDeactivate(null);
       setSelectedMember(null);
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to remove");
+      toast.error(err.response?.data?.message || "Failed to remove");
     } finally {
       setBusyId(null);
     }
@@ -93,7 +94,7 @@ const StaffPage = () => {
       setSelectedMember(null);
       setEditMember(null);
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to unlock");
+      toast.error(err.response?.data?.message || "Failed to unlock");
     } finally {
       setBusyId(null);
     }

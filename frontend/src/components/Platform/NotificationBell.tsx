@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { Bell, Check, X, Loader2 } from "lucide-react";
 import platformApi from "../../lib/platformApi";
+import { toast } from "../../lib/toast";
 
 interface Notification {
   id: string;
@@ -76,7 +77,7 @@ export default function NotificationBell() {
       });
       await Promise.all([fetchList(), fetchUnread()]);
     } catch (err: any) {
-      alert(err?.response?.data?.message || "Failed");
+      toast.error(err?.response?.data?.message || "Failed");
     } finally {
       setActing(null);
     }

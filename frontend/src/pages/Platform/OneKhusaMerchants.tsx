@@ -9,6 +9,7 @@ import {
   Link as LinkIcon,
 } from "lucide-react";
 import platformApi from "../../lib/platformApi";
+import { toast } from "../../lib/toast";
 
 interface Merchant {
   accountNumber: string;
@@ -71,7 +72,7 @@ export default function PlatformOneKhusaMerchants() {
       setSelectedSchoolId("");
       load(); // Refresh the list
     } catch (err: any) {
-      alert(err?.response?.data?.message || "Failed to link school");
+      toast.error(err?.response?.data?.message || "Failed to link school");
     } finally {
       setIsLinking(false);
     }

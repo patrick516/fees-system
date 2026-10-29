@@ -25,6 +25,7 @@ import {
 import api from "../../lib/axios";
 import { usePermission } from "../../hooks/usePermission";
 import { useAuthStore } from "../../store/authStore";
+import { toast } from "../../lib/toast";
 import {
   Select,
   SelectContent,
@@ -192,7 +193,7 @@ const StudentDetail = () => {
 
     const printWindow = window.open("", "_blank");
     if (!printWindow) {
-      alert("Please allow pop-ups to print your receipt.");
+      toast.info("Please allow pop-ups to print your receipt.");
       return;
     }
     printWindow.document.open();

@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import ToastContainer from "./components/ui/Toast";
 import axios from "axios";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { useAuthStore } from "./store/authStore";
@@ -192,6 +193,7 @@ function App() {
 
   return (
     <BrowserRouter>
+      <ToastContainer />
       <Routes>
         {/* PUBLIC */}
         <Route path="/login" element={<Login />} />

@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import api from "../../lib/axios";
 import type { PayrollRecord } from "../../types";
+import { toast } from "../../lib/toast";
 import { useSchoolSettings } from "../../hooks/useSchoolSettings";
 import {
   Select,
@@ -660,7 +661,7 @@ function EditPayrollModal({
       });
       onSaved();
     } catch (err: any) {
-      alert(err.response?.data?.message || "Failed to save");
+      toast.error(err.response?.data?.message || "Failed to save");
     } finally {
       setSaving(false);
     }
