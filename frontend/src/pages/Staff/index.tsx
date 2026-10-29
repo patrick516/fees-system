@@ -61,6 +61,7 @@ const StaffPage = () => {
     setBusyId(id);
     try {
       await api.post(`/staff/${id}/resend-invite`);
+      toast.success("Invitation resent successfully");
       await fetchAll();
       setSelectedMember(null);
     } catch (err: any) {
@@ -76,6 +77,7 @@ const StaffPage = () => {
     setBusyId(id);
     try {
       await api.delete(`/staff/${id}`);
+      toast.success("Staff member removed");
       await fetchAll();
       setConfirmDeactivate(null);
       setSelectedMember(null);
@@ -90,6 +92,7 @@ const StaffPage = () => {
     setBusyId(id);
     try {
       await api.post(`/staff/${id}/unlock`);
+      toast.success("Account unlocked");
       await fetchAll();
       setSelectedMember(null);
       setEditMember(null);

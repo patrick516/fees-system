@@ -118,32 +118,23 @@ export default function PayrollPage() {
       await Promise.all(
         selectedIds.map((id) => api.put(`/payroll/${id}`, { status: "PAID" })),
       );
-      setMessage({
-        kind: "success",
-        text: `Successfully marked ${selectedIds.length} record(s) as Paid.`,
-      });
+      toast.success(`${selectedIds.length} payroll record(s) marked as paid`);
       load();
     } catch (err: any) {
-      setMessage({
-        kind: "error",
-        text: "Failed to mark some records as paid.",
-      });
+      toast.error("Failed to mark some records as paid.");
     } finally {
       setBulkProcessing(false);
     }
   };
-
   const deleteRecord = async () => {
     if (!deletingId) return;
     try {
       await api.delete(`/payroll/${deletingId}`);
+      toast.success("Payroll record deleted");
       setDeletingId(null);
       load();
     } catch (err: any) {
-      setMessage({
-        kind: "error",
-        text: err.response?.data?.message || "Failed to delete",
-      });
+      toast.error(err.response?.data?.message || "Failed to delete");
     }
   };
 

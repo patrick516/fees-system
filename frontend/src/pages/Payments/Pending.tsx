@@ -33,6 +33,7 @@ const PendingPayments = () => {
     setActionLoading(id);
     try {
       await api.patch(`/payments/${id}/verify`);
+      toast.success("Payment verified successfully");
       setPayments((prev) => prev.filter((p) => p.id !== id));
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to verify");
