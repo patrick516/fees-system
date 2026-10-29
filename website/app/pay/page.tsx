@@ -536,44 +536,132 @@ export default function PayPage() {
               </div>
             )}
 
-            {/* Info: where to pay */}
+            {/* 🎯 Step-by-step payment instructions */}
             {paymentInfo && (
-              <div className="bg-blue-50 rounded-2xl p-4 border border-blue-100">
-                <p className="text-xs font-semibold text-blue-900 mb-2">
-                  Where to pay
-                </p>
-                <div className="space-y-1.5">
-                  {paymentInfo.airtelMoneyNumber && (
-                    <p className="text-xs text-blue-700">
-                      Airtel Money:{" "}
-                      <span className="font-mono font-semibold">
-                        {paymentInfo.airtelMoneyNumber}
-                      </span>
-                    </p>
+              <div className="space-y-3">
+                <h3 className="text-sm font-bold text-gray-900 px-1">
+                  How to pay
+                </h3>
+
+                {/* Airtel Money */}
+                {paymentInfo.airtelMoneyNumber && (
+                  <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center">
+                        <Smartphone size={14} className="text-red-600" />
+                      </div>
+                      <p className="text-sm font-bold text-gray-900">
+                        Airtel Money
+                      </p>
+                    </div>
+                    <ol className="text-xs text-gray-600 space-y-1 pl-4 list-decimal">
+                      <li>
+                        Dial <strong>*211#</strong> on your phone
+                      </li>
+                      <li>
+                        Select <strong>3. Make payments</strong>
+                      </li>
+                      <li>
+                        Select <strong>8. OneKhusa</strong>
+                      </li>
+                      <li>
+                        Enter account number:{" "}
+                        <strong className="font-mono">
+                          {paymentInfo.airtelMoneyNumber}
+                        </strong>
+                      </li>
+                      <li>
+                        Enter amount:{" "}
+                        <strong>MWK {amountNum.toLocaleString() || "0"}</strong>
+                      </li>
+                      <li>
+                        Reference: <strong>{student?.studentCode}</strong>
+                      </li>
+                      <li>Confirm with your PIN</li>
+                    </ol>
+                  </div>
+                )}
+
+                {/* TNM Mpamba */}
+                {paymentInfo.mpambaNumber && (
+                  <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center">
+                        <Smartphone size={14} className="text-amber-600" />
+                      </div>
+                      <p className="text-sm font-bold text-gray-900">
+                        TNM Mpamba
+                      </p>
+                    </div>
+                    <ol className="text-xs text-gray-600 space-y-1 pl-4 list-decimal">
+                      <li>
+                        Dial <strong>*444#</strong> on your phone
+                      </li>
+                      <li>
+                        Select <strong>Pay Bills</strong>
+                      </li>
+                      <li>
+                        Select <strong>OneKhusa</strong>
+                      </li>
+                      <li>
+                        Enter account number:{" "}
+                        <strong className="font-mono">
+                          {paymentInfo.mpambaNumber}
+                        </strong>
+                      </li>
+                      <li>
+                        Enter amount:{" "}
+                        <strong>MWK {amountNum.toLocaleString() || "0"}</strong>
+                      </li>
+                      <li>
+                        Reference: <strong>{student?.studentCode}</strong>
+                      </li>
+                      <li>Confirm with your PIN</li>
+                    </ol>
+                  </div>
+                )}
+
+                {/* Bank Transfer */}
+                {paymentInfo.bankAccounts &&
+                  paymentInfo.bankAccounts.length > 0 && (
+                    <div className="bg-white border border-gray-200 rounded-2xl p-4">
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center">
+                          <Landmark size={14} className="text-blue-600" />
+                        </div>
+                        <p className="text-sm font-bold text-gray-900">
+                          Bank Transfer
+                        </p>
+                      </div>
+                      <div className="text-xs text-gray-600 space-y-1.5">
+                        {paymentInfo.bankAccounts.map(
+                          (bank: any, i: number) => (
+                            <div key={i} className="space-y-0.5">
+                              <p>
+                                <strong>{bank.bankName}</strong>
+                                {bank.branch ? ` · ${bank.branch}` : ""}
+                              </p>
+                              <p>
+                                Account:{" "}
+                                <strong className="font-mono">
+                                  {bank.accountNumber}
+                                </strong>
+                              </p>
+                            </div>
+                          ),
+                        )}
+                        <p className="pt-1 border-t border-gray-200">
+                          Reference:{" "}
+                          <strong className="font-mono">
+                            {student?.studentCode}
+                          </strong>
+                        </p>
+                        <p className="text-[11px] text-gray-500 pt-1">
+                          Upload the receipt below after transferring.
+                        </p>
+                      </div>
+                    </div>
                   )}
-                  {paymentInfo.mpambaNumber && (
-                    <p className="text-xs text-blue-700">
-                      TNM Mpamba:{" "}
-                      <span className="font-mono font-semibold">
-                        {paymentInfo.mpambaNumber}
-                      </span>
-                    </p>
-                  )}
-                  {paymentInfo.bankAccounts?.map((bank: any, i: number) => (
-                    <p key={i} className="text-xs text-blue-700">
-                      {bank.bankName}:{" "}
-                      <span className="font-mono font-semibold">
-                        {bank.accountNumber}
-                      </span>
-                    </p>
-                  ))}
-                </div>
-                <p className="text-[10px] text-blue-600 mt-2 pt-2 border-t border-blue-200">
-                  Use reference:{" "}
-                  <span className="font-mono font-bold">
-                    {student?.studentCode}
-                  </span>
-                </p>
               </div>
             )}
           </div>

@@ -28,22 +28,18 @@ export default function SubscriptionLocked() {
       try {
         const res = await api.get("/auth/me");
         const newStatus = res.data?.data?.school?.subscriptionStatus;
-
-        // If the school is no longer locked, redirect to dashboard
         if (newStatus && newStatus !== "LOCKED" && newStatus !== "SUSPENDED") {
           setUnlocking(true);
           toast.success("Payment received! Unlocking your account...");
-          // Small delay so they see the success toast
           setTimeout(() => {
             window.location.href = "/dashboard";
           }, 1200);
         }
       } catch (err) {
-        // Silent — 403 means still locked, keep polling
+        // Silent — still locked
       }
     };
 
-    // First check immediately, then every 5 seconds
     checkUnlock();
     const interval = setInterval(checkUnlock, 5_000);
     return () => clearInterval(interval);
@@ -73,7 +69,6 @@ export default function SubscriptionLocked() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  // 🎯 Show "unlocking" transition after payment is detected
   if (unlocking) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-emerald-50 to-emerald-100 flex items-center justify-center px-4">
@@ -124,7 +119,6 @@ export default function SubscriptionLocked() {
 
         <div className="p-6">
           {!tanData ? (
-            /* ============ INITIAL STATE — Pay button ============ */
             <div className="space-y-4 text-center">
               <p className="text-sm text-gray-600 leading-relaxed">
                 Your subscription has expired. Click below to generate a payment
@@ -154,9 +148,7 @@ export default function SubscriptionLocked() {
               </button>
             </div>
           ) : (
-            /* ============ TAN GENERATED — Instructions ============ */
             <div className="space-y-4">
-              {/* Amount */}
               <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 text-center">
                 <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
                   Amount to pay
@@ -166,7 +158,6 @@ export default function SubscriptionLocked() {
                 </p>
               </div>
 
-              {/* Timed account */}
               <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                 <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-2 text-center">
                   Send payment to this account
@@ -192,7 +183,7 @@ export default function SubscriptionLocked() {
                 </p>
               </div>
 
-              {/* Airtel Money */}
+              {/* 🎯 CORRECTED Airtel Money Steps */}
               <div className="bg-white border border-gray-200 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center">
@@ -207,7 +198,10 @@ export default function SubscriptionLocked() {
                     Dial <strong>*211#</strong> on your phone
                   </li>
                   <li>
-                    Select <strong>Pay Bills</strong>
+                    Select <strong>3. Make payments</strong>
+                  </li>
+                  <li>
+                    Select <strong>8. OneKhusa</strong>
                   </li>
                   <li>
                     Enter account number:{" "}
@@ -226,7 +220,7 @@ export default function SubscriptionLocked() {
                 </ol>
               </div>
 
-              {/* TNM Mpamba */}
+              {/* TNM Mpamba Steps — same pattern, verify if you can */}
               <div className="bg-white border border-gray-200 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center">
@@ -242,6 +236,9 @@ export default function SubscriptionLocked() {
                     Select <strong>Pay Bills</strong>
                   </li>
                   <li>
+                    Select <strong>OneKhusa</strong> (or Malipo)
+                  </li>
+                  <li>
                     Enter account number:{" "}
                     <strong className="font-mono">
                       {tanData.timedAccountNumber}
@@ -258,7 +255,6 @@ export default function SubscriptionLocked() {
                 </ol>
               </div>
 
-              {/* Bank Transfer */}
               <div className="bg-white border border-gray-200 rounded-xl p-4">
                 <div className="flex items-center gap-2 mb-2">
                   <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -289,7 +285,6 @@ export default function SubscriptionLocked() {
                 </div>
               </div>
 
-              {/* Auto-unlock notice */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 flex items-start gap-2">
                 <Loader2
                   size={14}
@@ -305,7 +300,6 @@ export default function SubscriptionLocked() {
           )}
         </div>
 
-        {/* Footer */}
         <div className="border-t border-gray-100 p-4">
           <button
             onClick={logout}
