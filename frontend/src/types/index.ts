@@ -45,6 +45,16 @@ export interface School {
   motto?: string | null;
   primaryColor?: string | null;
   isActive: boolean;
+  subscriptionStatus?:
+    | "TRIAL"
+    | "ACTIVE"
+    | "GRACE"
+    | "READONLY"
+    | "LOCKED"
+    | "SUSPENDED"
+    | null;
+  trialEndsAt?: string | null;
+  subscriptionEndsAt?: string | null;
 }
 
 export interface Staff {

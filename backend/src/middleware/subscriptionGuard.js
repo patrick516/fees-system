@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 const prisma = require("../config/db");
 const { computeAutoStatus } = require("../lib/subscription");
 
-// 🎯 Paths that should NEVER go through the subscription check
+//  Paths that should NEVER go through the subscription check
 const PUBLIC_PATH_PREFIXES = [
   "/api/auth",
   "/api/platform",
@@ -82,8 +82,8 @@ const requireActiveSubscription = async (req, res, next) => {
         );
     }
 
-    // 🎯 Enforce access based on the effective status
     if (effectiveStatus === "LOCKED" || effectiveStatus === "SUSPENDED") {
+      res.setHeader("X-Subscription-Status", effectiveStatus);
       return res.status(403).json({
         success: false,
         message:
@@ -93,6 +93,7 @@ const requireActiveSubscription = async (req, res, next) => {
     }
 
     if (effectiveStatus === "READONLY" && req.method !== "GET") {
+      res.setHeader("X-Subscription-Status", effectiveStatus);
       return res.status(403).json({
         success: false,
         message:
@@ -101,8 +102,15 @@ const requireActiveSubscription = async (req, res, next) => {
       });
     }
 
-    // 🎯 Attach to req so downstream controllers know the real status
+    // Attach to req so downstream controllers know the real status
     req.effectiveSubscriptionStatus = effectiveStatus;
+
+    //  Send it back to the frontend so it can react in real time
+    res.setHeader("X-Subscription-Status", effectiveStatus);
+    const daysLeft = require("../lib/subscription").getDaysRemaining(school);
+    if (daysLeft !== null) {
+      res.setHeader("X-Subscription-Days-Left", String(daysLeft));
+    }
 
     next();
   } catch (err) {

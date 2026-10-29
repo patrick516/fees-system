@@ -18,7 +18,6 @@ api.interceptors.request.use((config) => {
 });
 
 // ==================== RESPONSE INTERCEPTOR ====================
-// Queue for concurrent requests while a refresh is in progress
 let isRefreshing = false;
 let pendingQueue: Array<{
   resolve: (token: string) => void;
@@ -33,8 +32,48 @@ const flushQueue = (err: any, token: string | null = null) => {
   pendingQueue = [];
 };
 
+// 🎯 Redirect to locked screen — but only if we're not already there
+const forceLockedRedirect = (status: string) => {
+  if (typeof window === "undefined") return;
+  const isAlreadyLocked = window.location.pathname.includes("subscription");
+  const isAuthPage = ["/login", "/signup", "/platform"].some((p) =>
+    window.location.pathname.startsWith(p),
+  );
+  if (!isAlreadyLocked && !isAuthPage) {
+    // Persist the status so the locked page can show details
+    sessionStorage.setItem("subscriptionStatus", status);
+    window.location.href = "/subscription-locked";
+  }
+};
+
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // 🎯 Read the subscription header on EVERY successful response
+    const subStatus = response.headers["x-subscription-status"];
+    if (subStatus && typeof window !== "undefined") {
+      const store = useAuthStore.getState();
+      const currentStatus = store.staff?.school?.subscriptionStatus;
+
+      if (currentStatus !== subStatus) {
+        // Update Zustand without re-rendering everything
+        if (store.staff?.school) {
+          store.setStaff({
+            ...store.staff,
+            school: {
+              ...store.staff.school,
+              subscriptionStatus: subStatus as any,
+            },
+          });
+        }
+
+        //  If transitioned to LOCKED/SUSPENDED, immediately redirect
+        if (subStatus === "LOCKED" || subStatus === "SUSPENDED") {
+          forceLockedRedirect(subStatus);
+        }
+      }
+    }
+    return response;
+  },
   async (error) => {
     const status = error.response?.status;
     const url = error.config?.url || "";
@@ -57,6 +96,37 @@ api.interceptors.response.use(
       return Promise.reject(error);
     }
 
+    // ============ 403 — SUBSCRIPTION LOCKED / READONLY ============
+    if (status === 403) {
+      const code = error.response?.data?.code;
+      const subStatus = error.response.headers?.["x-subscription-status"];
+
+      if (
+        code === "SUBSCRIPTION_LOCKED" ||
+        code === "SUBSCRIPTION_READONLY" ||
+        subStatus === "LOCKED" ||
+        subStatus === "SUSPENDED"
+      ) {
+        // Update Zustand to reflect reality
+        const store = useAuthStore.getState();
+        if (store.staff?.school) {
+          store.setStaff({
+            ...store.staff,
+            school: {
+              ...store.staff.school,
+              subscriptionStatus: (subStatus || "LOCKED") as any,
+            },
+          });
+        }
+
+        // Force redirect to locked screen
+        if (subStatus === "LOCKED" || subStatus === "SUSPENDED") {
+          forceLockedRedirect(subStatus);
+        }
+        return Promise.reject(error);
+      }
+    }
+
     // ============ 401 — ATTEMPT REFRESH ============
     const isAuthEndpoint =
       url.includes("/auth/login") ||
@@ -76,7 +146,6 @@ api.interceptors.response.use(
         return Promise.reject(error);
       }
 
-      // If already refreshing, queue this request
       if (isRefreshing) {
         return new Promise((resolve, reject) => {
           pendingQueue.push({
@@ -99,7 +168,6 @@ api.interceptors.response.use(
         });
 
         const { token: newAccess, refreshToken: newRefresh } = res.data.data;
-
         setTokens(newAccess, newRefresh);
         flushQueue(null, newAccess);
 
@@ -117,7 +185,6 @@ api.interceptors.response.use(
       }
     }
 
-    // ============ OTHER 401s — FORCE LOGOUT ============
     if (status === 401 && !isAuthEndpoint) {
       const { logout } = useAuthStore.getState();
       logout();

@@ -7,13 +7,37 @@ import { AlertTriangle, Lock, CalendarDays, Building2 } from "lucide-react";
 import api from "../../lib/axios";
 
 const MainLayout = () => {
-  const { staff } = useAuthStore();
+  const { staff, refreshSubscriptionStatus } = useAuthStore();
   const school = staff?.school as any;
 
   const location = useLocation();
   const navigate = useNavigate();
 
-  // 🎯 Setup Guard: Check both School Details AND Active Term
+  // 🎯 Poll subscription status every 60 seconds
+  // This catches the case where the user is idle and grace expires
+  useEffect(() => {
+    // Check immediately on mount
+    refreshSubscriptionStatus();
+
+    const interval = setInterval(() => {
+      refreshSubscriptionStatus();
+    }, 60_000);
+
+    // Also refresh when the user comes back to the tab
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "visible") {
+        refreshSubscriptionStatus();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [refreshSubscriptionStatus]);
+
+  //  Setup Guard: Check both School Details AND Active Term
   const [onboarding, setOnboarding] = useState<{
     hasSchoolDetails: boolean;
     hasActiveTerm: boolean;
