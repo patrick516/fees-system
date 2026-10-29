@@ -37,5 +37,7 @@ router.post(
   requireOwner,
   controller.unlockSettlement,
 );
+router.post("/:id/resend-invite", requireOwner, controller.resendInvite);
+router.delete("/:id", requireOwner, controller.deleteSchool);
 
 module.exports = router;

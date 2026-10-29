@@ -12,6 +12,9 @@ import {
   AlertTriangle,
   CheckCircle2,
   Clock,
+  Mail,
+  Trash2,
+  Loader2,
 } from "lucide-react";
 import platformApi from "../../lib/platformApi";
 import type { PlatformSchool } from "../../types/platform";
@@ -48,6 +51,17 @@ export default function PlatformDashboard() {
   const [error, setError] = useState("");
   const [inviteOpen, setInviteOpen] = useState(false);
 
+  // New: delete + resend state
+  const [deletingSchool, setDeletingSchool] = useState<PlatformSchool | null>(
+    null,
+  );
+  const [deleting, setDeleting] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const [toast, setToast] = useState<{
+    kind: "success" | "error";
+    text: string;
+  } | null>(null);
+
   // Pagination State
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 15;
@@ -71,10 +85,56 @@ export default function PlatformDashboard() {
     load();
   }, []);
 
+  // Auto-dismiss toast
+  useEffect(() => {
+    if (toast) {
+      const t = setTimeout(() => setToast(null), 4000);
+      return () => clearTimeout(t);
+    }
+  }, [toast]);
+
+  const handleResend = async (s: PlatformSchool) => {
+    setResendingId(s.id);
+    try {
+      const res = await platformApi.post(
+        `/platform/schools/${s.id}/resend-invite`,
+      );
+      setToast({
+        kind: res.data.warning === "EMAIL_FAILED" ? "error" : "success",
+        text: res.data.message,
+      });
+      load();
+    } catch (err: any) {
+      setToast({
+        kind: "error",
+        text: err?.response?.data?.message || "Failed to resend invite",
+      });
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deletingSchool) return;
+    setDeleting(true);
+    try {
+      await platformApi.delete(`/platform/schools/${deletingSchool.id}`);
+      setToast({ kind: "success", text: "School deleted permanently" });
+      setDeletingSchool(null);
+      load();
+    } catch (err: any) {
+      setToast({
+        kind: "error",
+        text: err?.response?.data?.message || "Failed to delete school",
+      });
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   const totalStudents = schools.reduce((s, x) => s + x.studentCount, 0);
   const activeCount = schools.filter((s) => s.isActive).length;
 
-  // Pagination Logic
   const totalPages = Math.ceil(schools.length / ITEMS_PER_PAGE);
   const paginatedSchools = schools.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -105,6 +165,23 @@ export default function PlatformDashboard() {
           </button>
         </div>
 
+        {toast && (
+          <div
+            className={`mb-4 text-sm rounded-lg px-4 py-3 flex items-center gap-2 ${
+              toast.kind === "success"
+                ? "bg-green-50 border border-green-200 text-green-800"
+                : "bg-red-50 border border-red-200 text-red-800"
+            }`}
+          >
+            {toast.kind === "success" ? (
+              <CheckCircle2 size={16} />
+            ) : (
+              <AlertTriangle size={16} />
+            )}
+            {toast.text}
+          </div>
+        )}
+
         {error && (
           <div className="text-sm rounded-lg bg-red-50 border border-red-200 text-red-700 px-4 py-3 mb-6">
             {error}
@@ -118,7 +195,6 @@ export default function PlatformDashboard() {
               Revenue & Collection
             </h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-              {/* Total Revenue */}
               <div className="bg-white rounded-xl border border-slate-200 p-5 lg:col-span-2">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
@@ -146,7 +222,6 @@ export default function PlatformDashboard() {
                 </div>
               </div>
 
-              {/* Fully Paid */}
               <div className="bg-white rounded-xl border border-slate-200 p-5">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
@@ -162,7 +237,6 @@ export default function PlatformDashboard() {
                 </p>
               </div>
 
-              {/* Partially Paid */}
               <div className="bg-white rounded-xl border border-slate-200 p-5">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
@@ -178,7 +252,6 @@ export default function PlatformDashboard() {
                 </p>
               </div>
 
-              {/* Unpaid */}
               <div className="bg-white rounded-xl border border-slate-200 p-5">
                 <div className="flex items-center justify-between mb-2">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
@@ -197,7 +270,7 @@ export default function PlatformDashboard() {
           </div>
         )}
 
-        {/* ==================== 2. PARTIAL PAYMENTS TABLE ==================== */}
+        {/* ==================== 2. OUTSTANDING BALANCES ==================== */}
         {analytics?.partialSchools?.length > 0 && (
           <div className="mb-8">
             <h2 className="text-sm font-semibold text-slate-800 uppercase tracking-wide mb-3">
@@ -327,70 +400,103 @@ export default function PlatformDashboard() {
           ) : (
             <>
               <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-                {paginatedSchools.map((s) => (
-                  <div
-                    key={s.id}
-                    className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col hover:shadow-md transition-shadow duration-200"
-                  >
-                    <div className="flex flex-col items-center text-center mb-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-2 overflow-hidden">
-                        {s.logo ? (
-                          <img
-                            src={s.logo}
-                            alt={s.name}
-                            className="w-full h-full object-contain"
-                          />
-                        ) : (
-                          <Building2 className="text-slate-400" size={18} />
-                        )}
-                      </div>
-                      <h3
-                        className="text-sm font-semibold text-slate-900 line-clamp-1 w-full"
-                        title={s.name}
-                      >
-                        {s.name}
-                      </h3>
-                      <p
-                        className="text-[11px] text-slate-500 mt-0.5 line-clamp-1 w-full"
-                        title={s.admin?.email || "No admin"}
-                      >
-                        {s.admin?.email || "No admin"}
-                      </p>
-                    </div>
-
-                    <div className="flex-1 space-y-1.5 mb-4 text-xs">
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-500">Status</span>
-                        <StatusBadge s={s} />
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-500">Students</span>
-                        <span className="font-medium text-slate-900">
-                          {s.studentCount}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-slate-500">OneKhusa</span>
-                        {s.onekhusaConfigured ? (
-                          <span className="text-[10px] font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded">
-                            Configured
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-medium text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded">
-                            Not set
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <Link
-                      to={`/platform/schools/${s.id}`}
-                      className="w-full block text-center bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold py-1.5 rounded-lg transition-colors mt-auto"
+                {paginatedSchools.map((s) => {
+                  const invitePending = !s.admin?.lastLogin && !!s.admin?.email;
+                  return (
+                    <div
+                      key={s.id}
+                      className="bg-white rounded-xl border border-slate-200 p-4 flex flex-col hover:shadow-md transition-shadow duration-200 relative group"
                     >
-                      Manage
-                    </Link>
-                  </div>
-                ))}
+                      {/* Hover action buttons (top right) */}
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {invitePending && (
+                          <button
+                            onClick={() => handleResend(s)}
+                            disabled={resendingId === s.id}
+                            title="Resend invitation email"
+                            className="p-1.5 bg-white border border-slate-200 rounded-lg text-blue-600 hover:bg-blue-50 hover:border-blue-300 shadow-sm disabled:opacity-50"
+                          >
+                            {resendingId === s.id ? (
+                              <Loader2 size={12} className="animate-spin" />
+                            ) : (
+                              <Mail size={12} />
+                            )}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setDeletingSchool(s)}
+                          title="Delete school"
+                          className="p-1.5 bg-white border border-slate-200 rounded-lg text-red-600 hover:bg-red-50 hover:border-red-300 shadow-sm"
+                        >
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+
+                      <div className="flex flex-col items-center text-center mb-3 mt-4">
+                        <div className="w-10 h-10 rounded-xl bg-slate-50 border border-slate-100 flex items-center justify-center mb-2 overflow-hidden">
+                          {s.logo ? (
+                            <img
+                              src={s.logo}
+                              alt={s.name}
+                              className="w-full h-full object-contain"
+                            />
+                          ) : (
+                            <Building2 className="text-slate-400" size={18} />
+                          )}
+                        </div>
+                        <h3
+                          className="text-sm font-semibold text-slate-900 line-clamp-1 w-full"
+                          title={s.name}
+                        >
+                          {s.name}
+                        </h3>
+                        <p
+                          className="text-[11px] text-slate-500 mt-0.5 line-clamp-1 w-full"
+                          title={s.admin?.email || "No admin"}
+                        >
+                          {s.admin?.email || "No admin"}
+                        </p>
+                        {invitePending && (
+                          <span className="mt-1 text-[9px] font-semibold bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full">
+                            INVITE PENDING
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex-1 space-y-1.5 mb-4 text-xs">
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">Status</span>
+                          <StatusBadge s={s} />
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">Students</span>
+                          <span className="font-medium text-slate-900">
+                            {s.studentCount}
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-slate-500">OneKhusa</span>
+                          {s.onekhusaConfigured ? (
+                            <span className="text-[10px] font-medium text-green-700 bg-green-50 px-1.5 py-0.5 rounded">
+                              Configured
+                            </span>
+                          ) : (
+                            <span className="text-[10px] font-medium text-slate-500 bg-slate-50 px-1.5 py-0.5 rounded">
+                              Not set
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <Link
+                        to={`/platform/schools/${s.id}`}
+                        className="w-full block text-center bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-semibold py-1.5 rounded-lg transition-colors mt-auto"
+                      >
+                        Manage
+                      </Link>
+                    </div>
+                  );
+                })}
               </div>
 
               {/* PAGINATION FOOTER */}
@@ -435,6 +541,58 @@ export default function PlatformDashboard() {
           )}
         </div>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      {deletingSchool && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+          onClick={() => !deleting && setDeletingSchool(null)}
+        >
+          <div
+            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="text-center">
+              <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <Trash2 size={24} className="text-red-600" />
+              </div>
+              <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                Delete {deletingSchool.name}?
+              </h3>
+              <p className="text-sm text-slate-500 mb-4">
+                This will permanently remove the school
+                {deletingSchool.studentCount > 0
+                  ? ` and all ${deletingSchool.studentCount} student records`
+                  : ""}
+                . This action cannot be undone.
+              </p>
+              {deletingSchool.studentCount > 0 && (
+                <div className="bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 text-xs text-amber-800 mb-4 text-left">
+                  ⚠️ This school has {deletingSchool.studentCount} students. Are
+                  you absolutely sure?
+                </div>
+              )}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setDeletingSchool(null)}
+                  disabled={deleting}
+                  className="flex-1 border border-slate-300 text-slate-700 py-2.5 rounded-lg text-sm font-medium hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="flex-1 bg-red-600 text-white py-2.5 rounded-lg text-sm font-medium hover:bg-red-700 disabled:opacity-50 flex items-center justify-center gap-2"
+                >
+                  {deleting && <Loader2 size={14} className="animate-spin" />}
+                  {deleting ? "Deleting..." : "Yes, Delete"}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       <InviteSchoolModal
         open={inviteOpen}

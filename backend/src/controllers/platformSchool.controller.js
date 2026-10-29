@@ -466,6 +466,139 @@ const unlockSettlement = async (req, res) => {
   }
 };
 
+// ==================== DELETE SCHOOL ====================
+// DELETE /api/platform/schools/:id
+const deleteSchool = async (req, res) => {
+  try {
+    const school = await prisma.school.findFirst({
+      where: { id: req.params.id, platformId: req.platformId },
+      include: { _count: { select: { students: true, staff: true } } },
+    });
+
+    if (!school) {
+      return res
+        .status(404)
+        .json({ success: false, message: "School not found" });
+    }
+
+    // Safety: don't allow deleting an ACTIVE school with real data
+    if (school.subscriptionStatus === "ACTIVE" && school._count.students > 0) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Cannot delete an active school that has students. Suspend it first or remove students.",
+      });
+    }
+
+    // The schema has onDelete: Cascade on most relations,
+    // but let's be extra safe by clearing these manual ones first.
+    await prisma.$transaction([
+      prisma.staff.deleteMany({ where: { schoolId: school.id } }),
+      prisma.notification.deleteMany({ where: { schoolId: school.id } }),
+      prisma.school.delete({ where: { id: school.id } }),
+    ]);
+
+    console.log(
+      `[platform] School deleted: ${school.name} (${school.id}) by platform admin`,
+    );
+
+    return res.json({ success: true, message: "School deleted permanently" });
+  } catch (err) {
+    console.error("deleteSchool error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to delete school" });
+  }
+};
+
+// ==================== RESEND INVITE ====================
+// POST /api/platform/schools/:id/resend-invite
+const resendInvite = async (req, res) => {
+  try {
+    const school = await prisma.school.findFirst({
+      where: { id: req.params.id, platformId: req.platformId },
+      include: {
+        staff: {
+          where: { role: { name: "School Admin" } },
+          take: 1,
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!school) {
+      return res
+        .status(404)
+        .json({ success: false, message: "School not found" });
+    }
+
+    const admin = school.staff[0];
+    if (!admin) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No admin found for this school" });
+    }
+
+    if (admin.lastLogin) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Admin has already logged in. Resend is only for pending invitations.",
+      });
+    }
+
+    // Generate fresh token and password
+    const crypto = require("crypto");
+    const bcrypt = require("bcryptjs");
+    const { sendPlatformSchoolInviteEmail } = require("../lib/mailer");
+
+    const chars = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+    const pick = () => chars[crypto.randomInt(0, chars.length)];
+    const block = () => Array.from({ length: 4 }, pick).join("");
+    const tempPassword = `SP-${block()}-${block()}-${block()}`;
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+    const inviteToken = crypto.randomBytes(32).toString("hex");
+    const inviteExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+    await prisma.staff.update({
+      where: { id: admin.id },
+      data: {
+        passwordHash,
+        invitationToken: inviteToken,
+        invitationExpires: inviteExpires,
+        invitedAt: new Date(),
+      },
+    });
+
+    const emailRes = await sendPlatformSchoolInviteEmail({
+      to: admin.email,
+      name: admin.firstName || "there",
+      inviteToken,
+      tempPassword,
+      expiresInDays: 7,
+    });
+
+    if (emailRes?.success === false || emailRes?.skipped) {
+      return res.status(200).json({
+        success: true,
+        message: "Invite regenerated, but email failed to send.",
+        warning: "EMAIL_FAILED",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Invitation resent to ${admin.email}`,
+    });
+  } catch (err) {
+    console.error("resendInvite error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to resend invite" });
+  }
+};
+
 module.exports = {
   listSchools,
   inviteSchool,
@@ -474,4 +607,6 @@ module.exports = {
   updateSchoolStatus,
   updateOneKhusa,
   unlockSettlement,
+  deleteSchool,
+  resendInvite,
 };
