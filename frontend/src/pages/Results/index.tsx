@@ -11,6 +11,7 @@ import {
   Check,
   Eye,
   FileSpreadsheet,
+  Star,
 } from "lucide-react";
 import { useExamResults } from "../../hooks/useExamResults";
 import { useClasses } from "../../hooks/useStudents";
@@ -99,6 +100,9 @@ const ResultsPage = () => {
   const [savingBoundaries, setSavingBoundaries] = useState(false);
   const [pendingRows, setPendingRows] = useState<any[]>([]);
   const [resolvingRowId, setResolvingRowId] = useState<string | null>(null);
+
+  // 🎯 New state: warn if English was missing from upload
+  const [englishMissingWarning, setEnglishMissingWarning] = useState(false);
 
   const boundaries =
     boundarySystem === "POINTS" ? pointsBoundaries : letterBoundaries;
@@ -202,6 +206,13 @@ const ResultsPage = () => {
     setMessage(res.message || (res.success ? "Uploaded" : "Upload failed"));
 
     if (res.success) {
+      // 🎯 Check if English was missing (backend sends this flag)
+      if (res.data?.englishIncluded === false) {
+        setEnglishMissingWarning(true);
+      } else {
+        setEnglishMissingWarning(false);
+      }
+
       setFile(null);
       setReuploadMode(false);
       handleViewClass(selectedClass); // Refresh rankings
@@ -242,7 +253,8 @@ const ResultsPage = () => {
 
   const handleViewClass = async (classId: string) => {
     setSelectedClass(classId);
-    setReuploadMode(false); // Reset re-upload mode when switching classes
+    setReuploadMode(false);
+    setEnglishMissingWarning(false); // 🎯 Reset warning when switching classes
     setLoadingResults(true);
     setExpandedStudent(null);
 
@@ -250,6 +262,14 @@ const ResultsPage = () => {
     if (res.success) {
       setClassResults(res.data);
       setResultsGradingSystem(res.gradingSystem || "POINTS");
+
+      // 🎯 Check if any student has englishIncluded: false
+      const anyMissingEnglish = res.data?.some(
+        (r: any) => r.englishIncluded === false,
+      );
+      if (anyMissingEnglish && res.gradingSystem === "POINTS") {
+        setEnglishMissingWarning(true);
+      }
     }
     setLoadingResults(false);
 
@@ -333,7 +353,7 @@ const ResultsPage = () => {
 
           <p className="text-xs text-gray-400 mb-4">
             {boundarySystem === "POINTS"
-              ? "Used for Form 3 & 4 — best 6 subjects summed, lower total wins."
+              ? "Used for Form 3 & 4 — best 6 subjects summed, English compulsory, lower total wins."
               : "Used for Form 1 & 2 — average mark maps to a letter grade."}
           </p>
 
@@ -554,6 +574,33 @@ const ResultsPage = () => {
             </div>
           )}
         </div>
+
+        {/* 🎯 English Warning Banner (appears if any student is missing English) */}
+        {englishMissingWarning && resultsGradingSystem === "POINTS" && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <AlertTriangle
+              className="text-amber-600 shrink-0 mt-0.5"
+              size={20}
+            />
+            <div className="flex-1">
+              <p className="font-medium text-amber-900 text-sm">
+                ⚠️ English not found in this upload
+              </p>
+              <p className="text-xs text-amber-700 mt-1">
+                English is compulsory for Form 3 & 4 rankings. The Best 6
+                calculation has fallen back to pure top-6 (without the English
+                requirement). Please re-upload with English marks to ensure
+                accurate MSCE-style rankings.
+              </p>
+            </div>
+            <button
+              onClick={() => setEnglishMissingWarning(false)}
+              className="text-amber-600 hover:text-amber-800"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {/* MAIN UPLOAD & VIEW SECTION */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -905,7 +952,7 @@ const ResultsPage = () => {
                 <span className="text-[10px] text-gray-400 italic">
                   {resultsGradingSystem === "LETTER"
                     ? "Ties broken by aggregate (lower is better)"
-                    : "Ties broken by equal points = shared rank"}
+                    : "English ⭐ compulsory in Best 6. Ties = shared rank"}
                 </span>
                 <span className="text-xs font-medium bg-gray-100 text-gray-600 px-2 py-1 rounded">
                   {resultsGradingSystem === "LETTER"
@@ -984,6 +1031,14 @@ const ResultsPage = () => {
                         ) : (
                           <td className="px-4 py-2 font-semibold text-[var(--color-primary)]">
                             {row.totalPoints}
+                            {row.englishIncluded === false && (
+                              <span
+                                className="ml-1 text-[10px] text-amber-600"
+                                title="English was not included (missing from upload)"
+                              >
+                                ⚠️
+                              </span>
+                            )}
                             <span className="ml-2 text-xs text-gray-400">
                               {expandedStudent === row.studentId ? "▲" : "▼"}
                             </span>
@@ -1000,18 +1055,39 @@ const ResultsPage = () => {
                               {row.subjects.map((s: any, i: number) => (
                                 <div
                                   key={i}
-                                  className="flex items-center justify-between bg-white border border-gray-100 rounded-lg px-3 py-2 text-xs"
+                                  className={`flex items-center justify-between border rounded-lg px-3 py-2 text-xs ${
+                                    s.isEnglish
+                                      ? "bg-purple-50 border-purple-200"
+                                      : s.countedInTotal === false
+                                        ? "bg-gray-100 border-gray-200 opacity-60"
+                                        : "bg-white border-gray-100"
+                                  }`}
                                 >
-                                  <span className="text-gray-600">
+                                  <span
+                                    className={`flex items-center gap-1 ${s.isEnglish ? "font-semibold text-purple-800" : "text-gray-600"}`}
+                                  >
+                                    {s.isEnglish && (
+                                      <Star
+                                        size={10}
+                                        className="text-purple-600 fill-purple-600"
+                                      />
+                                    )}
                                     {s.subject}
                                   </span>
-                                  <span className="font-medium text-gray-800">
+                                  <span
+                                    className={`font-medium ${s.isEnglish ? "text-purple-800" : "text-gray-800"}`}
+                                  >
                                     {s.mark}%{" "}
                                     <span className="text-gray-400">
                                       {resultsGradingSystem === "LETTER"
                                         ? `(${s.gradeLabel})`
                                         : `(Pt ${s.gradePoint})`}
                                     </span>
+                                    {s.countedInTotal === false && (
+                                      <span className="ml-1 text-[9px] text-gray-400">
+                                        not counted
+                                      </span>
+                                    )}
                                   </span>
                                 </div>
                               ))}
