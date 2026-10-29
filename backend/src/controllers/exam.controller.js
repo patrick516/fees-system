@@ -4,8 +4,9 @@ const { uploadToCloudinary } = require("../lib/cloudinary");
 
 // Look up the grade (point and/or label) for a given percentage mark
 const resolveGrade = (mark, boundaries) => {
+  //  Add +0.99 to the maxPercent to handle decimals (e.g., 69.9%)
   const match = boundaries.find(
-    (b) => mark >= b.minPercent && mark <= b.maxPercent,
+    (b) => mark >= b.minPercent && mark <= b.maxPercent + 0.99,
   );
   return {
     gradePoint: match ? match.gradePoint : null,
