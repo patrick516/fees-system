@@ -2,6 +2,7 @@ const prisma = require("../config/db");
 const {
   getDaysRemaining,
   getEffectiveEndDate,
+  computeAutoStatus,
   computeExtendedEnd,
   DEFAULT_TERM_DAYS,
 } = require("../lib/subscription");
@@ -35,7 +36,24 @@ const listSubscriptions = async (req, res) => {
       },
     });
 
-    const data = schools.map(({ _count, ...s }) => ({
+    // 🎯 Sync the subscriptionStatus field to match reality (dates)
+    const syncedSchools = await Promise.all(
+      schools.map(async (s) => {
+        const autoStatus = s.isActive ? computeAutoStatus(s) : "SUSPENDED";
+        if (autoStatus !== s.subscriptionStatus) {
+          await prisma.school
+            .update({
+              where: { id: s.id },
+              data: { subscriptionStatus: autoStatus },
+            })
+            .catch(() => {});
+          return { ...s, subscriptionStatus: autoStatus };
+        }
+        return s;
+      }),
+    );
+
+    const data = syncedSchools.map(({ _count, ...s }) => ({
       ...s,
       studentCount: _count.students,
       daysRemaining: getDaysRemaining(s),
@@ -64,8 +82,6 @@ const listSubscriptions = async (req, res) => {
   }
 };
 
-// ==================== MARK PAID MANUALLY (owner) ====================
-// POST /api/platform/subscriptions/:schoolId/mark-paid
 // Body: { term, academicYear, amount?, daysToAdd?, notes? }
 const markPaid = async (req, res) => {
   try {
@@ -174,30 +190,43 @@ const extendTrial = async (req, res) => {
         .json({ success: false, message: "School not found" });
     }
 
-    // Allow positive or negative numbers. If not a number, default to 0.
     const n = Number(days) || 0;
 
-    // Base date: if trial is in the future, add/subtract from there.
-    // Otherwise, start from today.
-    const base =
-      school.trialEndsAt && new Date(school.trialEndsAt) > new Date()
-        ? new Date(school.trialEndsAt)
-        : new Date();
+    // 🎯 Base date: extend from the latest future date, or from today
+    const subEnd = school.subscriptionEndsAt
+      ? new Date(school.subscriptionEndsAt)
+      : null;
+    const trialEnd = school.trialEndsAt ? new Date(school.trialEndsAt) : null;
+
+    let base = new Date();
+    if (subEnd && subEnd > base) base = subEnd;
+    else if (trialEnd && trialEnd > base) base = trialEnd;
 
     const newTrialEnd = new Date(base.getTime() + n * 24 * 60 * 60 * 1000);
+
+    // 🎯 Recompute what the effective status should be after adjustment
+    const updatedPreview = {
+      trialEndsAt: newTrialEnd,
+      subscriptionEndsAt: school.subscriptionEndsAt,
+      isActive: school.isActive,
+    };
+    const newStatus = computeAutoStatus(updatedPreview);
 
     await prisma.school.update({
       where: { id: school.id },
       data: {
         trialEndsAt: newTrialEnd,
-        subscriptionStatus: "TRIAL", // Reset to trial if they were in grace/locked
+        subscriptionStatus: newStatus,
       },
     });
 
     return res.json({
       success: true,
       message: `Trial adjusted by ${n} days`,
-      data: { trialEndsAt: newTrialEnd },
+      data: {
+        trialEndsAt: newTrialEnd,
+        subscriptionStatus: newStatus,
+      },
     });
   } catch (err) {
     console.error("extendTrial error:", err);

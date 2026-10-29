@@ -9,8 +9,10 @@ import {
   Clock,
   AlertTriangle,
   DollarSign,
+  Info,
 } from "lucide-react";
 import platformApi from "../../lib/platformApi";
+import { toast } from "../../lib/toast";
 
 interface SubSchool {
   id: string;
@@ -50,6 +52,15 @@ const statusColor: Record<string, string> = {
   SUSPENDED: "bg-red-100 text-red-700",
 };
 
+const formatDate = (iso: string | null) => {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+};
+
 export default function PlatformSubscriptions() {
   const [schools, setSchools] = useState<SubSchool[]>([]);
   const [defaults, setDefaults] = useState<Defaults | null>(null);
@@ -71,8 +82,9 @@ export default function PlatformSubscriptions() {
   const [payNotes, setPayNotes] = useState("");
   const [paySubmitting, setPaySubmitting] = useState(false);
 
+  //  Adjust Trial Modal state
   const [extending, setExtending] = useState<SubSchool | null>(null);
-  const [extendDays, setExtendDays] = useState(30);
+  const [extendDays, setExtendDays] = useState<number | "">("");
   const [extendSubmitting, setExtendSubmitting] = useState(false);
 
   const load = async () => {
@@ -113,10 +125,11 @@ export default function PlatformSubscriptions() {
         amount: payAmount,
         notes: payNotes || undefined,
       });
+      toast.success(`${paying.name} marked as paid`);
       setPaying(null);
       load();
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to mark as paid");
+      toast.error(err?.response?.data?.message || "Failed to mark as paid");
     } finally {
       setPaySubmitting(false);
     }
@@ -124,24 +137,43 @@ export default function PlatformSubscriptions() {
 
   const openExtendModal = (s: SubSchool) => {
     setExtending(s);
-    setExtendDays(defaults?.defaultTrialDays || 30);
+    setExtendDays(""); // 🎯 Start empty, not 30
   };
 
   const submitExtendTrial = async () => {
     if (!extending) return;
+    if (extendDays === "" || extendDays === 0) {
+      toast.error("Enter a number of days to add or reduce");
+      return;
+    }
     setExtendSubmitting(true);
     try {
       await platformApi.post(
         `/platform/subscriptions/${extending.id}/extend-trial`,
-        { days: extendDays },
+        { days: Number(extendDays) },
+      );
+      toast.success(
+        `Trial adjusted by ${extendDays > 0 ? "+" : ""}${extendDays} days`,
       );
       setExtending(null);
       load();
     } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to extend trial");
+      toast.error(err?.response?.data?.message || "Failed to extend trial");
     } finally {
       setExtendSubmitting(false);
     }
+  };
+
+  // 🎯 Compute preview of new end date as the user types
+  const previewEndDate = (s: SubSchool, days: number | "") => {
+    if (days === "" || days === 0) return null;
+    const base =
+      s.effectiveEndDate && new Date(s.effectiveEndDate) > new Date()
+        ? new Date(s.effectiveEndDate)
+        : new Date();
+    const n = Number(days);
+    const newEnd = new Date(base.getTime() + n * 24 * 60 * 60 * 1000);
+    return newEnd;
   };
 
   // ==================== FILTERING & STATS ====================
@@ -149,19 +181,15 @@ export default function PlatformSubscriptions() {
     const matchesSearch =
       s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (s.email && s.email.toLowerCase().includes(searchQuery.toLowerCase()));
-
     if (!matchesSearch) return false;
-
     if (filterStatus === "ALL") return true;
     if (filterStatus === "ACTIVE") return s.subscriptionStatus === "ACTIVE";
     if (filterStatus === "TRIAL") return s.subscriptionStatus === "TRIAL";
     if (filterStatus === "AT_RISK")
       return ["GRACE", "READONLY", "LOCKED"].includes(s.subscriptionStatus);
-
     return true;
   });
 
-  // Pagination Logic
   const totalPages = Math.ceil(filteredSchools.length / ITEMS_PER_PAGE);
   const paginatedSchools = filteredSchools.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
@@ -178,7 +206,6 @@ export default function PlatformSubscriptions() {
     ["GRACE", "READONLY", "LOCKED"].includes(s.subscriptionStatus),
   ).length;
 
-  // Calculate Expected Revenue based on active schools
   const expectedRevenue = schools
     .filter((s) => s.subscriptionStatus === "ACTIVE")
     .reduce((sum, s) => sum + (s.termPrice || 0), 0);
@@ -208,7 +235,7 @@ export default function PlatformSubscriptions() {
         </div>
       )}
 
-      {/* ==================== 1. STATS CARDS ==================== */}
+      {/* STATS */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4">
           <div className="w-10 h-10 rounded-lg bg-green-50 flex items-center justify-center shrink-0">
@@ -221,7 +248,6 @@ export default function PlatformSubscriptions() {
             <p className="text-xl font-bold text-slate-900">{activeCount}</p>
           </div>
         </div>
-
         <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4">
           <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center shrink-0">
             <Clock className="text-blue-600" size={20} />
@@ -233,7 +259,6 @@ export default function PlatformSubscriptions() {
             <p className="text-xl font-bold text-slate-900">{trialCount}</p>
           </div>
         </div>
-
         <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4">
           <div className="w-10 h-10 rounded-lg bg-red-50 flex items-center justify-center shrink-0">
             <AlertTriangle className="text-red-600" size={20} />
@@ -245,7 +270,6 @@ export default function PlatformSubscriptions() {
             <p className="text-xl font-bold text-slate-900">{atRiskCount}</p>
           </div>
         </div>
-
         <div className="bg-white rounded-xl border border-slate-200 p-5 flex items-center gap-4">
           <div className="w-10 h-10 rounded-lg bg-emerald-50 flex items-center justify-center shrink-0">
             <DollarSign className="text-emerald-600" size={20} />
@@ -261,7 +285,7 @@ export default function PlatformSubscriptions() {
         </div>
       </div>
 
-      {/* ==================== 2. TOOLBAR ==================== */}
+      {/* TOOLBAR */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mb-6">
         <div className="relative w-full sm:w-80">
           <Search
@@ -279,7 +303,6 @@ export default function PlatformSubscriptions() {
             className="w-full pl-9 pr-4 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
           />
         </div>
-
         <div className="flex items-center gap-2 bg-slate-100 p-1 rounded-lg">
           {[
             { id: "ALL", label: "All" },
@@ -305,7 +328,7 @@ export default function PlatformSubscriptions() {
         </div>
       </div>
 
-      {/* ==================== 3. DATA TABLE ==================== */}
+      {/* TABLE */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -340,8 +363,6 @@ export default function PlatformSubscriptions() {
                     0,
                     Math.min(100, (days / totalDays) * 100),
                   );
-
-                  // Progress Bar Color Logic
                   let barColor = "bg-green-500";
                   if (days <= 7) barColor = "bg-red-500";
                   else if (days <= 14) barColor = "bg-orange-500";
@@ -368,21 +389,12 @@ export default function PlatformSubscriptions() {
                         >
                           {s.subscriptionStatus}
                         </span>
-                        {!s.isActive && (
-                          <span className="ml-2 text-[10px] font-bold px-2 py-1 rounded-full bg-red-100 text-red-700">
-                            SUSPENDED
-                          </span>
-                        )}
                       </td>
                       <td className="px-5 py-4">
                         <div className="w-full max-w-[160px]">
                           <div className="flex justify-between text-[11px] mb-1">
                             <span className="text-slate-500">
-                              {s.effectiveEndDate
-                                ? new Date(
-                                    s.effectiveEndDate,
-                                  ).toLocaleDateString()
-                                : "—"}
+                              {formatDate(s.effectiveEndDate)}
                             </span>
                             <span className="font-semibold text-slate-700">
                               {days} days
@@ -392,7 +404,7 @@ export default function PlatformSubscriptions() {
                             <div
                               className={`h-1.5 rounded-full ${barColor}`}
                               style={{ width: `${percentageLeft}%` }}
-                            ></div>
+                            />
                           </div>
                         </div>
                       </td>
@@ -411,7 +423,7 @@ export default function PlatformSubscriptions() {
                             onClick={() => openExtendModal(s)}
                             className="text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 rounded px-2.5 py-1.5 transition bg-white"
                           >
-                            Extend Trial
+                            Adjust Trial
                           </button>
                           <button
                             onClick={() => openPayModal(s)}
@@ -429,7 +441,6 @@ export default function PlatformSubscriptions() {
           </table>
         </div>
 
-        {/* Pagination Footer */}
         {totalPages > 1 && (
           <div className="flex items-center justify-between px-5 py-3 border-t border-slate-200 bg-slate-50">
             <span className="text-xs text-slate-500">
@@ -471,8 +482,14 @@ export default function PlatformSubscriptions() {
 
       {/* ==================== MARK-PAID MODAL ==================== */}
       {paying && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
-          <div className="bg-white rounded-xl w-full max-w-md p-6">
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4"
+          onClick={() => !paySubmitting && setPaying(null)}
+        >
+          <div
+            className="bg-white rounded-xl w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 className="text-lg font-semibold text-slate-900 mb-1">
               Mark as Paid
             </h3>
@@ -564,51 +581,143 @@ export default function PlatformSubscriptions() {
         </div>
       )}
 
-      {/* ==================== EXTEND-TRIAL MODAL ==================== */}
-      {extending && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4">
-          <div className="bg-white rounded-xl w-full max-w-sm p-6">
-            <h3 className="text-lg font-semibold text-slate-900 mb-1">
-              Adjust Trial
-            </h3>
-            <p className="text-xs text-slate-500 mb-4">{extending.name}</p>
-
-            <div>
-              <label className="block text-xs font-medium text-slate-700 mb-1">
-                Adjust Trial Days
-              </label>
-              <input
-                type="number"
-                step={1}
-                value={extendDays}
-                onChange={(e) => setExtendDays(Number(e.target.value))}
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
-              />
-              <p className="text-[11px] text-slate-500 mt-1">
-                Use a positive number to extend, or a negative number (e.g.{" "}
-                <strong>-10</strong>) to reduce days.
-              </p>
-            </div>
-
-            <div className="flex items-center justify-end gap-2 mt-5">
-              <button
-                onClick={() => setExtending(null)}
-                disabled={extendSubmitting}
-                className="rounded-lg border border-slate-300 hover:bg-slate-50 text-sm font-medium px-4 py-2"
+      {/* ==================== ADJUST TRIAL MODAL ==================== */}
+      {extending &&
+        (() => {
+          const preview = previewEndDate(extending, extendDays);
+          const currentDays = extending.daysRemaining ?? 0;
+          return (
+            <div
+              className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4"
+              onClick={() => !extendSubmitting && setExtending(null)}
+            >
+              <div
+                className="bg-white rounded-xl w-full max-w-md p-6"
+                onClick={(e) => e.stopPropagation()}
               >
-                Cancel
-              </button>
-              <button
-                onClick={submitExtendTrial}
-                disabled={extendSubmitting}
-                className="rounded-lg bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2"
-              >
-                {extendSubmitting ? "Saving..." : "Adjust Trial"}
-              </button>
+                <h3 className="text-lg font-semibold text-slate-900 mb-1">
+                  Adjust Trial
+                </h3>
+                <p className="text-xs text-slate-500 mb-4">{extending.name}</p>
+
+                {/* 🎯 Current state */}
+                <div className="bg-slate-50 border border-slate-200 rounded-lg px-3 py-2.5 mb-4 space-y-1">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Current status</span>
+                    <span className="font-semibold text-slate-800">
+                      {extending.subscriptionStatus}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Trial ends</span>
+                    <span className="font-semibold text-slate-800">
+                      {formatDate(extending.trialEndsAt)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Days remaining</span>
+                    <span
+                      className={`font-semibold ${currentDays <= 0 ? "text-red-600" : currentDays <= 7 ? "text-amber-600" : "text-green-600"}`}
+                    >
+                      {currentDays <= 0 ? "Expired" : `${currentDays} days`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 🎯 Input + quick presets */}
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Adjust by (days)
+                </label>
+                <input
+                  type="number"
+                  value={extendDays}
+                  onChange={(e) =>
+                    setExtendDays(
+                      e.target.value === "" ? "" : Number(e.target.value),
+                    )
+                  }
+                  placeholder="e.g. 30"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 mb-2"
+                />
+                <div className="flex flex-wrap gap-1.5 mb-3">
+                  {[7, 14, 30, 60, 90].map((d) => (
+                    <button
+                      key={d}
+                      onClick={() => setExtendDays(d)}
+                      className="text-[11px] font-medium px-2 py-1 rounded-md border border-slate-200 text-slate-600 hover:bg-slate-50"
+                    >
+                      +{d}d
+                    </button>
+                  ))}
+                  {[7, 14, 30].map((d) => (
+                    <button
+                      key={`neg-${d}`}
+                      onClick={() => setExtendDays(-d)}
+                      className="text-[11px] font-medium px-2 py-1 rounded-md border border-red-200 text-red-600 hover:bg-red-50"
+                    >
+                      -{d}d
+                    </button>
+                  ))}
+                </div>
+
+                {/* 🎯 Preview */}
+                {preview && (
+                  <div className="flex items-start gap-2 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 mb-3">
+                    <Info size={14} className="text-blue-600 shrink-0 mt-0.5" />
+                    <div className="text-[11px] text-blue-800 leading-relaxed">
+                      New trial end:{" "}
+                      <strong>
+                        {preview.toLocaleDateString("en-GB", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </strong>
+                      <br />
+                      That's{" "}
+                      <strong>
+                        {Math.max(
+                          0,
+                          Math.round(
+                            (preview.getTime() - Date.now()) /
+                              (1000 * 60 * 60 * 24),
+                          ),
+                        )}{" "}
+                        days
+                      </strong>{" "}
+                      from today.
+                    </div>
+                  </div>
+                )}
+
+                <p className="text-[10px] text-slate-500 leading-relaxed">
+                  Use a positive number to extend, or a negative number to
+                  reduce days. If the trial already expired, the new date is
+                  calculated from today.
+                </p>
+
+                <div className="flex items-center justify-end gap-2 mt-5">
+                  <button
+                    onClick={() => setExtending(null)}
+                    disabled={extendSubmitting}
+                    className="rounded-lg border border-slate-300 hover:bg-slate-50 text-sm font-medium px-4 py-2"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={submitExtendTrial}
+                    disabled={
+                      extendSubmitting || extendDays === "" || extendDays === 0
+                    }
+                    className="rounded-lg bg-blue-700 hover:bg-blue-800 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2"
+                  >
+                    {extendSubmitting ? "Saving..." : "Adjust Trial"}
+                  </button>
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
-      )}
+          );
+        })()}
     </div>
   );
 }
