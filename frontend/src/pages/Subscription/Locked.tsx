@@ -236,7 +236,7 @@ export default function SubscriptionLocked() {
                     Select <strong>Pay Bills</strong>
                   </li>
                   <li>
-                    Select <strong>OneKhusa</strong> (or Malipo)
+                    Select <strong>OneKhusa</strong>
                   </li>
                   <li>
                     Enter account number:{" "}
