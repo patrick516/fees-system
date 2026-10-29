@@ -599,6 +599,83 @@ const resendInvite = async (req, res) => {
   }
 };
 
+// ==================== SEND PASSWORD RESET ====================
+// POST /api/platform/schools/:id/reset-password
+const sendPasswordReset = async (req, res) => {
+  try {
+    const crypto = require("crypto");
+    const { sendPasswordResetEmail } = require("../lib/mailer");
+
+    const school = await prisma.school.findFirst({
+      where: { id: req.params.id, platformId: req.platformId },
+      include: {
+        staff: {
+          where: { role: { name: "School Admin" } },
+          take: 1,
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!school) {
+      return res
+        .status(404)
+        .json({ success: false, message: "School not found" });
+    }
+
+    const admin = school.staff[0];
+    if (!admin) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No admin found for this school" });
+    }
+
+    if (!admin.lastLogin) {
+      return res.status(400).json({
+        success: false,
+        message: "Admin has never logged in. Use 'Resend Invitation' instead.",
+      });
+    }
+
+    // Generate a fresh reset token (30 minutes validity)
+    const resetToken = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+    await prisma.staff.update({
+      where: { id: admin.id },
+      data: {
+        passwordResetToken: resetToken,
+        passwordResetExpires: expiresAt,
+      },
+    });
+
+    const emailRes = await sendPasswordResetEmail({
+      to: admin.email,
+      name: admin.fullName || admin.firstName || "there",
+      resetToken,
+      expiresInMinutes: 30,
+    });
+
+    if (emailRes?.success === false) {
+      return res.status(200).json({
+        success: true,
+        message: "Reset link generated, but email failed to send.",
+        warning: "EMAIL_FAILED",
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: `Password reset link sent to ${admin.email}`,
+    });
+  } catch (err) {
+    console.error("sendPasswordReset error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to send reset link" });
+  }
+};
+
 module.exports = {
   listSchools,
   inviteSchool,
@@ -609,4 +686,5 @@ module.exports = {
   unlockSettlement,
   deleteSchool,
   resendInvite,
+  sendPasswordReset,
 };

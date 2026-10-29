@@ -15,6 +15,7 @@ import {
   Mail,
   Trash2,
   Loader2,
+  KeyRound,
 } from "lucide-react";
 import platformApi from "../../lib/platformApi";
 import type { PlatformSchool } from "../../types/platform";
@@ -31,10 +32,10 @@ function Tooltip({
   return (
     <div className="relative group/tip flex items-center">
       {children}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-slate-800 text-white text-[11px] font-medium rounded-md whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-opacity duration-150 pointer-events-none z-20 shadow-lg">
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2.5 py-1.5 bg-white text-slate-700 text-[11px] font-semibold rounded-md whitespace-nowrap opacity-0 group-hover/tip:opacity-100 transition-all duration-150 pointer-events-none z-20 shadow-md border border-slate-200">
         {label}
         {/* Small arrow */}
-        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+        <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-white" />
       </div>
     </div>
   );
@@ -125,6 +126,27 @@ export default function PlatformDashboard() {
       setToast({
         kind: "error",
         text: err?.response?.data?.message || "Failed to resend invite",
+      });
+    } finally {
+      setResendingId(null);
+    }
+  };
+
+  const handleReset = async (s: PlatformSchool) => {
+    setResendingId(s.id);
+    try {
+      const res = await platformApi.post(
+        `/platform/schools/${s.id}/reset-password`,
+      );
+      setToast({
+        kind: res.data.warning === "EMAIL_FAILED" ? "error" : "success",
+        text: res.data.message,
+      });
+      load();
+    } catch (err: any) {
+      setToast({
+        kind: "error",
+        text: err?.response?.data?.message || "Failed to send reset link",
       });
     } finally {
       setResendingId(null);
@@ -421,7 +443,7 @@ export default function PlatformDashboard() {
                     >
                       {/* Hover action buttons */}
                       <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                        {invitePending && (
+                        {invitePending ? (
                           <Tooltip label="Resend invitation email">
                             <button
                               onClick={() => handleResend(s)}
@@ -432,6 +454,20 @@ export default function PlatformDashboard() {
                                 <Loader2 size={12} className="animate-spin" />
                               ) : (
                                 <Mail size={12} />
+                              )}
+                            </button>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip label="Send password reset link">
+                            <button
+                              onClick={() => handleReset(s)}
+                              disabled={resendingId === s.id}
+                              className="p-1.5 bg-white border border-slate-200 rounded-lg text-green-600 hover:bg-green-50 hover:border-green-300 shadow-sm disabled:opacity-50 transition-colors"
+                            >
+                              {resendingId === s.id ? (
+                                <Loader2 size={12} className="animate-spin" />
+                              ) : (
+                                <KeyRound size={12} />
                               )}
                             </button>
                           </Tooltip>
