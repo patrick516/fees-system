@@ -953,7 +953,7 @@ const updateClassGradingSystem = async (req, res) => {
   }
 };
 // GET /api/exams/uploads-summary?examPeriodId=
-// GET /api/exams/uploads-summary?examPeriodId=
+
 const getUploadSummary = async (req, res) => {
   try {
     const { examPeriodId } = req.query;
@@ -970,7 +970,7 @@ const getUploadSummary = async (req, res) => {
 
     const summary = [];
     for (const cls of classes) {
-      // 🎯 FIX: Count unique students, not subject rows
+      // 🎯 Count UNIQUE students (not subject rows)
       const uniqueStudents = await prisma.examResult.findMany({
         where: {
           examPeriodId,
@@ -982,12 +982,31 @@ const getUploadSummary = async (req, res) => {
       });
       const count = uniqueStudents.length;
 
-      // AUTO-ENFORCE: Form 1 & 2 = LETTER, Form 3 & 4 = POINTS
+      // 🎯 Get the latest upload timestamp for this class + period
+      let lastUploadedAt = null;
+      let sourceFileUrl = null;
+      if (count > 0) {
+        const latestLog = await prisma.auditLog.findFirst({
+          where: {
+            schoolId: req.schoolId,
+            action: "EXAM_RESULTS_UPLOADED",
+            entityId: examPeriodId,
+            changes: { path: ["classId"], equals: cls.id },
+          },
+          orderBy: { createdAt: "desc" },
+          select: { createdAt: true, changes: true },
+        });
+        if (latestLog) {
+          lastUploadedAt = latestLog.createdAt;
+          sourceFileUrl = latestLog.changes?.sourceFileUrl || null;
+        }
+      }
+
+      // AUTO-ENFORCE grading system
       const isLowerForm =
         cls.level <= 2 ||
         cls.name.toLowerCase().includes("form 1") ||
         cls.name.toLowerCase().includes("form 2");
-
       const requiredGrading = isLowerForm ? "LETTER" : "POINTS";
 
       if (cls.gradingSystem !== requiredGrading) {
@@ -1003,6 +1022,8 @@ const getUploadSummary = async (req, res) => {
         gradingSystem: requiredGrading,
         hasResults: count > 0,
         studentsUploaded: count,
+        lastUploadedAt,
+        sourceFileUrl,
       });
     }
 
@@ -1012,7 +1033,6 @@ const getUploadSummary = async (req, res) => {
     res.status(500).json({ success: false, message: "Failed to get summary" });
   }
 };
-
 module.exports = {
   createExamPeriod,
   listExamPeriods,

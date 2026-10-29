@@ -68,6 +68,8 @@ const ResultsPage = () => {
     () => localStorage.getItem("results_selectedPeriod") || "",
   );
 
+  const [reuploadMode, setReuploadMode] = useState(false);
+
   // Summary of all classes for selected period
   const [uploadSummary, setUploadSummary] = useState<any[]>([]);
   const [loadingSummary, setLoadingSummary] = useState(false);
@@ -136,6 +138,7 @@ const ResultsPage = () => {
       await loadBoundaries("POINTS");
       await loadBoundaries("LETTER");
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // When period changes, fetch the summary of uploads
@@ -199,7 +202,8 @@ const ResultsPage = () => {
     setMessage(res.message || (res.success ? "Uploaded" : "Upload failed"));
 
     if (res.success) {
-      setFile(null); // Clear file input
+      setFile(null);
+      setReuploadMode(false);
       handleViewClass(selectedClass); // Refresh rankings
       loadPendingRows(selectedClass); // Refresh pending
 
@@ -238,6 +242,7 @@ const ResultsPage = () => {
 
   const handleViewClass = async (classId: string) => {
     setSelectedClass(classId);
+    setReuploadMode(false); // Reset re-upload mode when switching classes
     setLoadingResults(true);
     setExpandedStudent(null);
 
@@ -550,7 +555,7 @@ const ResultsPage = () => {
           )}
         </div>
 
-        {/* 🎯 MAIN UPLOAD & VIEW SECTION */}
+        {/* MAIN UPLOAD & VIEW SECTION */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-medium text-gray-800">
@@ -618,7 +623,7 @@ const ResultsPage = () => {
                             : "border-gray-200 hover:border-gray-300 hover:bg-gray-50"
                         }`}
                       >
-                        <div>
+                        <div className="min-w-0">
                           <p className="font-medium text-gray-800 text-sm">
                             {sum.className}
                           </p>
@@ -627,8 +632,23 @@ const ResultsPage = () => {
                               ? `✅ ${sum.studentsUploaded} students uploaded`
                               : "❌ Not uploaded"}
                           </p>
+                          {sum.hasResults && sum.lastUploadedAt && (
+                            <p className="text-[10px] text-gray-400 mt-1">
+                              📅{" "}
+                              {new Date(sum.lastUploadedAt).toLocaleString(
+                                "en-GB",
+                                {
+                                  day: "2-digit",
+                                  month: "short",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
+                            </p>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                           <span className="text-[10px] font-bold px-2 py-1 rounded bg-white border border-gray-200 text-gray-600">
                             {sum.gradingSystem === "LETTER"
                               ? "Letters"
@@ -662,45 +682,141 @@ const ResultsPage = () => {
                   </div>
                 ) : selectedClass ? (
                   <div className="space-y-4">
-                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                      <h4 className="font-medium text-gray-800 text-sm mb-1">
-                        {selectedClassObj?.name} — Upload Results
-                      </h4>
-                      <p className="text-xs text-gray-500 mb-3">
-                        Grading System:{" "}
-                        <strong>
-                          {selectedClassObj?.gradingSystem === "LETTER"
-                            ? "Letter Grades (A-F)"
-                            : "Points (1-9)"}
-                        </strong>{" "}
-                        (Locked)
-                      </p>
+                    {/* Upload form OR "Already uploaded" card */}
+                    {(() => {
+                      const currentSummary = uploadSummary.find(
+                        (s) => s.classId === selectedClass,
+                      );
+                      const alreadyUploaded =
+                        currentSummary?.hasResults === true;
 
-                      <input
-                        type="file"
-                        accept=".xlsx,.xls,.csv"
-                        onChange={(e) => setFile(e.target.files?.[0] || null)}
-                        className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[var(--color-primary-light)] file:text-[var(--color-primary-dark)] hover:file:bg-[var(--color-primary-light)]/80 mb-3"
-                      />
+                      // Show the "already uploaded" card
+                      if (alreadyUploaded && !reuploadMode) {
+                        return (
+                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                            <div className="flex items-start gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
+                                <Check className="text-green-600" size={20} />
+                              </div>
+                              <div className="flex-1">
+                                <h4 className="font-medium text-green-900 text-sm">
+                                  Results Already Uploaded
+                                </h4>
+                                <p className="text-xs text-green-700 mt-1">
+                                  {currentSummary.studentsUploaded} student
+                                  {currentSummary.studentsUploaded === 1
+                                    ? ""
+                                    : "s"}{" "}
+                                  processed for this class.
+                                </p>
+                                {currentSummary.lastUploadedAt && (
+                                  <p className="text-[11px] text-green-600 mt-2">
+                                    📅 Last uploaded:{" "}
+                                    {new Date(
+                                      currentSummary.lastUploadedAt,
+                                    ).toLocaleString()}
+                                  </p>
+                                )}
+                                {currentSummary.sourceFileUrl && (
+                                  <a
+                                    href={currentSummary.sourceFileUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 text-[11px] text-green-700 underline mt-1"
+                                  >
+                                    📄 View uploaded source file
+                                  </a>
+                                )}
+                              </div>
+                            </div>
 
-                      <button
-                        onClick={handleUpload}
-                        disabled={uploading || !file}
-                        className="flex items-center justify-center gap-2 w-full bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
-                      >
-                        {uploading ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : (
-                          <Upload size={14} />
-                        )}
-                        {uploading ? "Uploading..." : "Upload Sheet"}
-                      </button>
-                      {message && (
-                        <p className="text-xs text-center mt-2 text-gray-600">
-                          {message}
-                        </p>
-                      )}
-                    </div>
+                            <div className="mt-4 pt-3 border-t border-green-200 flex items-center justify-between">
+                              <p className="text-[11px] text-green-700">
+                                Re-uploading will overwrite existing results.
+                              </p>
+                              <button
+                                onClick={() => {
+                                  if (
+                                    window.confirm(
+                                      `Are you sure you want to re-upload results for ${selectedClassObj?.name}? This will overwrite ${currentSummary.studentsUploaded} existing record(s).`,
+                                    )
+                                  ) {
+                                    setReuploadMode(true);
+                                  }
+                                }}
+                                className="text-xs font-semibold text-red-600 hover:text-red-800 px-3 py-1.5 rounded-lg border border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors"
+                              >
+                                🔄 Re-upload (overwrites)
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Show the upload form
+                      return (
+                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                          {alreadyUploaded && (
+                            <div className="flex items-center gap-2 mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                              <AlertTriangle
+                                size={14}
+                                className="text-amber-600 shrink-0"
+                              />
+                              <p className="text-[11px] text-amber-800">
+                                ⚠️ Re-upload mode — existing results will be
+                                overwritten.
+                              </p>
+                              <button
+                                onClick={() => setReuploadMode(false)}
+                                className="ml-auto text-[11px] text-amber-700 hover:text-amber-900 underline"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          )}
+
+                          <h4 className="font-medium text-gray-800 text-sm mb-1">
+                            {selectedClassObj?.name} — Upload Results
+                          </h4>
+                          <p className="text-xs text-gray-500 mb-3">
+                            Grading System:{" "}
+                            <strong>
+                              {selectedClassObj?.gradingSystem === "LETTER"
+                                ? "Letter Grades (A-F)"
+                                : "Points (1-9)"}
+                            </strong>{" "}
+                            (Locked)
+                          </p>
+
+                          <input
+                            type="file"
+                            accept=".xlsx,.xls,.csv"
+                            onChange={(e) =>
+                              setFile(e.target.files?.[0] || null)
+                            }
+                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[var(--color-primary-light)] file:text-[var(--color-primary-dark)] hover:file:bg-[var(--color-primary-light)]/80 mb-3"
+                          />
+
+                          <button
+                            onClick={handleUpload}
+                            disabled={uploading || !file}
+                            className="flex items-center justify-center gap-2 w-full bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
+                          >
+                            {uploading ? (
+                              <Loader2 size={14} className="animate-spin" />
+                            ) : (
+                              <Upload size={14} />
+                            )}
+                            {uploading ? "Uploading..." : "Upload Sheet"}
+                          </button>
+                          {message && (
+                            <p className="text-xs text-center mt-2 text-gray-600">
+                              {message}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
 
                     {/* Pending Name Matches */}
                     {pendingRows.length > 0 && (
@@ -778,7 +894,7 @@ const ResultsPage = () => {
           )}
         </div>
 
-        {/* Class Rankings (Only shows if a class is selected and has results) */}
+        {/* Class Rankings */}
         {selectedClass && classResults.length > 0 && (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 overflow-x-auto">
             <div className="flex items-center justify-between mb-4">
