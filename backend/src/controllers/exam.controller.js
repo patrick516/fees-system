@@ -223,6 +223,17 @@ const uploadResults = async (req, res) => {
       });
     }
 
+    //  Verify the exam period exists in the database before proceeding
+    const examPeriod = await prisma.examPeriod.findFirst({
+      where: { id: examPeriodId, schoolId: req.schoolId },
+    });
+    if (!examPeriod) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "The selected exam period was not found. Please refresh the page and select a valid exam period.",
+      });
+    }
     const cls = await prisma.class.findFirst({
       where: { id: classId, schoolId: req.schoolId },
     });
@@ -942,6 +953,7 @@ const updateClassGradingSystem = async (req, res) => {
   }
 };
 // GET /api/exams/uploads-summary?examPeriodId=
+// GET /api/exams/uploads-summary?examPeriodId=
 const getUploadSummary = async (req, res) => {
   try {
     const { examPeriodId } = req.query;
@@ -958,16 +970,19 @@ const getUploadSummary = async (req, res) => {
 
     const summary = [];
     for (const cls of classes) {
-      // Count how many students have results for this class in this period
-      const count = await prisma.examResult.count({
+      // 🎯 FIX: Count unique students, not subject rows
+      const uniqueStudents = await prisma.examResult.findMany({
         where: {
           examPeriodId,
           schoolId: req.schoolId,
           student: { classId: cls.id },
         },
+        distinct: ["studentId"],
+        select: { studentId: true },
       });
+      const count = uniqueStudents.length;
 
-      //  AUTO-ENFORCE: Form 1 & 2 = LETTER, Form 3 & 4 = POINTS
+      // AUTO-ENFORCE: Form 1 & 2 = LETTER, Form 3 & 4 = POINTS
       const isLowerForm =
         cls.level <= 2 ||
         cls.name.toLowerCase().includes("form 1") ||
@@ -975,7 +990,6 @@ const getUploadSummary = async (req, res) => {
 
       const requiredGrading = isLowerForm ? "LETTER" : "POINTS";
 
-      // If the DB has the wrong grading system, silently fix it
       if (cls.gradingSystem !== requiredGrading) {
         await prisma.class.update({
           where: { id: cls.id },
