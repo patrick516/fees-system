@@ -260,6 +260,7 @@ const sendPasswordResetEmail = async ({
   });
 };
 //  SUPPORT REPLY (Platform Owner → School Admin)
+//  SUPPORT REPLY (Platform Owner → School Admin)
 const sendSupportReplyEmail = async ({
   to,
   name,
@@ -267,7 +268,8 @@ const sendSupportReplyEmail = async ({
   subject,
   replyPreview,
 }) => {
-  const loginUrl = `${process.env.CLIENT_URL || "https://fees-system-one.vercel.app"}/platform/login`;
+  // 🎯 School admins log in at /login (not /platform/login)
+  const loginUrl = `${process.env.CLIENT_URL || "https://fees-system-one.vercel.app"}/login`;
   const preview =
     replyPreview.length > 200
       ? `${replyPreview.slice(0, 200)}...`
@@ -300,11 +302,11 @@ const sendSupportReplyEmail = async ({
         </div>
 
         <a href="${loginUrl}" style="display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;">
-          View Full Reply →
+          Log In to View Reply →
         </a>
 
         <p style="margin: 24px 0 0; color: #94a3b8; font-size: 11px; line-height: 1.5;">
-          Log in to your portal to read the full reply and respond.
+          Log in to your school dashboard, then open the <strong>Support</strong> tab to read the full reply and respond.
         </p>
       </div>
       <p style="text-align: center; color: #94a3b8; font-size: 11px; margin-top: 16px;">
