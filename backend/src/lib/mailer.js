@@ -12,17 +12,32 @@ const LOGO_HEADER = `
     <img src="https://fees-system-one.vercel.app/images/SchoolPayLogo.jpg" alt="SchoolPay" width="64" height="64" style="border-radius: 12px; object-fit: contain;" />
   </div>
 `;
-
-// 🎯 Helper to guess a name from an email if one wasn't provided
+//  Helper to guess a name from an email if one wasn't provided
 const guessNameFromEmail = (email) => {
   if (!email) return "there";
   let prefix = email.split("@")[0];
-  prefix = prefix.replace(/[0-9]/g, ""); // Remove numbers (e.g., patric123 -> patric)
-  prefix = prefix.split(/[._-]/)[0]; // Split by dots/underscores (e.g., patric.stone -> patric)
-  if (prefix.length > 0) {
-    return prefix.charAt(0).toUpperCase() + prefix.slice(1).toLowerCase();
+  prefix = prefix.replace(/[0-9]/g, "");
+  prefix = prefix.split(/[._-]/)[0];
+
+  if (prefix.trim().length > 0) {
+    const cleanName = prefix.trim();
+    return cleanName.charAt(0).toUpperCase() + cleanName.slice(1).toLowerCase();
   }
   return "there";
+};
+
+//  Add this new bulletproof helper right below it
+const resolveName = (providedName, email) => {
+  // If no name provided, or it's just spaces, or it says "undefined" or "there" (from a broken form)
+  if (
+    !providedName ||
+    providedName.trim() === "" ||
+    providedName.toLowerCase() === "undefined" ||
+    providedName.toLowerCase() === "there"
+  ) {
+    return guessNameFromEmail(email);
+  }
+  return providedName.trim();
 };
 
 const sendEmail = async ({ to, toName, subject, htmlContent }) => {
@@ -71,7 +86,7 @@ const sendOtpEmail = async ({
 
         <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">Verify your email</h2>
         <p style="margin: 0 0 20px; color: #64748b; font-size: 14px; line-height: 1.5;">
-          Hi ${name || guessNameFromEmail(to)}, use the code below to ${purpose}. It expires in 10 minutes.
+         Hi ${resolveName(name, to)}, use the code below to ${purpose}. It expires in 10 minutes.
         </p>
         <div style="background: #f1f5f9; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px;">
           <p style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #1e3a8a; font-family: 'Courier New', monospace;">
