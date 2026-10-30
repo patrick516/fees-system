@@ -13,6 +13,18 @@ const LOGO_HEADER = `
   </div>
 `;
 
+// 🎯 Helper to guess a name from an email if one wasn't provided
+const guessNameFromEmail = (email) => {
+  if (!email) return "there";
+  let prefix = email.split("@")[0];
+  prefix = prefix.replace(/[0-9]/g, ""); // Remove numbers (e.g., patric123 -> patric)
+  prefix = prefix.split(/[._-]/)[0]; // Split by dots/underscores (e.g., patric.stone -> patric)
+  if (prefix.length > 0) {
+    return prefix.charAt(0).toUpperCase() + prefix.slice(1).toLowerCase();
+  }
+  return "there";
+};
+
 const sendEmail = async ({ to, toName, subject, htmlContent }) => {
   if (!BREVO_API_KEY) {
     console.warn("⚠️  BREVO_API_KEY missing — email not sent:", subject);
@@ -58,8 +70,8 @@ const sendOtpEmail = async ({
         ${LOGO_HEADER}
 
         <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">Verify your email</h2>
-        <p style="margin: 0 0 24px; color: #64748b; font-size: 14px; line-height: 1.5;">
-          Hi ${name || "there"}, use the code below to ${purpose}. It expires in 10 minutes.
+        <p style="margin: 0 0 20px; color: #64748b; font-size: 14px; line-height: 1.5;">
+          Hi ${name || guessNameFromEmail(to)}, use the code below to ${purpose}. It expires in 10 minutes.
         </p>
         <div style="background: #f1f5f9; border-radius: 12px; padding: 20px; text-align: center; margin-bottom: 24px;">
           <p style="margin: 0; font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #1e3a8a; font-family: 'Courier New', monospace;">
@@ -156,35 +168,27 @@ const sendPlatformSchoolInviteEmail = async ({
 
         <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">You're invited to SchoolPay</h2>
         <p style="margin: 0 0 20px; color: #64748b; font-size: 14px; line-height: 1.5;">
-          Hi ${name || "there"},
+          Hi ${name || guessNameFromEmail(to)},
         </p>
         <p style="margin: 0 0 20px; color: #64748b; font-size: 14px; line-height: 1.5;">
           You've been invited to set up and manage a school on <strong>SchoolPay</strong>.
-          Choose one of the two options below to get started.
+          Click the button below to accept the invitation.
         </p>
 
-        <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-          <p style="margin: 0 0 8px; color: #1e3a8a; font-size: 12px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">
-            Option 1 — Set Your Own Password
-          </p>
-          <p style="margin: 0 0 12px; color: #475569; font-size: 13px; line-height: 1.5;">
-            Click the button below. You'll be prompted to create a password
-            of your choice, then log in with it.
-          </p>
-          <a href="${acceptUrl}" style="display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 10px 20px; border-radius: 8px; font-size: 13px; font-weight: 600;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <a href="${acceptUrl}" style="display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-size: 15px; font-weight: 600;">
             Accept Invitation →
           </a>
         </div>
 
         <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
           <p style="margin: 0 0 8px; color: #475569; font-size: 12px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">
-            Option 2 — Use a Temporary Password
+            Your Temporary Password
           </p>
           <p style="margin: 0 0 12px; color: #475569; font-size: 13px; line-height: 1.5;">
-            Log in with the temporary password below. You'll be asked to
-            change it on first login.
+            When you click the button above, you will be prompted to enter this temporary password to secure your account:
           </p>
-          <p style="margin: 0; font-size: 18px; font-weight: 700; color: #1e3a8a; font-family: 'Courier New', monospace; letter-spacing: 1px;">
+          <p style="margin: 0; font-size: 18px; font-weight: 700; color: #1e3a8a; font-family: 'Courier New', monospace; letter-spacing: 1px; text-align: center;">
             ${tempPassword}
           </p>
         </div>
@@ -194,7 +198,7 @@ const sendPlatformSchoolInviteEmail = async ({
         </p>
 
         <p style="margin: 24px 0 0; color: #94a3b8; font-size: 11px; line-height: 1.5;">
-          Both the invitation link and the temporary password expire in ${expiresInDays} days.
+          This invitation and temporary password expire in ${expiresInDays} days.
           If the button doesn't work, paste this into your browser:<br>
           <span style="color: #64748b; word-break: break-all;">${acceptUrl}</span>
         </p>
@@ -229,7 +233,7 @@ const sendPasswordResetEmail = async ({
 
         <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">Reset your password</h2>
         <p style="margin: 0 0 24px; color: #64748b; font-size: 14px; line-height: 1.6;">
-          Hi ${name || "there"}, we received a request to reset your SchoolPay password.
+          Hi ${name || guessNameFromEmail(to)}, we received a request to reset your SchoolPay password.
           Click the button below to choose a new one. This link expires in ${expiresInMinutes} minutes.
         </p>
 
@@ -259,7 +263,7 @@ const sendPasswordResetEmail = async ({
     htmlContent: html,
   });
 };
-//  SUPPORT REPLY (Platform Owner → School Admin)
+
 //  SUPPORT REPLY (Platform Owner → School Admin)
 const sendSupportReplyEmail = async ({
   to,
@@ -283,7 +287,7 @@ const sendSupportReplyEmail = async ({
 
         <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">SchoolPay Support replied</h2>
         <p style="margin: 0 0 16px; color: #64748b; font-size: 14px; line-height: 1.5;">
-          Hi ${name || "there"}, SchoolPay Support has replied to your ticket for <strong>${schoolName}</strong>.
+          Hi ${name || guessNameFromEmail(to)}, SchoolPay Support has replied to your ticket for <strong>${schoolName}</strong>.
         </p>
 
         <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
@@ -322,6 +326,7 @@ const sendSupportReplyEmail = async ({
     htmlContent: html,
   });
 };
+
 module.exports = {
   sendEmail,
   sendOtpEmail,
