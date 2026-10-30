@@ -1,0 +1,14 @@
+_format_version: "3.0"
+_transform: true
+
+services:
+  - name: schoolpay-backend
+    url: http://127.0.0.1:5000
+    routes:
+      - name: schoolpay-api-route
+        paths:
+          - /api
+        strip_path: false
+        protocols:
+          - http
+          - https
