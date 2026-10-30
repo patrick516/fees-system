@@ -394,7 +394,7 @@ export default function SubscriptionLocked() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
-                  Transaction Reference (Optional)
+                  Transaction Reference
                 </label>
                 <input
                   value={complaintReference}
@@ -406,7 +406,7 @@ export default function SubscriptionLocked() {
 
               <div>
                 <label className="block text-xs font-medium text-slate-700 mb-1">
-                  OR Upload Screenshot (Optional)
+                  OR Upload Screenshot
                 </label>
                 <input
                   type="file"

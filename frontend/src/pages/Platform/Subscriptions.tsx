@@ -10,6 +10,8 @@ import {
   AlertTriangle,
   DollarSign,
   Info,
+  Eye,
+  X,
 } from "lucide-react";
 import platformApi from "../../lib/platformApi";
 import { toast } from "../../lib/toast";
@@ -75,6 +77,7 @@ export default function PlatformSubscriptions() {
 
   // Modals
   const [paying, setPaying] = useState<SubSchool | null>(null);
+  const [viewingDispute, setViewingDispute] = useState<SubSchool | null>(null);
   const [payTerm, setPayTerm] = useState("TERM_1");
   const [payYear, setPayYear] = useState("2026-2027");
   const [payDays, setPayDays] = useState(90);
@@ -467,6 +470,17 @@ export default function PlatformSubscriptions() {
                       </td>
                       <td className="px-5 py-4 text-right">
                         <div className="flex items-center justify-end gap-2">
+                          {/*  Eye icon shows only if there's a dispute */}
+                          {pendingDisputes[s.id] && (
+                            <button
+                              onClick={() => setViewingDispute(s)}
+                              className="p-1.5 text-amber-600 hover:bg-amber-50 border border-amber-200 rounded transition"
+                              title="View submitted details"
+                            >
+                              <Eye size={14} />
+                            </button>
+                          )}
+
                           <button
                             onClick={() => openExtendModal(s)}
                             className="text-xs font-medium text-slate-600 hover:text-slate-900 border border-slate-200 rounded px-2.5 py-1.5 transition bg-white"
@@ -793,6 +807,154 @@ export default function PlatformSubscriptions() {
             </div>
           );
         })()}
+
+      {/* ==================== VIEW DISPUTE DETAILS MODAL ==================== */}
+      {viewingDispute && pendingDisputes[viewingDispute.id] && (
+        <div
+          className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center px-4"
+          onClick={() => setViewingDispute(null)}
+        >
+          <div
+            className="bg-white rounded-xl w-full max-w-lg p-6 shadow-xl max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="text-lg font-semibold text-slate-900">
+                  Verification Request Details
+                </h3>
+                <p className="text-xs text-slate-500 mt-1">
+                  Submitted by{" "}
+                  {pendingDisputes[viewingDispute.id].actorName ||
+                    "School Admin"}{" "}
+                  on{" "}
+                  {new Date(
+                    pendingDisputes[viewingDispute.id].createdAt,
+                  ).toLocaleString()}
+                </p>
+              </div>
+              <button
+                onClick={() => setViewingDispute(null)}
+                className="text-slate-400 hover:text-slate-700"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* School Info */}
+              <div className="bg-slate-50 rounded-lg p-4 border border-slate-200">
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  School
+                </p>
+                <p className="text-sm font-medium text-slate-900">
+                  {viewingDispute.name}
+                </p>
+                <p className="text-xs text-slate-500">{viewingDispute.email}</p>
+              </div>
+
+              {/* Amount Claimed */}
+              <div className="bg-emerald-50 rounded-lg p-4 border border-emerald-200">
+                <p className="text-xs font-semibold text-emerald-700 uppercase tracking-wide mb-1">
+                  Amount Claimed
+                </p>
+                <p className="text-2xl font-bold text-emerald-900 font-mono">
+                  MWK{" "}
+                  {Number(
+                    pendingDisputes[viewingDispute.id].payload.amount,
+                  ).toLocaleString()}
+                </p>
+              </div>
+
+              {/* Reference Number */}
+              {pendingDisputes[viewingDispute.id].payload
+                .requesterReference && (
+                <div className="bg-blue-50 rounded-lg p-4 border border-blue-200">
+                  <p className="text-xs font-semibold text-blue-700 uppercase tracking-wide mb-1">
+                    Transaction Reference
+                  </p>
+                  <p className="text-sm font-mono font-semibold text-blue-900">
+                    {
+                      pendingDisputes[viewingDispute.id].payload
+                        .requesterReference
+                    }
+                  </p>
+                </div>
+              )}
+
+              {/* School's Message */}
+              {pendingDisputes[viewingDispute.id].payload.requesterMessage && (
+                <div>
+                  <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                    Message from School
+                  </p>
+                  <p className="text-sm text-slate-700 bg-amber-50 border border-amber-200 rounded-lg p-3 italic">
+                    "
+                    {
+                      pendingDisputes[viewingDispute.id].payload
+                        .requesterMessage
+                    }
+                    "
+                  </p>
+                </div>
+              )}
+
+              {/* Uploaded Proof */}
+              <div>
+                <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  Uploaded Proof
+                </p>
+                {pendingDisputes[viewingDispute.id].payload.proofImageUrl ? (
+                  <div className="border border-slate-200 rounded-lg overflow-hidden">
+                    <img
+                      src={
+                        pendingDisputes[viewingDispute.id].payload.proofImageUrl
+                      }
+                      alt="Payment proof"
+                      className="w-full h-auto max-h-80 object-contain bg-slate-50"
+                    />
+                    <div className="bg-slate-50 p-2 text-center border-t border-slate-200">
+                      <a
+                        href={
+                          pendingDisputes[viewingDispute.id].payload
+                            .proofImageUrl
+                        }
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-xs text-blue-600 hover:underline font-medium"
+                      >
+                        Open in new tab →
+                      </a>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-sm text-slate-400 italic">
+                    No file uploaded.
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 mt-6 pt-4 border-t border-slate-100">
+              <button
+                onClick={() => setViewingDispute(null)}
+                className="rounded-lg border border-slate-300 hover:bg-slate-50 text-sm font-medium px-4 py-2"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  setViewingDispute(null);
+                  openPayModal(viewingDispute);
+                }}
+                className="rounded-lg bg-blue-700 hover:bg-blue-800 text-white text-sm font-semibold px-4 py-2"
+              >
+                Proceed to Mark Paid
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
