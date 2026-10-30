@@ -3,9 +3,8 @@ const axios = require("axios");
 
 const BASE_URL =
   process.env.ONEKHUSA_ENV === "production"
-    ? "https://api.onekhusa.com/v1"
+    ? "https://api.onekhusa.com/live/v1"
     : "https://api.onekhusa.com/sandbox/v1";
-
 // ==================== TOKEN CACHE ====================
 let cachedToken = null;
 let tokenExpiresAt = 0;
