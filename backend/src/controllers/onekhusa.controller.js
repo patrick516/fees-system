@@ -298,7 +298,7 @@ const webhook = async (req, res) => {
 
         // Verify signature if enabled
         const shouldVerify = process.env.ONEKHUSA_WEBHOOK_VERIFY === "true";
-        if (shouldVerify && platform.subscriptionWebhookSecretSuccess) {
+        if (shouldVerify) {
           const secret =
             eventType === "payrequest.success"
               ? platform.subscriptionWebhookSecretSuccess
@@ -310,14 +310,43 @@ const webhook = async (req, res) => {
             );
           } else {
             const rawBody = JSON.stringify(req.body);
-            const expected = crypto
-              .createHmac("sha512", secret)
-              .update(rawBody)
-              .digest("hex");
-            if (expected !== signature) {
-              console.warn("[onekhusa-sub] Signature mismatch");
+
+            // 🎯 Compute both hex and base64 candidates
+            const candidates = {
+              "json-string-hex": crypto
+                .createHmac("sha512", secret)
+                .update(rawBody)
+                .digest("hex"),
+              "json-string-base64": crypto
+                .createHmac("sha512", secret)
+                .update(rawBody)
+                .digest("base64"),
+            };
+
+            //  DIAGNOSTIC LOGGING
+            console.log("========== SUBSCRIPTION SIGNATURE DEBUG ==========");
+            console.log("Event:", eventType);
+            console.log("Received signature:", signature);
+            console.log("Signature length:", signature?.length);
+            console.log("Secret (first 15):", secret.substring(0, 15));
+            console.log("Secret length:", secret.length);
+            console.log("Raw body length:", rawBody.length);
+            console.log("Raw body (first 150):", rawBody.substring(0, 150));
+            console.log("Expected hex:", candidates["json-string-hex"]);
+            console.log("Expected base64:", candidates["json-string-base64"]);
+            console.log("=================================================");
+
+            const matched = Object.entries(candidates).find(
+              ([, val]) => val === signature,
+            );
+
+            if (!matched) {
+              console.warn(
+                `[onekhusa-sub] ❌ Signature mismatch for platform webhook`,
+              );
               return;
             }
+            console.log(`[onekhusa-sub] ✅ Signature verified (${matched[0]})`);
           }
         }
 
