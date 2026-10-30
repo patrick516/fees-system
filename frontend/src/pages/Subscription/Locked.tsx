@@ -55,7 +55,11 @@ export default function SubscriptionLocked() {
           clearInterval(interval);
 
           setTimeout(() => {
-            window.location.href = "/dashboard";
+            //  Clear old stale data so the dashboard doesn't bounce us back
+            localStorage.removeItem("auth-storage"); // Or whatever your Zustand persist key is
+
+            //  Use location.replace instead of href so the back button doesn't loop
+            window.location.replace("/dashboard");
           }, 1200);
         }
       } catch (err) {
