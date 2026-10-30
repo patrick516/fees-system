@@ -32,14 +32,28 @@ export default function SubscriptionLocked() {
 
   //  Auto-poll: check every 5s if the subscription has been unlocked
   //  Auto-poll: check every 5s if the subscription has been unlocked
+  // 🎯 Ref to prevent multiple triggers
+  const hasUnlockedRef = useRef(false);
+
+  // 🎯 Auto-poll: check every 5s if the subscription has been unlocked
   useEffect(() => {
     const checkUnlock = async () => {
+      // If we already triggered the unlock, don't do anything else
+      if (hasUnlockedRef.current) return;
+
       try {
         const res = await api.get("/auth/me");
         const newStatus = res.data?.data?.school?.subscriptionStatus;
+
         if (newStatus && newStatus !== "LOCKED" && newStatus !== "SUSPENDED") {
+          hasUnlockedRef.current = true; // 🛑 Stop future checks
           setUnlocking(true);
+
           toast.success("Payment received! Unlocking your account...");
+
+          // Clear the interval immediately to stop the loop
+          clearInterval(interval);
+
           setTimeout(() => {
             window.location.href = "/dashboard";
           }, 1200);
