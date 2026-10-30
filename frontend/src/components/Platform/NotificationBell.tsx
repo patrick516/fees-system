@@ -131,6 +131,9 @@ export default function NotificationBell() {
           {!loading &&
             list.map((n) => {
               const isReopened = n.type === "TICKET_REOPENED";
+              const isSubscriptionDispute =
+                n.type === "SUBSCRIPTION_MANUAL_CONFIRM_REQUEST";
+
               return (
                 <div
                   key={n.id}
@@ -144,6 +147,8 @@ export default function NotificationBell() {
                         size={14}
                         className="text-amber-600 shrink-0 mt-0.5"
                       />
+                    ) : isSubscriptionDispute ? (
+                      <div className="mt-1 w-2 h-2 rounded-full shrink-0 bg-amber-600" />
                     ) : (
                       <div
                         className={`mt-1 w-2 h-2 rounded-full shrink-0 ${
@@ -153,7 +158,7 @@ export default function NotificationBell() {
                     )}
                     <div className="flex-1 min-w-0">
                       <p
-                        className={`text-sm font-semibold ${isReopened ? "text-amber-900" : "text-slate-900"}`}
+                        className={`text-sm font-semibold ${isReopened ? "text-amber-900" : isSubscriptionDispute ? "text-amber-900" : "text-slate-900"}`}
                       >
                         {n.title}
                       </p>
@@ -178,6 +183,43 @@ export default function NotificationBell() {
                             <div className="mt-1 not-italic font-sans text-slate-500">
                               Reason: {n.payload.reason}
                             </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* 🎯 Subscription Manual Verification Dispute */}
+                      {isSubscriptionDispute && n.payload && (
+                        <div className="mt-2 text-[11px] bg-amber-50 border border-amber-200 rounded-lg p-2 text-amber-800 leading-relaxed space-y-1">
+                          {n.payload.amount && (
+                            <div>
+                              Amount claimed:{" "}
+                              <strong>
+                                MWK {Number(n.payload.amount).toLocaleString()}
+                              </strong>
+                            </div>
+                          )}
+                          {n.payload.requesterReference && (
+                            <div>
+                              Reference:{" "}
+                              <span className="font-mono">
+                                {n.payload.requesterReference}
+                              </span>
+                            </div>
+                          )}
+                          {n.payload.requesterMessage && (
+                            <div className="italic">
+                              "{n.payload.requesterMessage}"
+                            </div>
+                          )}
+                          {n.payload.proofImageUrl && (
+                            <a
+                              href={n.payload.proofImageUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-block text-amber-700 underline font-semibold not-italic"
+                            >
+                              View uploaded proof →
+                            </a>
                           )}
                         </div>
                       )}
@@ -210,7 +252,16 @@ export default function NotificationBell() {
                             View ticket →
                           </Link>
                         )}
-                        {!isReopened && n.school && (
+                        {isSubscriptionDispute && (
+                          <Link
+                            to="/platform/subscriptions"
+                            onClick={() => setOpen(false)}
+                            className="text-xs font-semibold text-amber-700 hover:text-amber-900 hover:underline ml-auto"
+                          >
+                            Verify Payment →
+                          </Link>
+                        )}
+                        {!isReopened && !isSubscriptionDispute && n.school && (
                           <Link
                             to={`/platform/schools/${n.school.id}`}
                             className="text-[11px] text-blue-700 hover:underline ml-auto"

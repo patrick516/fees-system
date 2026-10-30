@@ -19,6 +19,7 @@ router.get("/public", schoolController.getPublicSchool);
 router.get("/public/:schoolId", schoolController.getPublicInfo);
 router.get("/lookup-by-email", schoolController.lookupByEmail);
 router.get("/by-slug/:slug", schoolController.getBySlug);
+
 router.get("/payment-info/:schoolId", async (req, res) => {
   try {
     const school = await prisma.school.findUnique({
@@ -45,7 +46,12 @@ router.get("/payment-info/:schoolId", async (req, res) => {
       .json({ success: false, message: "Failed to get payment info" });
   }
 });
-
+router.post(
+  "/subscription/request-manual-verification",
+  verifyToken, // your auth middleware
+  upload.single("proof"), // handles the file upload
+  controller.requestManualVerification,
+);
 //  PROTECTED ROUTES
 router.get(
   "/onboarding-status",

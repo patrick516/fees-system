@@ -727,7 +727,99 @@ const getPublicTiers = async (req, res) => {
       .json({ success: false, message: "Failed to load tiers" });
   }
 };
-// Add getPublicTiers to module.exports
+// POST /api/schools/subscription/request-manual-verification
+const requestManualVerification = async (req, res) => {
+  try {
+    const { message, referenceNumber } = req.body;
+
+    // Check if a file was uploaded (multer will add req.file)
+    const proofUrl = req.file ? req.file.path : null;
+
+    if (!referenceNumber && !proofUrl) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Please provide a transaction reference number or upload a screenshot of your payment.",
+      });
+    }
+
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: { id: true, name: true, platformId: true },
+    });
+
+    if (!school) {
+      return res
+        .status(404)
+        .json({ success: false, message: "School not found" });
+    }
+
+    // Find the latest pending subscription payment
+    const pendingPayment = await prisma.subscriptionPayment.findFirst({
+      where: { schoolId: school.id, status: "PENDING" },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (!pendingPayment) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "No pending payment found. Please generate a payment reference first.",
+      });
+    }
+
+    // Only one open request at a time
+    const existing = await prisma.notification.findFirst({
+      where: {
+        schoolId: school.id,
+        type: "SUBSCRIPTION_MANUAL_CONFIRM_REQUEST",
+        status: { in: ["UNREAD", "READ"] },
+      },
+    });
+    if (existing) {
+      return res.status(409).json({
+        success: false,
+        message:
+          "You already have a pending verification request. The platform owner will review it shortly.",
+      });
+    }
+
+    // Create the notification for the platform owner
+    const notification = await prisma.notification.create({
+      data: {
+        platformId: school.platformId,
+        schoolId: school.id,
+        type: "SUBSCRIPTION_MANUAL_CONFIRM_REQUEST",
+        title: "Manual Subscription Verification Request",
+        message: `${school.name} reports they have paid but are still locked.`,
+        payload: {
+          schoolId: school.id,
+          schoolName: school.name,
+          paymentId: pendingPayment.id,
+          amount: Number(pendingPayment.amount),
+          requestedBy: req.staff.fullName,
+          requesterMessage: message || null,
+          requesterReference: referenceNumber || null,
+          proofImageUrl: proofUrl, // 🎯 Store the Cloudinary URL
+        },
+        actorStaffId: req.staff.id,
+        actorName: req.staff.fullName,
+      },
+    });
+
+    return res.status(201).json({
+      success: true,
+      message:
+        "Request submitted. The platform owner will verify your payment shortly.",
+      data: { notificationId: notification.id },
+    });
+  } catch (err) {
+    console.error("requestManualVerification error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to submit request" });
+  }
+};
 module.exports = {
   getSettings,
   updateSettings,
@@ -745,4 +837,5 @@ module.exports = {
   getOnboardingStatus,
   getTierStatus,
   getPublicTiers,
+  requestManualVerification,
 };

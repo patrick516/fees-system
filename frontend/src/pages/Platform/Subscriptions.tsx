@@ -81,6 +81,11 @@ export default function PlatformSubscriptions() {
   const [payAmount, setPayAmount] = useState(0);
   const [payNotes, setPayNotes] = useState("");
   const [paySubmitting, setPaySubmitting] = useState(false);
+  const [pendingDisputes, setPendingDisputes] = useState<Record<string, any>>(
+    {},
+  );
+
+  //  Adjust Trial Modal state
 
   //  Adjust Trial Modal state
   const [extending, setExtending] = useState<SubSchool | null>(null);
@@ -90,9 +95,22 @@ export default function PlatformSubscriptions() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await platformApi.get("/platform/subscriptions");
-      setSchools(res.data.data.schools || []);
-      setDefaults(res.data.data.defaults || null);
+      const [subsRes, notifRes] = await Promise.all([
+        platformApi.get("/platform/subscriptions"),
+        platformApi.get("/platform/notifications?status=UNREAD,READ"),
+      ]);
+
+      setSchools(subsRes.data.data.schools || []);
+      setDefaults(subsRes.data.data.defaults || null);
+
+      //  Map disputes by schoolId
+      const disputes: Record<string, any> = {};
+      (notifRes.data.data || [])
+        .filter((n: any) => n.type === "SUBSCRIPTION_MANUAL_CONFIRM_REQUEST")
+        .forEach((n: any) => {
+          disputes[n.payload.schoolId] = n;
+        });
+      setPendingDisputes(disputes);
     } catch (err: any) {
       setError(err?.response?.data?.message || "Failed to load subscriptions");
     } finally {
@@ -104,7 +122,7 @@ export default function PlatformSubscriptions() {
     load();
   }, []);
 
-  // ==================== ACTIONS ====================
+  //  ACTIONS
   const openPayModal = (s: SubSchool) => {
     setPaying(s);
     setPayTerm("TERM_1");
@@ -112,8 +130,19 @@ export default function PlatformSubscriptions() {
     setPayDays(defaults?.defaultTermDays || 90);
     setPayAmount(s.termPrice || defaults?.termPrice || 0);
     setPayNotes("");
-  };
 
+    //  Pre-fill from dispute
+    const dispute = pendingDisputes[s.id];
+    if (dispute?.payload) {
+      if (dispute.payload.amount) setPayAmount(dispute.payload.amount);
+      let note = "";
+      if (dispute.payload.requesterReference)
+        note += `Ref: ${dispute.payload.requesterReference}. `;
+      if (dispute.payload.requesterMessage)
+        note += dispute.payload.requesterMessage;
+      setPayNotes(note.trim());
+    }
+  };
   const submitMarkPaid = async () => {
     if (!paying) return;
     setPaySubmitting(true);
@@ -125,6 +154,20 @@ export default function PlatformSubscriptions() {
         amount: payAmount,
         notes: payNotes || undefined,
       });
+
+      // 🎯 Resolve dispute if one exists
+      const dispute = pendingDisputes[paying.id];
+      if (dispute) {
+        try {
+          await platformApi.post(
+            `/platform/notifications/${dispute.id}/resolve`,
+            { action: "approve" },
+          );
+        } catch (e) {
+          console.error("Failed to resolve dispute:", e);
+        }
+      }
+
       toast.success(`${paying.name} marked as paid`);
       setPaying(null);
       load();
@@ -137,7 +180,7 @@ export default function PlatformSubscriptions() {
 
   const openExtendModal = (s: SubSchool) => {
     setExtending(s);
-    setExtendDays(""); // 🎯 Start empty, not 30
+    setExtendDays("");
   };
 
   const submitExtendTrial = async () => {
@@ -376,6 +419,11 @@ export default function PlatformSubscriptions() {
                         >
                           {s.name}
                         </Link>
+                        {pendingDisputes[s.id] && (
+                          <span className="ml-2 text-[10px] font-bold bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded">
+                            ⚠️ DISPUTE
+                          </span>
+                        )}
                         <p className="text-[11px] text-slate-500 mt-0.5">
                           {s.email || "No admin email"}
                         </p>
@@ -494,6 +542,33 @@ export default function PlatformSubscriptions() {
               Mark as Paid
             </h3>
             <p className="text-xs text-slate-500 mb-4">{paying.name}</p>
+
+            {/* 🎯 Dispute details */}
+            {pendingDisputes[paying.id]?.payload && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-xs text-amber-800 space-y-1.5">
+                <p className="font-semibold">School's verification request:</p>
+                {pendingDisputes[paying.id].payload.requesterMessage && (
+                  <p className="italic">
+                    "{pendingDisputes[paying.id].payload.requesterMessage}"
+                  </p>
+                )}
+                {pendingDisputes[paying.id].payload.requesterReference && (
+                  <p className="font-mono text-[11px]">
+                    Ref: {pendingDisputes[paying.id].payload.requesterReference}
+                  </p>
+                )}
+                {pendingDisputes[paying.id].payload.proofImageUrl && (
+                  <a
+                    href={pendingDisputes[paying.id].payload.proofImageUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-block text-amber-700 underline font-semibold"
+                  >
+                    View uploaded proof →
+                  </a>
+                )}
+              </div>
+            )}
 
             <div className="space-y-3">
               <div className="grid grid-cols-2 gap-3">

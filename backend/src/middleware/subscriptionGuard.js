@@ -15,6 +15,7 @@ const PUBLIC_PATH_PREFIXES = [
   "/api/schools/payment-info",
   "/api/payments/onekhusa/webhook",
   "/api/parent/support",
+  "/api/schools/subscription/request-manual-verification",
 ];
 
 const requireActiveSubscription = async (req, res, next) => {

@@ -559,10 +559,10 @@ export default function PayPage() {
                         Dial <strong>*211#</strong> on your phone
                       </li>
                       <li>
-                        Select <strong>3. Make payments</strong>
+                        Select <strong>1. Send Money</strong>
                       </li>
                       <li>
-                        Select <strong>8. OneKhusa</strong>
+                        Select <strong>OneKhusa</strong>
                       </li>
                       <li>
                         Enter account number:{" "}
@@ -598,7 +598,7 @@ export default function PayPage() {
                         Dial <strong>*444#</strong> on your phone
                       </li>
                       <li>
-                        Select <strong>Pay Bills</strong>
+                        Select <strong>1. Send Money</strong>
                       </li>
                       <li>
                         Select <strong>OneKhusa</strong>

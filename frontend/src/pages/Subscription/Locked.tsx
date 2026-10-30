@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuthStore } from "../../store/authStore";
 import {
   LogOut,
@@ -22,7 +22,16 @@ export default function SubscriptionLocked() {
   const [copied, setCopied] = useState(false);
   const [unlocking, setUnlocking] = useState(false);
 
-  // 🎯 Auto-poll: check every 5s if the subscription has been unlocked
+  //  Manual verification state
+  const [showComplaintModal, setShowComplaintModal] = useState(false);
+  const [complaintMessage, setComplaintMessage] = useState("");
+  const [complaintReference, setComplaintReference] = useState("");
+  const [proofFile, setProofFile] = useState<File | null>(null);
+  const [submittingComplaint, setSubmittingComplaint] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  //  Auto-poll: check every 5s if the subscription has been unlocked
+  //  Auto-poll: check every 5s if the subscription has been unlocked
   useEffect(() => {
     const checkUnlock = async () => {
       try {
@@ -67,6 +76,43 @@ export default function SubscriptionLocked() {
     setCopied(true);
     toast.success("Account number copied");
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  //  Manual verification submit handler
+  const handleSubmitComplaint = async () => {
+    if (!complaintReference.trim() && !proofFile) {
+      toast.error("Please provide a reference number or upload a screenshot.");
+      return;
+    }
+
+    setSubmittingComplaint(true);
+    try {
+      const formData = new FormData();
+      if (complaintMessage.trim())
+        formData.append("message", complaintMessage.trim());
+      if (complaintReference.trim())
+        formData.append("referenceNumber", complaintReference.trim());
+      if (proofFile) formData.append("proof", proofFile);
+
+      const res = await api.post(
+        "/schools/subscription/request-manual-verification",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } },
+      );
+
+      toast.success(
+        res.data.message ||
+          "Request submitted. The platform owner will verify shortly.",
+      );
+      setShowComplaintModal(false);
+      setComplaintMessage("");
+      setComplaintReference("");
+      setProofFile(null);
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to submit request");
+    } finally {
+      setSubmittingComplaint(false);
+    }
   };
 
   if (unlocking) {
@@ -198,10 +244,10 @@ export default function SubscriptionLocked() {
                     Dial <strong>*211#</strong> on your phone
                   </li>
                   <li>
-                    Select <strong>3. Make payments</strong>
+                    Select <strong>1. Send Money</strong>
                   </li>
                   <li>
-                    Select <strong>8. OneKhusa</strong>
+                    Select <strong>OneKhusa</strong> (or "Others")
                   </li>
                   <li>
                     Enter account number:{" "}
@@ -233,7 +279,7 @@ export default function SubscriptionLocked() {
                     Dial <strong>*444#</strong> on your phone
                   </li>
                   <li>
-                    Select <strong>Pay Bills</strong>
+                    Select <strong>1. Send Money</strong>
                   </li>
                   <li>
                     Select <strong>OneKhusa</strong>
@@ -296,10 +342,27 @@ export default function SubscriptionLocked() {
                   will open automatically.
                 </p>
               </div>
+
+              {/* 🎯 Manual verification request */}
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 space-y-2">
+                <p className="text-sm font-semibold text-amber-900">
+                  Already paid but still locked?
+                </p>
+                <p className="text-xs text-amber-700 leading-relaxed">
+                  If you have sent the money but your account has not unlocked,
+                  request manual verification. Provide a reference number or
+                  upload a screenshot of your payment.
+                </p>
+                <button
+                  onClick={() => setShowComplaintModal(true)}
+                  className="w-full bg-amber-600 hover:bg-amber-700 text-white py-2.5 rounded-lg text-sm font-semibold transition-colors"
+                >
+                  Request Manual Verification
+                </button>
+              </div>
             </div>
           )}
         </div>
-
         <div className="border-t border-gray-100 p-4">
           <button
             onClick={logout}
@@ -309,6 +372,95 @@ export default function SubscriptionLocked() {
           </button>
         </div>
       </div>
+
+      {/* 🎯 Manual Verification Modal */}
+      {showComplaintModal && (
+        <div
+          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center px-4"
+          onClick={() => !submittingComplaint && setShowComplaintModal(false)}
+        >
+          <div
+            className="bg-white rounded-xl w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-semibold text-slate-900 mb-1">
+              Request Manual Verification
+            </h3>
+            <p className="text-sm text-slate-500 mb-4">
+              Provide a transaction reference number <strong>or</strong> upload
+              a screenshot of your payment. At least one is required.
+            </p>
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Transaction Reference (Optional)
+                </label>
+                <input
+                  value={complaintReference}
+                  onChange={(e) => setComplaintReference(e.target.value)}
+                  placeholder="e.g. WB261030.1232.289241"
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  OR Upload Screenshot (Optional)
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  ref={fileInputRef}
+                  onChange={(e) => setProofFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="w-full border border-dashed border-slate-300 rounded-lg p-4 text-center cursor-pointer hover:bg-slate-50 transition-colors"
+                >
+                  <span className="text-sm text-slate-600">
+                    {proofFile
+                      ? proofFile.name
+                      : "Click to browse or take a photo"}
+                  </span>
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700 mb-1">
+                  Additional Notes (Optional)
+                </label>
+                <textarea
+                  value={complaintMessage}
+                  onChange={(e) => setComplaintMessage(e.target.value)}
+                  rows={2}
+                  placeholder="Any other details..."
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 resize-none"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2 mt-6">
+              <button
+                onClick={() => setShowComplaintModal(false)}
+                disabled={submittingComplaint}
+                className="rounded-lg border border-slate-300 hover:bg-slate-50 text-sm font-medium px-4 py-2"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleSubmitComplaint}
+                disabled={submittingComplaint}
+                className="rounded-lg bg-amber-600 hover:bg-amber-700 disabled:opacity-60 text-white text-sm font-semibold px-4 py-2"
+              >
+                {submittingComplaint ? "Submitting..." : "Submit Request"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
