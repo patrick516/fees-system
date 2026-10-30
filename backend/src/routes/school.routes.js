@@ -48,9 +48,9 @@ router.get("/payment-info/:schoolId", async (req, res) => {
 });
 router.post(
   "/subscription/request-manual-verification",
-  verifyToken, // your auth middleware
-  upload.single("proof"), // handles the file upload
-  controller.requestManualVerification,
+  verifyStaff,
+  upload.single("proof"),
+  schoolController.requestManualVerification,
 );
 //  PROTECTED ROUTES
 router.get(
