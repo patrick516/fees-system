@@ -12,7 +12,7 @@ import {
 import api from "../../lib/axios";
 import type { Student, Class, Pagination } from "../../types";
 import { usePermission } from "../../hooks/usePermission";
-
+import { isReadOnly } from "../../lib/permissions";
 const StudentsPage = () => {
   const navigate = useNavigate();
   const { can } = usePermission();
@@ -79,7 +79,7 @@ const StudentsPage = () => {
               : " total"}
           </p>
         </div>
-        {can("students", "write") && (
+        {can("students", "write") && !isReadOnly() && (
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => navigate("/students/promote")}

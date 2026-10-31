@@ -15,6 +15,7 @@ import FeeStructureForm from "../../components/Classes/FeeStructureForm";
 import TermActivationCard from "../../components/Classes/TermActivationCard";
 import TermHistoryTable from "../../components/Classes/TermHistoryTable";
 import PaymentDetailsCard from "../../components/Classes/PaymentDetailsCard";
+import { isReadOnly } from "../../lib/permissions";
 
 const termLabel = (t?: string | null) =>
   t ? t.replace("_", " ").replace("TERM", "Term") : "";
@@ -141,7 +142,7 @@ const ClassesPage = () => {
 
       <TermHistoryTable history={termHistory} activeTerm={activeTerm} />
 
-      {can("classes", "write") && (
+      {can("classes", "write") && !isReadOnly() && (
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h3 className="font-medium text-gray-800 mb-4">Add New Class</h3>
           <form onSubmit={handleAddClass} className="flex gap-3">
@@ -223,7 +224,7 @@ const ClassesPage = () => {
                   )}
                 </div>
                 <div className="col-span-2 flex justify-end gap-1">
-                  {can("payments", "write") && (
+                  {can("payments", "write") && !isReadOnly() && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -236,7 +237,7 @@ const ClassesPage = () => {
                       <Edit2 size={14} />
                     </button>
                   )}
-                  {can("classes", "delete") && (
+                  {can("classes", "delete") && !isReadOnly() && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -296,7 +297,8 @@ const ClassesPage = () => {
                   )}
 
                   {showFeeForm !== cls.id ? (
-                    can("payments", "write") && (
+                    can("payments", "write") &&
+                    !isReadOnly() && (
                       <button
                         onClick={() => {
                           setEditingFee(null);

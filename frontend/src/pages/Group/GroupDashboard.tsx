@@ -19,7 +19,8 @@ const GroupDashboard = () => {
   // Add School Form State
   const [form, setForm] = useState({
     schoolName: "",
-    adminName: "",
+    adminFirstName: "",
+    adminLastName: "",
     adminEmail: "",
   });
   const [submitting, setSubmitting] = useState(false);
@@ -48,14 +49,23 @@ const GroupDashboard = () => {
       toast.error("School name and admin email are required");
       return;
     }
+    if (!form.adminFirstName || !form.adminLastName) {
+      toast.error("Admin first name and last name are required");
+      return;
+    }
 
     setSubmitting(true);
     try {
       await api.post("/group/schools", form);
       toast.success("School added and admin invited successfully!");
       setShowAddModal(false);
-      setForm({ schoolName: "", adminName: "", adminEmail: "" });
-      fetchSchools(); // Refresh list
+      setForm({
+        schoolName: "",
+        adminFirstName: "",
+        adminLastName: "",
+        adminEmail: "",
+      });
+      fetchSchools();
     } catch (err: any) {
       toast.error(err.response?.data?.message || "Failed to add school");
     } finally {
@@ -65,9 +75,8 @@ const GroupDashboard = () => {
 
   // Handle switching to a specific school
   const handleManageSchool = (schoolId: string) => {
-    // Save the selected school to local storage so axios sends it in headers
     localStorage.setItem("activeSchoolId", schoolId);
-    // Redirect to the main dashboard (which will now show that school's data)
+    localStorage.setItem("isViewingAsGroupAdmin", "true");
     window.location.href = "/dashboard";
   };
 
@@ -240,19 +249,37 @@ const GroupDashboard = () => {
                   className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
                 />
               </div>
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">
-                  Admin Full Name
-                </label>
-                <input
-                  type="text"
-                  value={form.adminName}
-                  onChange={(e) =>
-                    setForm({ ...form, adminName: e.target.value })
-                  }
-                  placeholder="e.g., John Doe"
-                  className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                />
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Admin First Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={form.adminFirstName}
+                    onChange={(e) =>
+                      setForm({ ...form, adminFirstName: e.target.value })
+                    }
+                    placeholder="e.g., John"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">
+                    Admin Last Name *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={form.adminLastName}
+                    onChange={(e) =>
+                      setForm({ ...form, adminLastName: e.target.value })
+                    }
+                    placeholder="e.g., Doe"
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">

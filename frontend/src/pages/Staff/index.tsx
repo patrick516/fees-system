@@ -20,6 +20,7 @@ import EditStaffModal from "../../components/Staff/EditStaffModal";
 import { useAuthStore } from "../../store/authStore";
 import type { Staff, Department } from "../../types";
 import { toast } from "../../lib/toast";
+import { isReadOnly } from "../../lib/permissions";
 
 const StaffPage = () => {
   const { staff: currentUser } = useAuthStore();
@@ -149,13 +150,15 @@ const StaffPage = () => {
             Invite team members and manage their access
           </p>
         </div>
-        <button
-          onClick={() => setShowInvite(true)}
-          className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] transition-colors"
-        >
-          <UserPlus size={16} />
-          Invite Staff
-        </button>
+        {!isReadOnly() && (
+          <button
+            onClick={() => setShowInvite(true)}
+            className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] transition-colors"
+          >
+            <UserPlus size={16} />
+            Invite Staff
+          </button>
+        )}
       </div>
 
       {/* Staff list */}
@@ -238,18 +241,20 @@ const StaffPage = () => {
                     </td>
                     <td className="px-6 py-4">{getStatusBadge(member)}</td>
                     <td className="px-6 py-4 text-right">
-                      <button
-                        onClick={() => setSelectedMember(member)}
-                        disabled={busyId === member.id}
-                        className="p-1.5 rounded hover:bg-gray-100 text-gray-500 disabled:opacity-40"
-                        title="Manage"
-                      >
-                        {busyId === member.id ? (
-                          <Loader2 size={16} className="animate-spin" />
-                        ) : (
-                          <MoreVertical size={16} />
-                        )}
-                      </button>
+                      {!isReadOnly() && (
+                        <button
+                          onClick={() => setSelectedMember(member)}
+                          disabled={busyId === member.id}
+                          className="p-1.5 rounded hover:bg-gray-100 text-gray-500 disabled:opacity-40"
+                          title="Manage"
+                        >
+                          {busyId === member.id ? (
+                            <Loader2 size={16} className="animate-spin" />
+                          ) : (
+                            <MoreVertical size={16} />
+                          )}
+                        </button>
+                      )}
                     </td>
                   </tr>
                 ))}

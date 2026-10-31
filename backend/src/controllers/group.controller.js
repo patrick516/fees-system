@@ -38,7 +38,7 @@ const listGroupSchools = async (req, res) => {
 // Allows Group Director to add a new school to their group
 const addSchoolToGroup = async (req, res) => {
   try {
-    const { schoolName, adminEmail, adminName } = req.body;
+    const { schoolName, adminEmail, adminFirstName, adminLastName } = req.body;
 
     if (!schoolName || !adminEmail) {
       return res.status(400).json({
@@ -86,9 +86,10 @@ const addSchoolToGroup = async (req, res) => {
         data: {
           schoolId: school.id,
           roleId: roleMap["School Admin"],
-          fullName: adminName || "School Administrator",
-          firstName: adminName?.split(" ")[0] || "School",
-          lastName: adminName?.split(" ").slice(1).join(" ") || "Admin",
+          firstName: adminFirstName || "School",
+          lastName: adminLastName || "Administrator",
+          fullName:
+            `${adminFirstName || "School"} ${adminLastName || "Administrator"}`.trim(),
           email: adminEmail,
           phone: "",
           passwordHash,
@@ -105,7 +106,7 @@ const addSchoolToGroup = async (req, res) => {
 
     await sendPlatformSchoolInviteEmail({
       to: adminEmail,
-      name: adminName || "there",
+      name: `${adminFirstName || ""} ${adminLastName || ""}`.trim() || "there",
       inviteToken,
       tempPassword,
       expiresInDays: 7,

@@ -20,8 +20,8 @@ import {
   Briefcase,
   Wallet,
   LifeBuoy,
-  Building2, // 🎯 Added for Group Dashboard
-  ChevronDown, // 🎯 Added for School Switcher
+  Building2,
+  ChevronDown,
 } from "lucide-react";
 import { useAuthStore } from "../../../store/authStore";
 import api from "../../../lib/axios";
@@ -41,7 +41,6 @@ type NavSection = {
   items: NavItem[];
 };
 
-// 🎯 Grouped Navigation
 const navSections: NavSection[] = [
   {
     title: "Main",
@@ -139,17 +138,15 @@ const Sidebar = () => {
   const [pendingCount, setPendingCount] = useState(0);
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
 
-  // 🎯 Multi-Tenant State
   const [groupSchools, setGroupSchools] = useState<any[]>([]);
   const [activeSchool, setActiveSchool] = useState<any>(null);
   const [showSchoolSwitcher, setShowSchoolSwitcher] = useState(false);
 
   const isGroupAdmin = staff?.isGroupAdmin || false;
+  const viewingAsGroup = !!localStorage.getItem("activeSchoolId");
 
-  // 🎯 Fetch group schools if user is a Group Admin
   useEffect(() => {
     if (!isGroupAdmin) {
-      // Normal users just see their own school
       setActiveSchool(staff?.school);
       return;
     }
@@ -159,7 +156,6 @@ const Sidebar = () => {
         const res = await api.get("/group/schools");
         setGroupSchools(res.data.data);
 
-        // Determine which school is currently active
         const activeId =
           localStorage.getItem("activeSchoolId") || staff?.schoolId;
         const matched = res.data.data.find((s: any) => s.id === activeId);
@@ -167,7 +163,6 @@ const Sidebar = () => {
         if (matched) {
           setActiveSchool(matched);
         } else if (res.data.data.length > 0) {
-          // Default to first school if none selected
           setActiveSchool(res.data.data[0]);
           localStorage.setItem("activeSchoolId", res.data.data[0].id);
         }
@@ -178,17 +173,18 @@ const Sidebar = () => {
     loadGroupSchools();
   }, [isGroupAdmin, staff]);
 
-  // 🎯 Handle School Switch
   const handleSwitchSchool = (school: any) => {
     localStorage.setItem("activeSchoolId", school.id);
+    if (school.id !== staff?.schoolId) {
+      localStorage.setItem("isViewingAsGroupAdmin", "true");
+    } else {
+      localStorage.removeItem("isViewingAsGroupAdmin");
+    }
     setActiveSchool(school);
     setShowSchoolSwitcher(false);
-    // Hard reload to flush all contexts (safest for multi-tenant)
     window.location.href = "/dashboard";
   };
 
-  // Check if the logged-in user has "read" permission for a resource.
-  // School Admin always passes (safety fallback).
   const canRead = (resource: Resource): boolean => {
     if (!staff?.role) return false;
     if (staff.role.name === "School Admin") return true;
@@ -196,7 +192,6 @@ const Sidebar = () => {
     return Array.isArray(perms) && perms.includes("read");
   };
 
-  // 🎯 Poll support unread count every 60s
   useEffect(() => {
     const load = async () => {
       try {
@@ -211,10 +206,8 @@ const Sidebar = () => {
     return () => clearInterval(t);
   }, []);
 
-  //  Poll pending payments count every 60s (lightweight endpoint)
   useEffect(() => {
     if (!activeYear) return;
-
     const load = async () => {
       try {
         const params = new URLSearchParams();
@@ -223,17 +216,17 @@ const Sidebar = () => {
         const res = await api.get(`/payments/pending-count?${params}`);
         setPendingCount(res.data.data?.count || 0);
       } catch {
-        // Silently ignore — user may lack permissions or no data yet
+        // Silently ignore
       }
     };
-
     load();
     const t = setInterval(load, 60_000);
     return () => clearInterval(t);
   }, [activeYear, currentTerm]);
 
   const handleLogout = () => {
-    localStorage.removeItem("activeSchoolId"); // 🎯 Clear active school on logout
+    localStorage.removeItem("activeSchoolId");
+    localStorage.removeItem("isViewingAsGroupAdmin");
     logout();
     navigate("/login");
   };
@@ -271,7 +264,6 @@ const Sidebar = () => {
           </button>
         </div>
 
-        {/* 🎯 School Switcher Dropdown for Group Admins */}
         {isGroupAdmin && groupSchools.length > 0 && (
           <div className="mt-4 relative">
             <button
@@ -306,8 +298,8 @@ const Sidebar = () => {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-6 custom-scrollbar">
-        {/* 🎯 Group Overview Link (Only for Group Admin) */}
-        {isGroupAdmin && (
+        {/* 🎯 Group Overview Link (only when NOT viewing a specific school) */}
+        {isGroupAdmin && !viewingAsGroup && (
           <div className="mb-4">
             <NavLink
               to="/group"
@@ -326,13 +318,26 @@ const Sidebar = () => {
           </div>
         )}
 
+        {/* 🎯 Back to Group button (only when viewing a specific school) */}
+        {isGroupAdmin && viewingAsGroup && (
+          <div className="mb-4">
+            <button
+              onClick={() => {
+                localStorage.removeItem("activeSchoolId");
+                localStorage.removeItem("isViewingAsGroupAdmin");
+                window.location.href = "/group";
+              }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-amber-300 hover:bg-white/10 transition-colors"
+            >
+              ← Back to Group Overview
+            </button>
+          </div>
+        )}
+
         {navSections.map((section) => {
-          // Filter items based on permissions
           const visibleItems = section.items.filter((item) =>
             canRead(item.resource),
           );
-
-          // If user has no access to any item in this section, hide the section header
           if (visibleItems.length === 0) return null;
 
           return (
@@ -403,7 +408,6 @@ const Sidebar = () => {
 
   return (
     <>
-      {/* ── Mobile top bar ── */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-40 flex items-center h-14 px-4 bg-slate-900 border-b border-slate-800 text-white">
         <button
           onClick={() => setOpen(true)}
@@ -428,12 +432,10 @@ const Sidebar = () => {
         </div>
       </div>
 
-      {/* ── Desktop sidebar ── */}
       <aside className="hidden md:flex md:flex-col md:w-64 md:shrink-0 h-screen sticky top-0">
         {sidebarContent}
       </aside>
 
-      {/* ── Mobile drawer ── */}
       <div
         onClick={close}
         className={`md:hidden fixed inset-0 z-40 bg-black/50 transition-opacity duration-300 ${

@@ -5,6 +5,7 @@ import api from "../../lib/axios";
 import type { Payment, Pagination } from "../../types";
 import { usePermission } from "../../hooks/usePermission";
 import PaymentInsights from "../../components/Payments/PaymentInsights";
+import { isReadOnly } from "../../lib/permissions";
 
 const statusConfig = {
   VERIFIED: {
@@ -64,7 +65,7 @@ const PaymentsPage = () => {
             {pagination?.total || 0} total payments
           </p>
         </div>
-        {can("payments", "write") && (
+        {can("payments", "write") && !isReadOnly() && (
           <button
             onClick={() => navigate("/payments/record")}
             className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm hover:bg-[var(--color-primary-dark)]"

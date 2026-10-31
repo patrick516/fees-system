@@ -27,6 +27,7 @@ import { getCurrentAcademicYear } from "../../lib/utils";
 import api from "../../lib/axios";
 import { useActiveTerm } from "../../hooks/useActiveTerm";
 import AnalyticsTab from "./AnalyticsTab";
+import { isReadOnly } from "../../lib/permissions";
 
 const defaultPointsBoundaries = [
   { minPercent: 80, maxPercent: 100, gradePoint: 1, gradeLabel: "" },
@@ -104,7 +105,7 @@ const ResultsPage = () => {
   const [pendingRows, setPendingRows] = useState<any[]>([]);
   const [resolvingRowId, setResolvingRowId] = useState<string | null>(null);
 
-  // 🎯 Warn if English was missing from upload
+  //  Warn if English was missing from upload
   const [englishMissingWarning, setEnglishMissingWarning] = useState(false);
 
   const boundaries =
@@ -353,7 +354,7 @@ const ResultsPage = () => {
                 </button>
               </div>
             </div>
-            {!editingBoundaries && (
+            {!editingBoundaries && !isReadOnly() && (
               <button
                 onClick={() => setEditingBoundaries(true)}
                 className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)]"
@@ -508,43 +509,47 @@ const ResultsPage = () => {
         {/* Exam Periods */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <h3 className="font-medium text-gray-800 mb-4">Exam Periods</h3>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-            <input
-              placeholder="Name eg. End of Term 2"
-              value={newPeriod.name}
-              onChange={(e) =>
-                setNewPeriod({ ...newPeriod, name: e.target.value })
-              }
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm col-span-2"
-            />
-            <Select
-              value={newPeriod.term}
-              onValueChange={(v) => setNewPeriod({ ...newPeriod, term: v })}
-            >
-              <SelectTrigger className="w-full bg-transparent border-gray-200 rounded-lg text-sm h-auto py-2">
-                <SelectValue placeholder="Term" />
-              </SelectTrigger>
-              <SelectContent className="bg-white">
-                <SelectItem value="TERM_1">Term 1</SelectItem>
-                <SelectItem value="TERM_2">Term 2</SelectItem>
-                <SelectItem value="TERM_3">Term 3</SelectItem>
-              </SelectContent>
-            </Select>
-            <input
-              placeholder="eg. 2025-2026"
-              value={newPeriod.academicYear}
-              onChange={(e) =>
-                setNewPeriod({ ...newPeriod, academicYear: e.target.value })
-              }
-              className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
-            />
-          </div>
-          <button
-            onClick={handleCreatePeriod}
-            className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)]"
-          >
-            <Plus size={14} /> Create Exam Period
-          </button>
+          {!isReadOnly() && (
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                <input
+                  placeholder="Name eg. End of Term 2"
+                  value={newPeriod.name}
+                  onChange={(e) =>
+                    setNewPeriod({ ...newPeriod, name: e.target.value })
+                  }
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm col-span-2"
+                />
+                <Select
+                  value={newPeriod.term}
+                  onValueChange={(v) => setNewPeriod({ ...newPeriod, term: v })}
+                >
+                  <SelectTrigger className="w-full bg-transparent border-gray-200 rounded-lg text-sm h-auto py-2">
+                    <SelectValue placeholder="Term" />
+                  </SelectTrigger>
+                  <SelectContent className="bg-white">
+                    <SelectItem value="TERM_1">Term 1</SelectItem>
+                    <SelectItem value="TERM_2">Term 2</SelectItem>
+                    <SelectItem value="TERM_3">Term 3</SelectItem>
+                  </SelectContent>
+                </Select>
+                <input
+                  placeholder="eg. 2025-2026"
+                  value={newPeriod.academicYear}
+                  onChange={(e) =>
+                    setNewPeriod({ ...newPeriod, academicYear: e.target.value })
+                  }
+                  className="px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                />
+              </div>
+              <button
+                onClick={handleCreatePeriod}
+                className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)]"
+              >
+                <Plus size={14} /> Create Exam Period
+              </button>
+            </>
+          )}
 
           {periods.length > 0 && (
             <div className="mt-4 overflow-hidden rounded-lg border border-gray-100">
@@ -572,12 +577,20 @@ const ResultsPage = () => {
                         {p.academicYear}
                       </td>
                       <td className="px-4 py-2 text-right">
-                        <button
-                          onClick={() => handleToggleActive(p.id, p.isActive)}
-                          className={`text-xs px-3 py-1 rounded-full font-medium ${p.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
-                        >
-                          {p.isActive ? "Visible to parents" : "Hidden"}
-                        </button>
+                        {isReadOnly() ? (
+                          <span
+                            className={`text-xs px-3 py-1 rounded-full font-medium ${p.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
+                          >
+                            {p.isActive ? "Visible to parents" : "Hidden"}
+                          </span>
+                        ) : (
+                          <button
+                            onClick={() => handleToggleActive(p.id, p.isActive)}
+                            className={`text-xs px-3 py-1 rounded-full font-medium ${p.isActive ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500"}`}
+                          >
+                            {p.isActive ? "Visible to parents" : "Hidden"}
+                          </button>
+                        )}
                       </td>
                     </tr>
                   ))}
@@ -741,134 +754,163 @@ const ResultsPage = () => {
                   </div>
                 ) : selectedClass ? (
                   <div className="space-y-4">
-                    {/* Upload form OR "Already uploaded" card */}
-                    {(() => {
-                      const alreadyUploaded =
-                        currentSummary?.hasResults === true;
-
-                      // Show the "already uploaded" card
-                      if (alreadyUploaded && !reuploadMode) {
-                        return (
-                          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                            <div className="flex items-start gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
-                                <Check className="text-green-600" size={20} />
-                              </div>
-                              <div className="flex-1">
-                                <h4 className="font-medium text-green-900 text-sm">
-                                  Results Already Uploaded
-                                </h4>
-                                <p className="text-xs text-green-700 mt-1">
-                                  {currentSummary.studentsUploaded} student
-                                  {currentSummary.studentsUploaded === 1
-                                    ? ""
-                                    : "s"}{" "}
-                                  processed for this class.
-                                </p>
-                                {currentSummary.lastUploadedAt && (
-                                  <p className="text-[11px] text-green-600 mt-2">
-                                    📅 Last uploaded:{" "}
-                                    {new Date(
-                                      currentSummary.lastUploadedAt,
-                                    ).toLocaleString()}
-                                  </p>
-                                )}
-                                {currentSummary.sourceFileUrl && (
-                                  <a
-                                    href={currentSummary.sourceFileUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1 text-[11px] text-green-700 underline mt-1"
-                                  >
-                                    📄 View uploaded source file
-                                  </a>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="mt-4 pt-3 border-t border-green-200 flex items-center justify-between">
-                              <p className="text-[11px] text-green-700">
-                                Re-uploading will overwrite existing results.
+                    {isReadOnly() ? (
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center shrink-0">
+                            <Eye className="text-blue-600" size={20} />
+                          </div>
+                          <div className="flex-1">
+                            <h4 className="font-medium text-blue-900 text-sm">
+                              Read-Only Mode
+                            </h4>
+                            <p className="text-xs text-blue-700 mt-1">
+                              You are viewing this school's results as a Group
+                              Director. Uploads and edits are disabled. Contact
+                              the School Admin to make changes.
+                            </p>
+                            {currentSummary?.hasResults && (
+                              <p className="text-[11px] text-blue-600 mt-2">
+                                📊 {currentSummary.studentsUploaded} student
+                                {currentSummary.studentsUploaded === 1
+                                  ? ""
+                                  : "s"}{" "}
+                                already uploaded
                               </p>
-                              {/* 🎯 Opens the beautiful confirmation modal */}
-                              <button
-                                onClick={() => setShowReuploadConfirm(true)}
-                                className="text-xs font-semibold text-red-600 hover:text-red-800 px-3 py-1.5 rounded-lg border border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors flex items-center gap-1.5"
-                              >
-                                <RefreshCw size={12} /> Re-upload (overwrites)
-                              </button>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Upload form OR "Already uploaded" card */
+                      (() => {
+                        const alreadyUploaded =
+                          currentSummary?.hasResults === true;
+
+                        // Show the "already uploaded" card
+                        if (alreadyUploaded && !reuploadMode) {
+                          return (
+                            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                              <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center shrink-0">
+                                  <Check className="text-green-600" size={20} />
+                                </div>
+                                <div className="flex-1">
+                                  <h4 className="font-medium text-green-900 text-sm">
+                                    Results Already Uploaded
+                                  </h4>
+                                  <p className="text-xs text-green-700 mt-1">
+                                    {currentSummary.studentsUploaded} student
+                                    {currentSummary.studentsUploaded === 1
+                                      ? ""
+                                      : "s"}{" "}
+                                    processed for this class.
+                                  </p>
+                                  {currentSummary.lastUploadedAt && (
+                                    <p className="text-[11px] text-green-600 mt-2">
+                                      📅 Last uploaded:{" "}
+                                      {new Date(
+                                        currentSummary.lastUploadedAt,
+                                      ).toLocaleString()}
+                                    </p>
+                                  )}
+                                  {currentSummary.sourceFileUrl && (
+                                    <a
+                                      href={currentSummary.sourceFileUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1 text-[11px] text-green-700 underline mt-1"
+                                    >
+                                      📄 View uploaded source file
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="mt-4 pt-3 border-t border-green-200 flex items-center justify-between">
+                                <p className="text-[11px] text-green-700">
+                                  Re-uploading will overwrite existing results.
+                                </p>
+                                {/* 🎯 Opens the beautiful confirmation modal */}
+                                <button
+                                  onClick={() => setShowReuploadConfirm(true)}
+                                  className="text-xs font-semibold text-red-600 hover:text-red-800 px-3 py-1.5 rounded-lg border border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors flex items-center gap-1.5"
+                                >
+                                  <RefreshCw size={12} /> Re-upload (overwrites)
+                                </button>
+                              </div>
                             </div>
+                          );
+                        }
+
+                        // Show the upload form
+                        return (
+                          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                            {alreadyUploaded && (
+                              <div className="flex items-center gap-2 mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                                <AlertTriangle
+                                  size={14}
+                                  className="text-amber-600 shrink-0"
+                                />
+                                <p className="text-[11px] text-amber-800">
+                                  ⚠️ Re-upload mode — existing results will be
+                                  overwritten.
+                                </p>
+                                <button
+                                  onClick={() => setReuploadMode(false)}
+                                  className="ml-auto text-[11px] text-amber-700 hover:text-amber-900 underline"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            )}
+
+                            <h4 className="font-medium text-gray-800 text-sm mb-1">
+                              {selectedClassObj?.name} — Upload Results
+                            </h4>
+                            <p className="text-xs text-gray-500 mb-3">
+                              Grading System:{" "}
+                              <strong>
+                                {selectedClassObj?.gradingSystem === "LETTER"
+                                  ? "Letter Grades (A-F)"
+                                  : "Points (1-9)"}
+                              </strong>{" "}
+                              (Locked)
+                            </p>
+
+                            <input
+                              type="file"
+                              accept=".xlsx,.xls,.csv"
+                              onChange={(e) =>
+                                setFile(e.target.files?.[0] || null)
+                              }
+                              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[var(--color-primary-light)] file:text-[var(--color-primary-dark)] hover:file:bg-[var(--color-primary-light)]/80 mb-3"
+                            />
+
+                            <button
+                              onClick={handleUpload}
+                              disabled={uploading || !file}
+                              className="flex items-center justify-center gap-2 w-full bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
+                            >
+                              {uploading ? (
+                                <Loader2 size={14} className="animate-spin" />
+                              ) : (
+                                <Upload size={14} />
+                              )}
+                              {uploading ? "Uploading..." : "Upload Sheet"}
+                            </button>
+                            {message && (
+                              <p className="text-xs text-center mt-2 text-gray-600">
+                                {message}
+                              </p>
+                            )}
                           </div>
                         );
-                      }
-
-                      // Show the upload form
-                      return (
-                        <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                          {alreadyUploaded && (
-                            <div className="flex items-center gap-2 mb-3 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
-                              <AlertTriangle
-                                size={14}
-                                className="text-amber-600 shrink-0"
-                              />
-                              <p className="text-[11px] text-amber-800">
-                                ⚠️ Re-upload mode — existing results will be
-                                overwritten.
-                              </p>
-                              <button
-                                onClick={() => setReuploadMode(false)}
-                                className="ml-auto text-[11px] text-amber-700 hover:text-amber-900 underline"
-                              >
-                                Cancel
-                              </button>
-                            </div>
-                          )}
-
-                          <h4 className="font-medium text-gray-800 text-sm mb-1">
-                            {selectedClassObj?.name} — Upload Results
-                          </h4>
-                          <p className="text-xs text-gray-500 mb-3">
-                            Grading System:{" "}
-                            <strong>
-                              {selectedClassObj?.gradingSystem === "LETTER"
-                                ? "Letter Grades (A-F)"
-                                : "Points (1-9)"}
-                            </strong>{" "}
-                            (Locked)
-                          </p>
-
-                          <input
-                            type="file"
-                            accept=".xlsx,.xls,.csv"
-                            onChange={(e) =>
-                              setFile(e.target.files?.[0] || null)
-                            }
-                            className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[var(--color-primary-light)] file:text-[var(--color-primary-dark)] hover:file:bg-[var(--color-primary-light)]/80 mb-3"
-                          />
-
-                          <button
-                            onClick={handleUpload}
-                            disabled={uploading || !file}
-                            className="flex items-center justify-center gap-2 w-full bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
-                          >
-                            {uploading ? (
-                              <Loader2 size={14} className="animate-spin" />
-                            ) : (
-                              <Upload size={14} />
-                            )}
-                            {uploading ? "Uploading..." : "Upload Sheet"}
-                          </button>
-                          {message && (
-                            <p className="text-xs text-center mt-2 text-gray-600">
-                              {message}
-                            </p>
-                          )}
-                        </div>
-                      );
-                    })()}
+                      })()
+                    )}
 
                     {/* Pending Name Matches */}
-                    {pendingRows.length > 0 && (
+                    {pendingRows.length > 0 && !isReadOnly() && (
                       <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
                         <div className="flex items-center gap-2 mb-2">
                           <AlertTriangle size={14} className="text-amber-600" />
