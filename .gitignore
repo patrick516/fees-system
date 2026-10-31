@@ -1,2 +1,6 @@
 .vercel
 .env*
+
+# Database backups (contain sensitive data)
+backend/backups/
+*.sql
