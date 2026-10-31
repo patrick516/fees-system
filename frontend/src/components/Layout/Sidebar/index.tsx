@@ -141,9 +141,17 @@ const Sidebar = () => {
   const [groupSchools, setGroupSchools] = useState<any[]>([]);
   const [activeSchool, setActiveSchool] = useState<any>(null);
   const [showSchoolSwitcher, setShowSchoolSwitcher] = useState(false);
-
   const isGroupAdmin = staff?.isGroupAdmin || false;
-  const viewingAsGroup = !!localStorage.getItem("activeSchoolId");
+  const [viewingAsGroup, setViewingAsGroup] = useState(
+    () => !!localStorage.getItem("activeSchoolId"),
+  );
+
+  useEffect(() => {
+    const checkActive = () => {
+      setViewingAsGroup(!!localStorage.getItem("activeSchoolId"));
+    };
+    checkActive();
+  }, []);
 
   useEffect(() => {
     if (!isGroupAdmin) {
@@ -156,15 +164,18 @@ const Sidebar = () => {
         const res = await api.get("/group/schools");
         setGroupSchools(res.data.data);
 
-        const activeId =
-          localStorage.getItem("activeSchoolId") || staff?.schoolId;
-        const matched = res.data.data.find((s: any) => s.id === activeId);
+        const storedId = localStorage.getItem("activeSchoolId");
+        const matched = storedId
+          ? res.data.data.find((s: any) => s.id === storedId)
+          : null;
 
         if (matched) {
           setActiveSchool(matched);
-        } else if (res.data.data.length > 0) {
-          setActiveSchool(res.data.data[0]);
-          localStorage.setItem("activeSchoolId", res.data.data[0].id);
+        } else {
+          //  No stored school — show group mode (don't auto-set!)
+          setActiveSchool(
+            res.data.data.length > 0 ? res.data.data[0] : staff?.school,
+          );
         }
       } catch (err) {
         console.error("Failed to load group schools");
@@ -318,13 +329,15 @@ const Sidebar = () => {
           </div>
         )}
 
-        {/* 🎯 Back to Group button (only when viewing a specific school) */}
+        {/*  Back to Group button (only when viewing a specific school) */}
         {isGroupAdmin && viewingAsGroup && (
           <div className="mb-4">
             <button
               onClick={() => {
                 localStorage.removeItem("activeSchoolId");
                 localStorage.removeItem("isViewingAsGroupAdmin");
+                sessionStorage.clear();
+                //  Hard reload — forces full component remount
                 window.location.href = "/group";
               }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-amber-300 hover:bg-white/10 transition-colors"

@@ -16,6 +16,11 @@ const GroupDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
 
+  useEffect(() => {
+    localStorage.removeItem("activeSchoolId");
+    localStorage.removeItem("isViewingAsGroupAdmin");
+  }, []);
+
   // Add School Form State
   const [form, setForm] = useState({
     schoolName: "",
