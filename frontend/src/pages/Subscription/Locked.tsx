@@ -29,13 +29,11 @@ export default function SubscriptionLocked() {
   const [proofFile, setProofFile] = useState<File | null>(null);
   const [submittingComplaint, setSubmittingComplaint] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const isPayingRef = useRef(false);
 
-  //  Auto-poll: check every 5s if the subscription has been unlocked
-  //  Auto-poll: check every 5s if the subscription has been unlocked
-  // 🎯 Ref to prevent multiple triggers
   const hasUnlockedRef = useRef(false);
 
-  // 🎯 Auto-poll: check every 5s if the subscription has been unlocked
+  //  Auto-poll: check every 5s if the subscription has been unlocked
   useEffect(() => {
     const checkUnlock = async () => {
       // If we already triggered the unlock, don't do anything else
@@ -73,6 +71,8 @@ export default function SubscriptionLocked() {
   }, []);
 
   const handlePay = async () => {
+    if (isPayingRef.current) return;
+    isPayingRef.current = true;
     setLoading(true);
     setError("");
     try {
@@ -85,6 +85,7 @@ export default function SubscriptionLocked() {
       setError(err.response?.data?.message || "Failed to initiate payment");
     } finally {
       setLoading(false);
+      isPayingRef.current = false;
     }
   };
 

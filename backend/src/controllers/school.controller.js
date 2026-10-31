@@ -449,7 +449,7 @@ const updateNotificationDefaults = async (req, res) => {
 };
 
 //  INITIATE SUBSCRIPTION PAYMENT
-// POST /api/schools/subscription/pay
+
 const onekhusa = require("../lib/onekhusa"); // Make sure this is imported at top
 
 const initiateSubscriptionPayment = async (req, res) => {
@@ -458,6 +458,31 @@ const initiateSubscriptionPayment = async (req, res) => {
       where: { id: req.schoolId },
     });
     const platform = await prisma.platform.findFirst();
+
+    const existingPayment = await prisma.subscriptionPayment.findFirst({
+      where: {
+        schoolId: school.id,
+        status: "PENDING",
+        createdAt: {
+          gte: new Date(Date.now() - 15 * 60 * 1000), // Last 15 minutes
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    if (existingPayment && existingPayment.onekhusaTimedAccount) {
+      return res.json({
+        success: true,
+        data: {
+          paymentId: existingPayment.id,
+          timedAccountNumber: existingPayment.onekhusaTimedAccount,
+          amount: Number(existingPayment.amount),
+          expiryDate: new Date(
+            existingPayment.createdAt.getTime() + 15 * 60 * 1000,
+          ),
+        },
+      });
+    }
 
     if (!platform?.subscriptionMerchantAccount) {
       return res.status(400).json({

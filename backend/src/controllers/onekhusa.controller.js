@@ -197,8 +197,11 @@ const handleSubscriptionWebhook = async (body, platform, eventType) => {
     return;
   }
 
+  //  IDEMPOTENCY: Handle OneKhusa webhook retries
   if (payment.status !== "PENDING") {
-    console.log("[onekhusa-sub] Payment already resolved, skipping");
+    console.log(
+      `[onekhusa]  Ignoring duplicate webhook. Payment ${payment.id} is already ${payment.status}`,
+    );
     return;
   }
 
@@ -436,13 +439,16 @@ const webhook = async (req, res) => {
       return;
     }
 
+    //  IDEMPOTENCY: Handle OneKhusa webhook retries
     if (payment.status !== "PENDING") {
-      console.log("[onekhusa] Payment already resolved, skipping");
+      console.log(
+        `[onekhusa-sub]  Ignoring duplicate webhook. Payment ${payment.id} is already ${payment.status}`,
+      );
       return;
     }
 
     if (eventType === "payrequest.success" && transactionStatusCode === "S") {
-      // 🎯 Extract the fee data sent by OneKhusa
+      //  Extract the fee data sent by OneKhusa
       const amountReceived = req.body.beneficiary?.amountReceived;
       const transactionFee = req.body.transaction?.transactionFee;
 

@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
@@ -57,6 +57,7 @@ export default function PayPage() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState("");
+  const isUploadingRef = useRef(false);
 
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
 
@@ -64,7 +65,7 @@ export default function PayPage() {
     if (!paymentInfo) return [];
     const methods = [];
 
-    // 🎯 Airtel Money — always shown if school has saved a number
+    //  Airtel Money — always shown if school has saved a number
     if (paymentInfo.airtelMoneyNumber) {
       methods.push({
         value: "AIRTEL_MONEY",
@@ -177,6 +178,8 @@ export default function PayPage() {
 
   const handleReceiptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isUploadingRef.current) return;
+
     setError("");
 
     const amount = parseFloat(form.amount);
@@ -190,6 +193,7 @@ export default function PayPage() {
     }
 
     setLoading(true);
+    isUploadingRef.current = true;
     try {
       const formData = new FormData();
       formData.append("studentId", student?.id || "");
@@ -211,6 +215,7 @@ export default function PayPage() {
       );
     } finally {
       setLoading(false);
+      isUploadingRef.current = false;
     }
   };
 
