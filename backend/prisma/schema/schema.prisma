@@ -1,7 +1,20 @@
-  generator client {
-    provider = "prisma-client-js"
-  }
+generator client {
+  provider = "prisma-client-js"
+}
 
-  datasource db {
-    provider = "postgresql"
-  }
+datasource db {
+  provider = "postgresql"
+}
+
+// Allows a Director to manage multiple schools under one umbrella.
+model SchoolGroup {
+  id        String   @id @default(uuid())
+  name      String  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  schools School[]
+  staff   Staff[]  
+
+  @@map("school_groups")
+}

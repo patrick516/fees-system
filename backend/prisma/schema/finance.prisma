@@ -30,8 +30,9 @@ model FeeStructure {
 
   academicYear String
   term         Term
-  totalAmount  Decimal @db.Decimal(12, 2)
   currency     String  @default("MWK")
+  dayAmount      Decimal @db.Decimal(12, 2)
+  boardingAmount Decimal @db.Decimal(12, 2)
 
   tuitionFee           Decimal? @db.Decimal(12, 2)
   examFee              Decimal? @db.Decimal(12, 2)

@@ -30,6 +30,11 @@ model Class {
   @@map("classes")
 }
 
+enum StudentType {
+  DAY
+  BOARDING
+}
+
 model Student {
   id       String @id @default(uuid())
   schoolId String
@@ -47,6 +52,7 @@ model Student {
 
   dateOfBirth DateTime
   gender      Gender
+  studentType StudentType @default(DAY) 
   photo       String?
   isActive    Boolean  @default(true)
 
@@ -68,7 +74,6 @@ model Student {
   @@unique([schoolId, studentCode])
   @@map("students")
 }
-
 model TermActivation {
   id       String @id @default(uuid())
   schoolId String

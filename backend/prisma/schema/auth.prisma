@@ -25,7 +25,6 @@ model Platform {
   email String
   phone String
 
-  //  Subscription Defaults (per new school) 
   defaultTermPrice                  Float   @default(0)
   defaultTrialDays                  Int     @default(30)
   currency                          String  @default("MWK")
@@ -47,6 +46,8 @@ model Platform {
 //  SCHOOL
 model School {
   id         String   @id @default(uuid())
+  groupId String?
+  group   SchoolGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   platformId String
   platform   Platform @relation(fields: [platformId], references: [id])
 
@@ -164,8 +165,11 @@ model Role {
 //  STAFF 
 model Staff {
   id       String @id @default(uuid())
-  schoolId String
-  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  schoolId String?
+  groupId String?
+  group   SchoolGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  isGroupAdmin Boolean @default(false)
+  school   School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
