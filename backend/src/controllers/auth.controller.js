@@ -234,6 +234,8 @@ const staffLogin = async (req, res) => {
           fullName: staff.fullName,
           email: staff.email,
           phone: staff.phone,
+          isGroupAdmin: staff.isGroupAdmin,
+          groupId: staff.groupId,
           role: {
             id: staff.role.id,
             name: staff.role.name,
@@ -267,6 +269,8 @@ const getStaffProfile = async (req, res) => {
         fullName: true,
         email: true,
         phone: true,
+        isGroupAdmin: true,
+        groupId: true,
         role: {
           select: { id: true, name: true, permissions: true },
         },

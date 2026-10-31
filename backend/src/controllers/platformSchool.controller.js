@@ -244,6 +244,7 @@ const inviteSchool = async (req, res) => {
         admin: {
           id: result.admin.id,
           email: result.admin.email,
+          isGroupAdmin: result.admin.isGroupAdmin,
         },
       },
     });
