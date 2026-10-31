@@ -301,7 +301,7 @@ const getAnalytics = async (req, res) => {
       include: { school: { select: { name: true } } },
     });
 
-    const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalRevenue = payments.reduce((sum, p) => sum + Number(p.amount), 0);
     const onekhusaRevenue = payments
       .filter((p) => p.method === "ONEKHUSA")
       .reduce((sum, p) => sum + p.amount, 0);
