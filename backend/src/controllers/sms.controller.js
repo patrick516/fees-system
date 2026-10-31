@@ -1,8 +1,7 @@
-// backend/src/controllers/sms.controller.js
 const prisma = require("../config/db");
 const { sendNotifications } = require("../lib/notifier");
 
-// ==================== HELPER: Resolve the default channel ====================
+//  HELPER: Resolve the default channel
 const resolveChannel = (requested, school) => {
   if (requested && ["SMS", "EMAIL", "BOTH"].includes(requested.toUpperCase())) {
     return requested.toUpperCase();
@@ -10,7 +9,7 @@ const resolveChannel = (requested, school) => {
   return school?.notificationDefaults?.defaultChannel || "BOTH";
 };
 
-// ==================== BULK SEND ====================
+//  BULK SEND
 // POST /api/sms/bulk
 // Body: { type, message?, term?, channel? }
 const sendBulkSMS = async (req, res) => {

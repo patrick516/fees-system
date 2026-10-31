@@ -186,6 +186,7 @@ const schoolRequestRoutes = require("./src/routes/schoolRequest.routes");
 const employeeRoutes = require("./src/routes/employee.routes");
 const payrollRoutes = require("./src/routes/payroll.routes");
 const supportRoutes = require("./src/routes/support.routes");
+const groupRoutes = require("./src/routes/group.routes");
 const parentSupportRoutes = require("./src/routes/parentSupport.routes");
 const platformSupportRoutes = require("./src/routes/platformSupport.routes");
 
@@ -212,6 +213,7 @@ app.use("/api/audit", requireActiveSubscription, auditRoutes);
 app.use("/api/employees", employeeRoutes);
 app.use("/api/payroll", payrollRoutes);
 app.use("/api/support", supportRoutes);
+app.use("/api/group", groupRoutes);
 app.use("/api/parent/support", parentSupportRoutes);
 app.use("/api/platform/support", platformSupportRoutes);
 

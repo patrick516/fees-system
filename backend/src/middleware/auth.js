@@ -2,6 +2,19 @@ const jwt = require("jsonwebtoken");
 const prisma = require("../config/db");
 const { logAudit } = require("../lib/audit");
 
+const getActiveSchoolId = (req, staff) => {
+  // 1. If the user is a Group Admin, check if they passed a specific school in headers
+  const headerSchoolId = req.headers["x-active-school-id"];
+
+  if (staff.isGroupAdmin && headerSchoolId) {
+    // Security check: We will verify in the specific controllers if this school belongs to their group.
+    return headerSchoolId;
+  }
+
+  // 2. Default to their assigned school
+  return staff.schoolId;
+};
+
 // STAFF AUTH
 const verifyStaff = async (req, res, next) => {
   try {
@@ -17,12 +30,12 @@ const verifyStaff = async (req, res, next) => {
     const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Load staff with role + school (role is now a relation)
     const staff = await prisma.staff.findUnique({
       where: { id: decoded.id },
       include: {
         role: { select: { id: true, name: true, permissions: true } },
         school: true,
+        group: true,
       },
     });
 
@@ -34,8 +47,8 @@ const verifyStaff = async (req, res, next) => {
     }
 
     req.staff = staff;
-    req.schoolId = staff.schoolId;
-    // Make sure IP + UA are always available for downstream audit calls
+    req.schoolId = getActiveSchoolId(req, staff);
+
     if (!req.ip) req.ip = req.socket?.remoteAddress;
     next();
   } catch (error) {
@@ -46,7 +59,7 @@ const verifyStaff = async (req, res, next) => {
   }
 };
 
-// ==================== GENERIC AUTHENTICATE ====================
+//  GENERIC AUTHENTICATE
 const authenticate = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -69,6 +82,8 @@ const authenticate = async (req, res, next) => {
       select: {
         id: true,
         schoolId: true,
+        groupId: true,
+        isGroupAdmin: true,
         email: true,
         fullName: true,
         isActive: true,
@@ -105,7 +120,7 @@ const authenticate = async (req, res, next) => {
     }
 
     req.staff = staff;
-    req.schoolId = staff.schoolId;
+    req.schoolId = getActiveSchoolId(req, staff);
     next();
   } catch (err) {
     console.error("Auth middleware error:", err);
@@ -113,7 +128,7 @@ const authenticate = async (req, res, next) => {
   }
 };
 
-// ==================== PARENT AUTH ====================
+//  PARENT AUTH
 const verifyParent = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -149,6 +164,7 @@ const verifyParent = async (req, res, next) => {
 
     req.student = student;
     req.parentPhone = decoded.phone;
+    req.schoolId = student.schoolId;
     next();
   } catch (error) {
     return res.status(401).json({
@@ -200,6 +216,7 @@ const verifyStaffOrParent = async (req, res, next) => {
       include: {
         role: { select: { id: true, name: true, permissions: true } },
         school: true,
+        group: true,
       },
     });
 
@@ -211,7 +228,7 @@ const verifyStaffOrParent = async (req, res, next) => {
     }
 
     req.staff = staff;
-    req.schoolId = staff.schoolId;
+    req.schoolId = getActiveSchoolId(req, staff);
     req.userType = "STAFF";
     next();
   } catch (error) {
