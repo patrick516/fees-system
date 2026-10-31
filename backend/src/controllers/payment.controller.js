@@ -4,7 +4,7 @@ const { generateReceiptNumber, buildSchoolPrefix } = require("../lib/utils");
 const { sendNotifications } = require("../lib/notifier");
 const { reconcileVerifiedPayment } = require("../lib/paymentReconciliation"); // 🎯 Centralized logic
 
-// 🎯 RENAMED & FIXED: Accepts any manual payment method (CASH, BANK, MOBILE) and respects discounts
+//  RENAMED & FIXED: Accepts any manual payment method (CASH, BANK, MOBILE) and respects discounts
 const recordManualPayment = async (req, res) => {
   try {
     const { studentId, amount, term, academicYear, notes, paymentMethod } =
@@ -42,11 +42,18 @@ const recordManualPayment = async (req, res) => {
         },
       });
 
-      let requiredAmount = feeStructure?.totalAmount
-        ? Number(feeStructure.totalAmount)
-        : null;
+      //  Day vs Boarding Logic
+      let baseAmount = 0;
+      if (feeStructure) {
+        if (student.studentType === "BOARDING") {
+          baseAmount = Number(feeStructure.boardingAmount || 0);
+        } else {
+          baseAmount = Number(feeStructure.dayAmount || 0);
+        }
+      }
+      let requiredAmount = baseAmount > 0 ? baseAmount : null;
 
-      // 🎯 FIX: Deduct the student's discount from the required amount
+      //  FIX: Deduct the student's discount from the required amount
       if (requiredAmount) {
         const discount = await tx.studentDiscount.findUnique({
           where: {
@@ -264,7 +271,6 @@ const submitPayment = async (req, res) => {
       where: { id: studentId },
       include: { school: { select: { name: true } }, class: true },
     });
-
     const feeStructure = await prisma.feeStructure.findFirst({
       where: {
         schoolId: req.student.schoolId,
@@ -275,11 +281,18 @@ const submitPayment = async (req, res) => {
       },
     });
 
-    let requiredAmount = feeStructure?.totalAmount
-      ? Number(feeStructure.totalAmount)
-      : null;
+    //  Day vs Boarding Logic
+    let baseAmount = 0;
+    if (feeStructure) {
+      if (student.studentType === "BOARDING") {
+        baseAmount = Number(feeStructure.boardingAmount || 0);
+      } else {
+        baseAmount = Number(feeStructure.dayAmount || 0);
+      }
+    }
+    let requiredAmount = baseAmount > 0 ? baseAmount : null;
 
-    // 🎯 FIX: Deduct discount for parent-submitted payments too
+    //  FIX: Deduct discount for parent-submitted payments too
     if (requiredAmount) {
       const discount = await prisma.studentDiscount.findUnique({
         where: {
@@ -796,14 +809,22 @@ const getPaymentSummary = async (req, res) => {
       noFeeCount = 0;
 
     for (const s of students) {
-      const baseFee = s.class.feeStructures[0]?.totalAmount
-        ? Number(s.class.feeStructures[0].totalAmount)
-        : 0;
-      if (baseFee === 0) {
+      const fs = s.class.feeStructures[0];
+      if (!fs) {
         noFeeCount++;
         continue;
       }
 
+      //  Day vs Boarding Logic
+      const baseFee =
+        s.studentType === "BOARDING"
+          ? Number(fs.boardingAmount || 0)
+          : Number(fs.dayAmount || 0);
+
+      if (baseFee === 0) {
+        noFeeCount++;
+        continue;
+      }
       const discountAmt = s.discounts[0]?.amount
         ? Number(s.discounts[0].amount)
         : 0;

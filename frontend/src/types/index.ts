@@ -64,6 +64,9 @@ export interface Staff {
   lastName: string;
   fullName: string;
   email: string;
+  schoolId?: string;
+  isGroupAdmin?: boolean;
+  groupId?: string;
   phone: string;
   role: Role;
   avatar: string | null;

@@ -6,8 +6,15 @@ const {
   getDailyCollectionReport,
   getFinancialStatement,
 } = require("../controllers/report.controller");
-const { verifyStaff } = require("../middleware/auth");
+const { downloadReportCard } = require("../controllers/reportCard.controller");
+const { verifyStaff, verifyStaffOrParent } = require("../middleware/auth");
 const { requirePermission } = require("../middleware/role");
+
+// 🎯 REPORT CARD: Accessible by BOTH Staff and Parents
+// (The controller handles the security to ensure a parent can only download their own child's card)
+router.get("/report-card", verifyStaffOrParent, downloadReportCard);
+
+// ==================== STAFF ONLY REPORTS ====================
 
 // Existing
 router.get(

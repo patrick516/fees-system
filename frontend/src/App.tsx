@@ -46,6 +46,7 @@ import EmployeeDetail from "./pages/Employees/Detail";
 import PayrollPage from "./pages/Payroll/index";
 import SupportPage from "./pages/Support/index";
 import PlatformSupportPage from "./pages/Platform/Support";
+import GroupDashboard from "./pages/Group/GroupDashboard";
 
 //  GUARDS
 
@@ -225,6 +226,7 @@ function App() {
         >
           <Route index element={<Navigate to="/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
+          <Route path="/group" element={<GroupDashboard />} />
           <Route
             path="students"
             element={

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, Home, Bus } from "lucide-react";
 import { format } from "date-fns";
 import api from "../../lib/axios";
 import type { Class } from "../../types";
@@ -39,9 +39,9 @@ const AddStudent = () => {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
-  // DOB split into three parts (day/month/year) driven by shadcn Selects
+  // DOB split into three parts
   const [dobDay, setDobDay] = useState("");
-  const [dobMonth, setDobMonth] = useState(""); // "1" .. "12"
+  const [dobMonth, setDobMonth] = useState("");
   const [dobYear, setDobYear] = useState("");
 
   const { academicYear: activeYear } = useActiveTerm();
@@ -52,6 +52,7 @@ const AddStudent = () => {
     lastName: "",
     gender: "",
     classId: "",
+    studentType: "DAY", // 🎯 Added Student Type
     parentName: "",
     parentPhone: "",
     parentPhone2: "",
@@ -59,7 +60,6 @@ const AddStudent = () => {
     academicYear: getCurrentAcademicYear(),
   });
 
-  // Years list — current year down to 1950
   const YEARS = useMemo(() => {
     const currentYear = new Date().getFullYear();
     const years: number[] = [];
@@ -67,33 +67,28 @@ const AddStudent = () => {
     return years;
   }, []);
 
-  // Days in the selected month/year (or 31 if month not picked yet)
   const daysInMonth = useMemo(() => {
     if (!dobMonth || !dobYear) return 31;
     const y = parseInt(dobYear);
     const m = parseInt(dobMonth);
-    return new Date(y, m, 0).getDate(); // 0 gives last day of previous month
+    return new Date(y, m, 0).getDate();
   }, [dobMonth, dobYear]);
 
-  // Derived Date object — undefined unless all three parts are set and valid
   const dateOfBirth = useMemo(() => {
     if (!dobDay || !dobMonth || !dobYear) return undefined;
     const y = parseInt(dobYear);
     const m = parseInt(dobMonth);
     const d = parseInt(dobDay);
     const date = new Date(y, m - 1, d);
-    // Reject overflow (e.g. Feb 30 → Mar 2)
     if (
       date.getFullYear() !== y ||
       date.getMonth() !== m - 1 ||
       date.getDate() !== d
-    ) {
+    )
       return undefined;
-    }
     return date;
   }, [dobDay, dobMonth, dobYear]);
 
-  // If the day exceeds the days in the newly chosen month, clear it
   useEffect(() => {
     if (!dobDay) return;
     const d = parseInt(dobDay);
@@ -101,17 +96,13 @@ const AddStudent = () => {
   }, [daysInMonth, dobDay]);
 
   useEffect(() => {
-    if (activeYear) {
-      setForm((prev) => ({ ...prev, academicYear: activeYear }));
-    }
+    if (activeYear) setForm((prev) => ({ ...prev, academicYear: activeYear }));
   }, [activeYear]);
 
   useEffect(() => {
     api
       .get("/schools/classes")
-      .then((res) => {
-        setClasses(res.data.data);
-      })
+      .then((res) => setClasses(res.data.data))
       .catch(() => {});
   }, []);
 
@@ -119,33 +110,17 @@ const AddStudent = () => {
     e.preventDefault();
     setError("");
 
-    if (!form.firstName.trim() || !form.lastName.trim()) {
-      setError("First name and last name are required");
-      return;
-    }
-
-    if (!form.gender || !form.classId) {
-      setError("Please select gender and class");
-      return;
-    }
-
-    if (!dateOfBirth) {
-      setError("Please select a valid date of birth");
-      return;
-    }
-
-    if (form.parentPhone.length !== 9) {
-      setError("Please enter the full 9-digit parent phone number");
-      return;
-    }
-
-    if (form.parentPhone2 && form.parentPhone2.length !== 9) {
-      setError("Second phone must be 9 digits (or leave it empty)");
-      return;
-    }
+    if (!form.firstName.trim() || !form.lastName.trim())
+      return setError("First name and last name are required");
+    if (!form.gender || !form.classId)
+      return setError("Please select gender and class");
+    if (!dateOfBirth) return setError("Please select a valid date of birth");
+    if (form.parentPhone.length !== 9)
+      return setError("Please enter the full 9-digit parent phone number");
+    if (form.parentPhone2 && form.parentPhone2.length !== 9)
+      return setError("Second phone must be 9 digits");
 
     setLoading(true);
-
     try {
       const payload = {
         ...form,
@@ -182,7 +157,6 @@ const AddStudent = () => {
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <button
           onClick={() => navigate("/students")}
@@ -201,7 +175,6 @@ const AddStudent = () => {
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Student Info */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h3 className="font-medium text-gray-800 mb-4">
             Student Information
@@ -238,13 +211,11 @@ const AddStudent = () => {
               </div>
             </div>
 
-            {/* Date of Birth — three shadcn Selects */}
             <div className="md:col-span-2">
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Date of Birth *
               </label>
               <div className="grid grid-cols-[80px_1fr_100px] gap-2">
-                {/* Day */}
                 <Select value={dobDay} onValueChange={setDobDay}>
                   <SelectTrigger className="w-full bg-transparent border-gray-300 rounded-lg text-sm h-[38px]">
                     <SelectValue placeholder="Day" />
@@ -263,8 +234,6 @@ const AddStudent = () => {
                     )}
                   </SelectContent>
                 </Select>
-
-                {/* Month */}
                 <Select value={dobMonth} onValueChange={setDobMonth}>
                   <SelectTrigger className="w-full bg-transparent border-gray-300 rounded-lg text-sm h-[38px]">
                     <SelectValue placeholder="Month" />
@@ -281,8 +250,6 @@ const AddStudent = () => {
                     ))}
                   </SelectContent>
                 </Select>
-
-                {/* Year */}
                 <Select value={dobYear} onValueChange={setDobYear}>
                   <SelectTrigger className="w-full bg-transparent border-gray-300 rounded-lg text-sm h-[38px]">
                     <SelectValue placeholder="Year" />
@@ -350,6 +317,37 @@ const AddStudent = () => {
               </Select>
             </div>
 
+            {/* 🎯 STUDENT TYPE TOGGLE */}
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Student Type *
+              </label>
+              <div className="flex bg-gray-100 p-1 rounded-lg mt-1 w-full max-w-xs">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, studentType: "DAY" })}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${
+                    form.studentType === "DAY"
+                      ? "bg-white text-gray-900 shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  <Bus size={16} /> Day Scholar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, studentType: "BOARDING" })}
+                  className={`flex-1 flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all ${
+                    form.studentType === "BOARDING"
+                      ? "bg-indigo-600 text-white shadow-sm"
+                      : "text-gray-500 hover:text-gray-700"
+                  }`}
+                >
+                  <Home size={16} /> Boarder
+                </button>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Academic Year *
@@ -366,7 +364,6 @@ const AddStudent = () => {
           </div>
         </div>
 
-        {/* Parent Info */}
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h3 className="font-medium text-gray-800 mb-4">
             Parent / Guardian Information
@@ -386,7 +383,6 @@ const AddStudent = () => {
               />
             </div>
 
-            {/* Phone Number — +265 fixed prefix */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Phone Number *{" "}
@@ -413,7 +409,6 @@ const AddStudent = () => {
               </p>
             </div>
 
-            {/* Second Phone — +265 fixed prefix */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Second Phone{" "}
@@ -453,7 +448,6 @@ const AddStudent = () => {
           </div>
         </div>
 
-        {/* Messages */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
             {error}
@@ -465,7 +459,6 @@ const AddStudent = () => {
           </div>
         )}
 
-        {/* Submit */}
         <div className="flex gap-4">
           <button
             type="button"

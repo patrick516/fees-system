@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   Plus,
   GraduationCap,
@@ -8,208 +7,49 @@ import {
   ChevronUp,
   Edit2,
   Trash2,
-  CheckCircle,
-  AlertCircle,
-  AlertTriangle,
-  X,
-  FileBarChart,
-  History,
 } from "lucide-react";
 import api from "../../lib/axios";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "../../components/ui/select";
-import { getCurrentAcademicYear } from "../../lib/utils";
 import { useActiveTerm } from "../../hooks/useActiveTerm";
 import { usePermission } from "../../hooks/usePermission";
-import { DatePicker } from "../../components/ui/date-picker";
-
-const terms = [
-  { value: "TERM_1", label: "Term 1" },
-  { value: "TERM_2", label: "Term 2" },
-  { value: "TERM_3", label: "Term 3" },
-];
-
-const ITEM_CLASS =
-  "cursor-pointer mx-1 my-0.5 rounded-md pl-3 pr-7 focus:bg-gray-100 focus:text-gray-900 data-[highlighted]:bg-gray-100 data-[highlighted]:text-gray-900";
-
-const formatDate = (iso?: string | null) => {
-  if (!iso) return "—";
-  return new Date(iso).toLocaleDateString("en-GB", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
+import FeeStructureForm from "../../components/Classes/FeeStructureForm";
+import TermActivationCard from "../../components/Classes/TermActivationCard";
+import TermHistoryTable from "../../components/Classes/TermHistoryTable";
+import PaymentDetailsCard from "../../components/Classes/PaymentDetailsCard";
 
 const termLabel = (t?: string | null) =>
   t ? t.replace("_", " ").replace("TERM", "Term") : "";
 
-const formatCurrency = (val: string | number) => {
-  if (val === undefined || val === null || val === "") return "";
-  const str = String(val).replace(/,/g, "");
-  if (str.endsWith(".")) return str;
-  const parts = str.split(".");
-  parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ",");
-  return parts.join(".");
-};
-
-const termOrder: Record<string, number> = {
-  TERM_1: 1,
-  TERM_2: 2,
-  TERM_3: 3,
-};
-
 const ClassesPage = () => {
-  const navigate = useNavigate();
   const { can } = usePermission();
+  const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
+
   const [classes, setClasses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
   const [classForm, setClassForm] = useState({ name: "", level: "" });
-  const [classError, setClassError] = useState("");
   const [expandedClass, setExpandedClass] = useState<string | null>(null);
 
-  // Delete confirmation modal
-  const [deleteModal, setDeleteModal] = useState<{
-    open: boolean;
-    classId: string | null;
-    className: string;
-    error: string | null;
-    deleting: boolean;
-  }>({
+  const [deleteModal, setDeleteModal] = useState({
     open: false,
-    classId: null,
+    classId: null as string | null,
     className: "",
-    error: null,
     deleting: false,
   });
 
-  const [paymentSaveError, setPaymentSaveError] = useState("");
-
-  // Payment details state
-  const [bankAccounts, setBankAccounts] = useState<any[]>([]);
-  const [mobileMoney, setMobileMoney] = useState({
-    airtelMoneyNumber: "",
-    airtelMoneyName: "",
-    mpambaNumber: "",
-    mpambaName: "",
-    paymentInstructions: "",
-  });
-  const [paymentDetailsLoading, setPaymentDetailsLoading] = useState(false);
-  const [paymentDetailsSaved, setPaymentDetailsSaved] = useState(false);
-  const [isEditingPayment, setIsEditingPayment] = useState(false);
-  const [hasSavedPayment, setHasSavedPayment] = useState(false);
-  const [savedPayment, setSavedPayment] = useState<{
-    bankAccounts: any[];
-    mobileMoney: {
-      airtelMoneyNumber: string;
-      airtelMoneyName: string;
-      mpambaNumber: string;
-      mpambaName: string;
-      paymentInstructions: string;
-    };
-  } | null>(null);
-  const [showAddBank, setShowAddBank] = useState(false);
-  const [newBank, setNewBank] = useState({
-    bankName: "",
-    accountName: "",
-    accountNumber: "",
-    branch: "",
-  });
-
-  // Active term
-  const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
-
-  // Fee structure form
-  const [feeForm, setFeeForm] = useState({
-    classId: "",
-    term: "TERM_1",
-    academicYear: getCurrentAcademicYear(),
-    totalAmount: "",
-    tuitionFee: "",
-    examFee: "",
-    buildingLevy: "",
-    uniformFee: "",
-    bookFee: "",
-  });
-  const [feeLoading, setFeeLoading] = useState(false);
-  const [feeError, setFeeError] = useState("");
-  const [feeSuccess, setFeeSuccess] = useState("");
+  // Fee Form State
   const [showFeeForm, setShowFeeForm] = useState<string | null>(null);
   const [editingFee, setEditingFee] = useState<any>(null);
 
-  // Active term state
+  // Term State
   const [activeTerm, setActiveTerm] = useState<any>(null);
-  const [activatingTerm, setActivatingTerm] = useState(false);
-  const [activateForm, setActivateForm] = useState({
-    term: "TERM_1",
-    academicYear: getCurrentAcademicYear(),
-    startDate: "",
-    endDate: "",
-  });
-  const [activateError, setActivateError] = useState("");
-  const [activateSuccess, setActivateSuccess] = useState("");
-  const [showActivateForm, setShowActivateForm] = useState(false);
-
-  // Confirmation modal
-  const [confirmModal, setConfirmModal] = useState<{
-    open: boolean;
-    skipWarning: string | null;
-  }>({ open: false, skipWarning: null });
-
-  // Term history
   const [termHistory, setTermHistory] = useState<any[]>([]);
-  const [termHistoryLoading, setTermHistoryLoading] = useState(true);
-
-  // Sync Activate Term form
-  useEffect(() => {
-    if (activeYear) {
-      setActivateForm((prev) => ({ ...prev, academicYear: activeYear }));
-    }
-    if (currentTerm) {
-      setActivateForm((prev) => ({ ...prev, term: currentTerm }));
-    }
-    if (activeTerm?.activeTermStartDate) {
-      setActivateForm((prev) => ({
-        ...prev,
-        startDate: activeTerm.activeTermStartDate.slice(0, 10),
-      }));
-    }
-    if (activeTerm?.activeTermEndDate) {
-      setActivateForm((prev) => ({
-        ...prev,
-        endDate: activeTerm.activeTermEndDate.slice(0, 10),
-      }));
-    }
-  }, [
-    activeYear,
-    currentTerm,
-    activeTerm?.activeTermStartDate,
-    activeTerm?.activeTermEndDate,
-  ]);
-
-  // Sync new fee form
-  useEffect(() => {
-    if (activeYear && showFeeForm && !editingFee) {
-      setFeeForm((prev) => ({
-        ...prev,
-        academicYear: activeYear,
-        term: currentTerm || prev.term,
-      }));
-    }
-  }, [activeYear, currentTerm, showFeeForm, editingFee]);
 
   const fetchClasses = async () => {
     try {
       const res = await api.get("/schools/classes");
       setClasses(res.data.data);
-    } catch {
-      console.error("Failed to load classes");
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -225,106 +65,23 @@ const ClassesPage = () => {
   };
 
   const fetchTermHistory = async () => {
-    setTermHistoryLoading(true);
     try {
       const res = await api.get("/schools/term-history");
       setTermHistory(res.data.data || []);
     } catch {
       setTermHistory([]);
-    } finally {
-      setTermHistoryLoading(false);
     }
-  };
-
-  const fetchPaymentDetails = async () => {
-    try {
-      const res = await api.get("/schools/me");
-      const school = res.data.data;
-      const banks = school.bankAccounts || [];
-      const mm = {
-        airtelMoneyNumber: school.airtelMoneyNumber || "",
-        airtelMoneyName: school.airtelMoneyName || "",
-        mpambaNumber: school.mpambaNumber || "",
-        mpambaName: school.mpambaName || "",
-        paymentInstructions: school.paymentInstructions || "",
-      };
-      setBankAccounts(banks);
-      setMobileMoney(mm);
-      setSavedPayment({ bankAccounts: banks, mobileMoney: mm });
-
-      const hasData =
-        banks.length > 0 ||
-        !!mm.airtelMoneyNumber ||
-        !!mm.mpambaNumber ||
-        !!mm.paymentInstructions;
-      setHasSavedPayment(hasData);
-      setIsEditingPayment(!hasData);
-    } catch {}
   };
 
   useEffect(() => {
     fetchClasses();
     fetchActiveTerm();
     fetchTermHistory();
-    fetchPaymentDetails();
   }, []);
-
-  const handleSavePaymentDetails = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setPaymentSaveError("");
-    setPaymentDetailsLoading(true);
-    try {
-      await api.put("/schools/payment-details", {
-        bankAccounts,
-        ...mobileMoney,
-      });
-      setSavedPayment({ bankAccounts, mobileMoney });
-      setHasSavedPayment(true);
-      setIsEditingPayment(false);
-      setShowAddBank(false);
-      setPaymentDetailsSaved(true);
-      setTimeout(() => setPaymentDetailsSaved(false), 3000);
-    } catch (err: any) {
-      setPaymentSaveError(
-        err.response?.data?.message || "Failed to save payment details",
-      );
-    } finally {
-      setPaymentDetailsLoading(false);
-    }
-  };
-
-  const handleCancelPaymentEdit = () => {
-    if (savedPayment) {
-      setBankAccounts(savedPayment.bankAccounts);
-      setMobileMoney(savedPayment.mobileMoney);
-    }
-    setShowAddBank(false);
-    setIsEditingPayment(false);
-    setPaymentSaveError("");
-  };
-
-  const handleAddBank = () => {
-    if (!newBank.bankName || !newBank.accountNumber) return;
-    setBankAccounts((prev) => [
-      ...prev,
-      { ...newBank, id: Date.now().toString() },
-    ]);
-    setNewBank({
-      bankName: "",
-      accountName: "",
-      accountNumber: "",
-      branch: "",
-    });
-    setShowAddBank(false);
-  };
-
-  const handleDeleteBank = (index: number) => {
-    setBankAccounts((prev) => prev.filter((_, i) => i !== index));
-  };
 
   const handleAddClass = async (e: React.FormEvent) => {
     e.preventDefault();
-    setClassError("");
+    if (!classForm.name || !classForm.level) return;
     setAdding(true);
     try {
       await api.post("/schools/classes", {
@@ -333,198 +90,28 @@ const ClassesPage = () => {
       });
       setClassForm({ name: "", level: "" });
       fetchClasses();
-    } catch (err: any) {
-      setClassError(err.response?.data?.message || "Failed to add class");
+    } catch (err) {
+      alert("Failed to add class");
     } finally {
       setAdding(false);
     }
   };
 
-  const openDeleteModal = (cls: any) => {
-    setDeleteModal({
-      open: true,
-      classId: cls.id,
-      className: cls.name,
-      error: null,
-      deleting: false,
-    });
-  };
-
   const handleDeleteClass = async () => {
     if (!deleteModal.classId) return;
-    setDeleteModal((prev) => ({ ...prev, deleting: true, error: null }));
+    setDeleteModal((prev) => ({ ...prev, deleting: true }));
     try {
       await api.delete(`/schools/classes/${deleteModal.classId}`);
       setDeleteModal({
         open: false,
         classId: null,
         className: "",
-        error: null,
         deleting: false,
       });
       fetchClasses();
     } catch (err: any) {
-      setDeleteModal((prev) => ({
-        ...prev,
-        deleting: false,
-        error: err.response?.data?.message || "Failed to delete class",
-      }));
-    }
-  };
-
-  const openFeeForm = (classId: string, existingFee?: any) => {
-    setFeeError("");
-    setFeeSuccess("");
-    setEditingFee(existingFee || null);
-    setShowFeeForm(classId);
-    if (existingFee) {
-      setFeeForm({
-        classId,
-        term: existingFee.term,
-        academicYear: existingFee.academicYear,
-        totalAmount: existingFee.totalAmount.toString(),
-        tuitionFee: existingFee.tuitionFee?.toString() || "",
-        examFee: existingFee.examFee?.toString() || "",
-        buildingLevy: existingFee.buildingLevy?.toString() || "",
-        uniformFee: existingFee.uniformFee?.toString() || "",
-        bookFee: existingFee.bookFee?.toString() || "",
-      });
-    } else {
-      setFeeForm((prev) => ({
-        ...prev,
-        classId,
-        academicYear: activeYear || prev.academicYear,
-        term: currentTerm || prev.term,
-        totalAmount: "",
-        tuitionFee: "",
-        examFee: "",
-        buildingLevy: "",
-        uniformFee: "",
-        bookFee: "",
-      }));
-    }
-  };
-
-  const recalculateTotal = (updated: typeof feeForm) => {
-    const tuition = parseFloat(updated.tuitionFee) || 0;
-    const exam = parseFloat(updated.examFee) || 0;
-    const building = parseFloat(updated.buildingLevy) || 0;
-    const uniform = parseFloat(updated.uniformFee) || 0;
-    const book = parseFloat(updated.bookFee) || 0;
-    const total = tuition + exam + building + uniform + book;
-    if (total > 0) {
-      return { ...updated, totalAmount: total.toString() };
-    }
-    return updated;
-  };
-
-  const handleFeeChange = (field: string, value: string) => {
-    const updated = { ...feeForm, [field]: value };
-    const recalculated = recalculateTotal(updated);
-    setFeeForm(recalculated);
-  };
-
-  const handleSaveFee = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFeeError("");
-    setFeeSuccess("");
-    setFeeLoading(true);
-
-    try {
-      if (editingFee) {
-        await api.put(`/schools/fee-structures/${editingFee.id}`, {
-          totalAmount: feeForm.totalAmount,
-          tuitionFee: feeForm.tuitionFee || undefined,
-          examFee: feeForm.examFee || undefined,
-          buildingLevy: feeForm.buildingLevy || undefined,
-          uniformFee: feeForm.uniformFee || undefined,
-          bookFee: feeForm.bookFee || undefined,
-        });
-        setFeeSuccess("Fee structure updated successfully");
-      } else {
-        await api.post("/schools/fee-structures", {
-          classId: feeForm.classId,
-          term: feeForm.term,
-          academicYear: feeForm.academicYear,
-          totalAmount: feeForm.totalAmount,
-          tuitionFee: feeForm.tuitionFee || undefined,
-          examFee: feeForm.examFee || undefined,
-          buildingLevy: feeForm.buildingLevy || undefined,
-          uniformFee: feeForm.uniformFee || undefined,
-          bookFee: feeForm.bookFee || undefined,
-        });
-        setFeeSuccess("Fee structure saved successfully");
-      }
-      fetchClasses();
-      setTimeout(() => {
-        setShowFeeForm(null);
-        setFeeSuccess("");
-        setEditingFee(null);
-      }, 1500);
-    } catch (err: any) {
-      setFeeError(
-        err.response?.data?.message || "Failed to save fee structure",
-      );
-    } finally {
-      setFeeLoading(false);
-    }
-  };
-
-  const computeSkipWarning = (): string | null => {
-    if (!activeTerm?.activeTerm || !activeTerm?.activeAcademicYear) return null;
-    if (activeTerm.activeAcademicYear !== activateForm.academicYear)
-      return null;
-
-    const from = termOrder[activeTerm.activeTerm];
-    const to = termOrder[activateForm.term];
-    if (from === undefined || to === undefined) return null;
-
-    if (to > from + 1) {
-      const skipped = `Term ${from + 1}`;
-      return `You're skipping ${skipped}. The system will still activate ${termLabel(activateForm.term)}, but ${skipped} won't have a record in Term History.`;
-    }
-    if (to < from) {
-      return `You're moving back from ${termLabel(activeTerm.activeTerm)} to ${termLabel(activateForm.term)}. The current term will be archived.`;
-    }
-    return null;
-  };
-
-  const handleActivateTerm = (e: React.FormEvent) => {
-    e.preventDefault();
-    setActivateError("");
-    setActivateSuccess("");
-
-    if (activateForm.startDate && activateForm.endDate) {
-      if (activateForm.endDate < activateForm.startDate) {
-        setActivateError("End date must be after start date");
-        return;
-      }
-    }
-
-    const skipWarning = computeSkipWarning();
-    setConfirmModal({ open: true, skipWarning });
-  };
-
-  const handleConfirmActivate = async () => {
-    setConfirmModal({ open: false, skipWarning: null });
-    setActivateError("");
-    setActivateSuccess("");
-    setActivatingTerm(true);
-
-    try {
-      const res = await api.post("/schools/activate-term", activateForm);
-      setActivateSuccess(res.data.message);
-      await Promise.all([fetchActiveTerm(), fetchTermHistory()]);
-      setTimeout(() => {
-        setShowActivateForm(false);
-        setActivateSuccess("");
-      }, 1800);
-    } catch (err: any) {
-      setActivateError(
-        err.response?.data?.message || "Failed to activate term",
-      );
-    } finally {
-      setActivatingTerm(false);
+      alert(err.response?.data?.message || "Failed to delete");
+      setDeleteModal((prev) => ({ ...prev, deleting: false }));
     }
   };
 
@@ -544,346 +131,16 @@ const ClassesPage = () => {
         </p>
       </div>
 
-      {/* Active Term Card */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <div>
-            <h3 className="font-medium text-gray-800">Active Term</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Sets the default term and academic year across the whole system
-            </p>
-          </div>
-          {activeTerm && !showActivateForm && can("settings", "write") && (
-            <button
-              onClick={() => {
-                setShowActivateForm(true);
-                setActivateError("");
-                setActivateSuccess("");
-              }}
-              className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition-colors"
-            >
-              <Edit2 size={14} /> Change
-            </button>
-          )}
-        </div>
+      <TermActivationCard
+        activeTerm={activeTerm}
+        onUpdated={() => {
+          fetchActiveTerm();
+          fetchTermHistory();
+        }}
+      />
 
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr className="text-left text-gray-500">
-              <th className="px-6 py-2.5 font-medium">Term</th>
-              <th className="px-6 py-2.5 font-medium">Academic Year</th>
-              <th className="px-6 py-2.5 font-medium">Term Dates</th>
-              <th className="px-6 py-2.5 font-medium">Status</th>
-            </tr>
-          </thead>
-          <tbody>
-            {activeTerm ? (
-              <tr className="border-t border-gray-100">
-                <td className="px-6 py-3 font-medium text-gray-800">
-                  {termLabel(activeTerm.activeTerm)}
-                </td>
-                <td className="px-6 py-3 text-gray-700">
-                  {activeTerm.activeAcademicYear}
-                </td>
-                <td className="px-6 py-3 text-gray-600 text-xs">
-                  {activeTerm.activeTermStartDate ||
-                  activeTerm.activeTermEndDate ? (
-                    <>
-                      {formatDate(activeTerm.activeTermStartDate)}
-                      {" — "}
-                      {formatDate(activeTerm.activeTermEndDate)}
-                    </>
-                  ) : (
-                    <span className="text-gray-400 italic">No dates set</span>
-                  )}
-                </td>
-                <td className="px-6 py-3">
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
-                    <CheckCircle size={12} /> Active
-                  </span>
-                </td>
-              </tr>
-            ) : (
-              <tr className="border-t border-gray-100">
-                <td colSpan={4} className="px-6 py-8 text-center">
-                  <AlertCircle
-                    size={24}
-                    className="mx-auto mb-2 text-yellow-400"
-                  />
-                  <p className="text-sm text-gray-500 font-medium">
-                    No active term set
-                  </p>
-                  <p className="text-xs text-gray-400 mt-1">
-                    Activate a term below to enable fee collection across the
-                    system
-                  </p>
-                </td>
-              </tr>
-            )}
-          </tbody>
-        </table>
+      <TermHistoryTable history={termHistory} activeTerm={activeTerm} />
 
-        {(!activeTerm || showActivateForm) && (
-          <form
-            onSubmit={handleActivateTerm}
-            className="border-t border-gray-100 bg-gray-50 p-5 space-y-3"
-          >
-            <p className="text-xs font-semibold text-gray-600 uppercase tracking-wide">
-              {activeTerm ? "Change Active Term" : "Activate a Term"}
-            </p>
-
-            <div className="flex flex-wrap gap-3 items-end">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Term
-                </label>
-                <Select
-                  value={activateForm.term}
-                  onValueChange={(v) =>
-                    setActivateForm({ ...activateForm, term: v })
-                  }
-                >
-                  <SelectTrigger className="w-[130px] bg-white border-gray-300 rounded-lg text-sm h-[38px]">
-                    <SelectValue placeholder="Select term" />
-                  </SelectTrigger>
-                  <SelectContent className="bg-white w-auto min-w-[130px]">
-                    {terms.map((t) => (
-                      <SelectItem
-                        key={t.value}
-                        value={t.value}
-                        className={ITEM_CLASS}
-                      >
-                        {t.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Academic Year
-                </label>
-                <input
-                  value={activateForm.academicYear}
-                  onChange={(e) =>
-                    setActivateForm({
-                      ...activateForm,
-                      academicYear: e.target.value,
-                    })
-                  }
-                  placeholder="eg. 2025-2026"
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm w-32 focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] bg-white"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  Start Date
-                </label>
-                <DatePicker
-                  value={activateForm.startDate}
-                  onChange={(v) =>
-                    setActivateForm({ ...activateForm, startDate: v })
-                  }
-                  placeholder="Pick start date"
-                  clearable={false}
-                  className="w-[160px]"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">
-                  End Date
-                </label>
-                <DatePicker
-                  value={activateForm.endDate}
-                  onChange={(v) =>
-                    setActivateForm({ ...activateForm, endDate: v })
-                  }
-                  placeholder="Pick end date"
-                  clearable={false}
-                  min={activateForm.startDate || undefined}
-                  className="w-[160px]"
-                />
-              </div>
-
-              <button
-                type="submit"
-                disabled={activatingTerm}
-                className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
-              >
-                {activatingTerm ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <CheckCircle size={14} />
-                )}
-                {activatingTerm
-                  ? "Activating..."
-                  : activeTerm
-                    ? "Update Active Term"
-                    : "Activate Term"}
-              </button>
-
-              {activeTerm && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowActivateForm(false);
-                    setActivateError("");
-                    setActivateSuccess("");
-                  }}
-                  className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-white"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-
-            {activateError && (
-              <p className="text-red-600 text-sm">{activateError}</p>
-            )}
-            {activateSuccess && (
-              <p className="text-green-600 text-sm"> {activateSuccess}</p>
-            )}
-          </form>
-        )}
-      </div>
-
-      {/* Term History */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center gap-2">
-          <History size={16} className="text-[var(--color-primary)]" />
-          <div>
-            <h3 className="font-medium text-gray-800">Term History</h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Every term the school has ever run — with its financials
-            </p>
-          </div>
-        </div>
-
-        {termHistoryLoading ? (
-          <div className="flex items-center justify-center h-24">
-            <Loader2 size={18} className="animate-spin text-gray-300" />
-          </div>
-        ) : termHistory.length === 0 ? (
-          <div className="px-6 py-8 text-center">
-            <History size={28} className="mx-auto mb-2 text-gray-200" />
-            <p className="text-sm text-gray-400 font-medium">
-              No term history yet
-            </p>
-            <p className="text-xs text-gray-300 mt-1">
-              Activate a term to start recording its history
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 border-b border-gray-100">
-                <tr className="text-left text-gray-500">
-                  <th className="px-6 py-2.5 text-xs font-medium uppercase">
-                    Term
-                  </th>
-                  <th className="px-6 py-2.5 text-xs font-medium uppercase">
-                    Year
-                  </th>
-                  <th className="px-6 py-2.5 text-xs font-medium uppercase">
-                    Dates
-                  </th>
-                  <th className="px-6 py-2.5 text-xs font-medium uppercase text-right">
-                    Collected
-                  </th>
-                  <th className="px-6 py-2.5 text-xs font-medium uppercase text-right">
-                    Outstanding
-                  </th>
-                  <th className="px-6 py-2.5 text-xs font-medium uppercase text-center">
-                    Debtors
-                  </th>
-                  <th className="px-6 py-2.5 text-xs font-medium uppercase text-right">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-50">
-                {termHistory.map((t: any) => {
-                  const isCurrentlyActive =
-                    activeTerm?.activeTerm === t.term &&
-                    activeTerm?.activeAcademicYear === t.academicYear;
-
-                  return (
-                    <tr
-                      key={t.id}
-                      className={`hover:bg-gray-50 ${
-                        isCurrentlyActive ? "bg-blue-50/40" : ""
-                      }`}
-                    >
-                      <td className="px-6 py-3 font-medium text-gray-800">
-                        {termLabel(t.term)}
-                        {isCurrentlyActive && (
-                          <span className="ml-2 text-[10px] px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">
-                            Active
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-6 py-3 text-gray-600">
-                        {t.academicYear}
-                      </td>
-                      <td className="px-6 py-3 text-xs text-gray-500">
-                        {t.startDate || t.endDate ? (
-                          <>
-                            {formatDate(t.startDate)}
-                            {" — "}
-                            {formatDate(t.endDate)}
-                          </>
-                        ) : (
-                          <span className="italic text-gray-400">No dates</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-3 text-right font-medium text-green-700">
-                        MWK {Number(t.totalCollected || 0).toLocaleString()}
-                      </td>
-                      <td
-                        className={`px-6 py-3 text-right font-medium ${
-                          Number(t.outstanding) > 0
-                            ? "text-red-600"
-                            : "text-green-600"
-                        }`}
-                      >
-                        {Number(t.outstanding) > 0
-                          ? `MWK ${Number(t.outstanding).toLocaleString()}`
-                          : "✓ Clear"}
-                      </td>
-                      <td className="px-6 py-3 text-center">
-                        {t.debtors > 0 ? (
-                          <span className="text-red-600 font-medium">
-                            {t.debtors}
-                          </span>
-                        ) : (
-                          <span className="text-gray-400">0</span>
-                        )}
-                      </td>
-                      <td className="px-6 py-3 text-right">
-                        <button
-                          onClick={() =>
-                            navigate(
-                              `/reports?term=${t.term}&academicYear=${t.academicYear}`,
-                            )
-                          }
-                          className="inline-flex items-center gap-1 text-xs font-medium text-[var(--color-primary-dark)] hover:text-[var(--color-primary)]"
-                        >
-                          <FileBarChart size={12} /> View Report
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
-
-      {/* Add Class Form */}
       {can("classes", "write") && (
         <div className="bg-white rounded-xl p-6 shadow-sm border border-gray-100">
           <h3 className="font-medium text-gray-800 mb-4">Add New Class</h3>
@@ -893,9 +150,9 @@ const ClassesPage = () => {
               onChange={(e) =>
                 setClassForm({ ...classForm, name: e.target.value })
               }
-              placeholder="Class name (eg. Form 1, Form 3)"
+              placeholder="Class name"
               required
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="flex-1 px-4 py-2 border rounded-lg text-sm"
             />
             <input
               type="number"
@@ -905,45 +162,28 @@ const ClassesPage = () => {
               }
               placeholder="Level"
               required
-              className="w-20 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
+              className="w-20 px-3 py-2 border rounded-lg text-sm"
             />
             <button
               type="submit"
               disabled={adding}
-              className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
+              className="flex items-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm"
             >
               {adding ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
                 <Plus size={14} />
-              )}
+              )}{" "}
               Add
             </button>
           </form>
-          {classError && (
-            <p className="text-red-600 text-sm mt-2">{classError}</p>
-          )}
         </div>
       )}
 
-      {/* Classes List */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        {!loading && classes.length > 0 && (
-          <div className="grid grid-cols-12 gap-2 px-4 sm:px-6 py-2.5 bg-gray-50 border-b border-gray-100 text-xs font-medium text-gray-500 uppercase">
-            <div className="col-span-5 sm:col-span-4">Class</div>
-            <div className="hidden sm:block sm:col-span-2">Students</div>
-            <div className="col-span-3">Term Fee</div>
-            <div className="col-span-4 sm:col-span-3 text-right">Actions</div>
-          </div>
-        )}
         {loading ? (
-          <div className="flex items-center justify-center h-32">
-            <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-[var(--color-primary)]" />
-          </div>
-        ) : classes.length === 0 ? (
-          <div className="p-12 text-center">
-            <GraduationCap size={40} className="mx-auto mb-2 text-gray-300" />
-            <p className="text-sm text-gray-400">No classes added yet</p>
+          <div className="p-8 text-center">
+            <Loader2 className="animate-spin mx-auto text-gray-400" />
           </div>
         ) : (
           classes.map((cls: any) => (
@@ -952,69 +192,62 @@ const ClassesPage = () => {
               className="border-b border-gray-100 last:border-b-0"
             >
               <div
-                className="grid grid-cols-12 items-center gap-2 px-4 sm:px-6 py-3.5 cursor-pointer hover:bg-gray-50"
+                className="grid grid-cols-12 items-center gap-2 px-6 py-3.5 cursor-pointer hover:bg-gray-50"
                 onClick={() =>
                   setExpandedClass(expandedClass === cls.id ? null : cls.id)
                 }
               >
-                <div className="col-span-5 sm:col-span-4 flex items-center gap-3 min-w-0">
-                  <div className="w-9 h-9 bg-[var(--color-primary-light)] rounded-lg flex items-center justify-center shrink-0">
+                <div className="col-span-5 flex items-center gap-3">
+                  <div className="w-9 h-9 bg-blue-50 rounded-lg flex items-center justify-center">
                     <GraduationCap
                       size={16}
                       className="text-[var(--color-primary)]"
                     />
                   </div>
-                  <div className="min-w-0">
-                    <p className="font-medium text-gray-800 truncate">
-                      {cls.name}
-                    </p>
+                  <div>
+                    <p className="font-medium text-gray-800">{cls.name}</p>
                     <p className="text-xs text-gray-400">Level {cls.level}</p>
                   </div>
                 </div>
-
-                <div className="hidden sm:block sm:col-span-2 text-sm text-gray-600">
+                <div className="col-span-2 text-sm text-gray-600">
                   {cls._count?.students || 0}
                 </div>
-
                 <div className="col-span-3">
                   {getActiveFee(cls) ? (
-                    <span className="text-xs sm:text-sm font-semibold text-gray-800">
-                      MWK{" "}
-                      {Number(getActiveFee(cls).totalAmount).toLocaleString()}
+                    <span className="font-semibold text-gray-800">
+                      MWK {Number(getActiveFee(cls).dayAmount).toLocaleString()}{" "}
+                      <span className="text-gray-400 font-normal">(Day)</span>
                     </span>
                   ) : (
-                    <span className="inline-flex px-2 py-0.5 rounded-full bg-yellow-50 text-yellow-700 text-xs font-medium">
-                      Not set
-                    </span>
+                    <span className="text-yellow-600 text-xs">Not set</span>
                   )}
                 </div>
-
-                <div className="col-span-4 sm:col-span-3 flex items-center justify-end gap-1">
+                <div className="col-span-2 flex justify-end gap-1">
                   {can("payments", "write") && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         setExpandedClass(cls.id);
-                        openFeeForm(cls.id, getActiveFee(cls));
+                        setEditingFee(getActiveFee(cls) || null);
+                        setShowFeeForm(cls.id);
                       }}
-                      className="p-1.5 text-gray-400 hover:text-[var(--color-primary)] hover:bg-gray-100 rounded"
-                      title={getActiveFee(cls) ? "Edit fee" : "Set fee"}
+                      className="p-1.5 text-gray-400 hover:text-[var(--color-primary)]"
                     >
-                      {getActiveFee(cls) ? (
-                        <Edit2 size={14} />
-                      ) : (
-                        <Plus size={14} />
-                      )}
+                      <Edit2 size={14} />
                     </button>
                   )}
                   {can("classes", "delete") && (
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        openDeleteModal(cls);
+                        setDeleteModal({
+                          open: true,
+                          classId: cls.id,
+                          className: cls.name,
+                          deleting: false,
+                        });
                       }}
-                      className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded"
-                      title="Delete class"
+                      className="p-1.5 text-gray-400 hover:text-red-500"
                     >
                       <Trash2 size={14} />
                     </button>
@@ -1030,220 +263,67 @@ const ClassesPage = () => {
               {expandedClass === cls.id && (
                 <div className="border-t border-gray-100 px-6 py-4 space-y-4">
                   {cls.feeStructures && cls.feeStructures.length > 0 ? (
-                    <div>
-                      <p className="text-xs font-medium text-gray-500 uppercase mb-3">
-                        Current Fee Structures
-                      </p>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        {cls.feeStructures.map((fee: any) => (
-                          <div
-                            key={fee.id}
-                            className="border border-gray-200 rounded-lg p-4"
-                          >
-                            <div className="flex items-center justify-between mb-2">
-                              <span className="text-xs font-medium text-[var(--color-primary-dark)] bg-[var(--color-primary-light)] px-2 py-0.5 rounded">
-                                {termLabel(fee.term)} {fee.academicYear}
-                              </span>
-                              {can("payments", "write") && (
-                                <button
-                                  onClick={() => openFeeForm(cls.id, fee)}
-                                  className="p-1 text-gray-400 hover:text-[var(--color-primary)]"
-                                >
-                                  <Edit2 size={12} />
-                                </button>
-                              )}
-                            </div>
-                            <p className="text-lg font-bold text-gray-800">
-                              MWK {Number(fee.totalAmount).toLocaleString()}
-                            </p>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                      {cls.feeStructures.map((fee: any) => (
+                        <div
+                          key={fee.id}
+                          className="border border-gray-200 rounded-lg p-4"
+                        >
+                          <div className="flex justify-between mb-2">
+                            <span className="text-xs font-medium bg-blue-50 px-2 py-0.5 rounded text-blue-700">
+                              {termLabel(fee.term)} {fee.academicYear}
+                            </span>
                           </div>
-                        ))}
-                      </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Day:</span>
+                            <span className="font-bold">
+                              MWK {Number(fee.dayAmount).toLocaleString()}
+                            </span>
+                          </div>
+                          <div className="flex justify-between text-sm">
+                            <span className="text-gray-500">Boarding:</span>
+                            <span className="font-bold text-indigo-600">
+                              MWK {Number(fee.boardingAmount).toLocaleString()}
+                            </span>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   ) : (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <p className="text-sm text-yellow-700">
-                        No fee structures set for this class yet. Add fees
-                        below.
-                      </p>
-                    </div>
+                    <p className="text-sm text-yellow-700">
+                      No fee structures set yet.
+                    </p>
                   )}
 
                   {showFeeForm !== cls.id ? (
                     can("payments", "write") && (
                       <button
-                        onClick={() => openFeeForm(cls.id)}
-                        className="flex items-center gap-2 text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] text-sm font-medium"
+                        onClick={() => {
+                          setEditingFee(null);
+                          setShowFeeForm(cls.id);
+                        }}
+                        className="flex items-center gap-2 text-[var(--color-primary)] text-sm font-medium"
                       >
-                        <Plus size={16} />
-                        {cls.feeStructures?.length > 0
-                          ? "Add Another Term Fee"
-                          : "Set Fee Structure"}
+                        <Plus size={16} /> Set Fee Structure
                       </button>
                     )
                   ) : (
-                    <form
-                      onSubmit={handleSaveFee}
-                      className="bg-gray-50 rounded-xl p-5 border border-gray-200 space-y-4"
-                    >
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-gray-800">
-                          {editingFee
-                            ? "Edit Fee Structure"
-                            : "New Fee Structure"}{" "}
-                          — {cls.name}
-                        </p>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowFeeForm(null);
-                            setEditingFee(null);
-                          }}
-                          className="text-gray-400 hover:text-gray-600 text-sm"
-                        >
-                          Cancel
-                        </button>
-                      </div>
-
-                      {!editingFee && (
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Term *
-                            </label>
-                            <Select
-                              value={feeForm.term}
-                              onValueChange={(v) =>
-                                setFeeForm({ ...feeForm, term: v })
-                              }
-                            >
-                              <SelectTrigger className="w-full bg-white border-gray-300 rounded-lg text-sm h-[38px]">
-                                <SelectValue placeholder="Select term" />
-                              </SelectTrigger>
-                              <SelectContent className="bg-white w-auto min-w-[130px]">
-                                {terms.map((t) => (
-                                  <SelectItem
-                                    key={t.value}
-                                    value={t.value}
-                                    className={ITEM_CLASS}
-                                  >
-                                    {t.label}
-                                  </SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-600 mb-1">
-                              Academic Year *
-                            </label>
-                            <input
-                              value={feeForm.academicYear}
-                              onChange={(e) =>
-                                setFeeForm({
-                                  ...feeForm,
-                                  academicYear: e.target.value,
-                                })
-                              }
-                              placeholder="eg. 2025-2026"
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                            />
-                          </div>
-                        </div>
-                      )}
-
-                      <div>
-                        <p className="text-xs font-medium text-gray-600 mb-2">
-                          Fee Breakdown{" "}
-                          <span className="text-gray-400">
-                            (optional — total auto-calculates)
-                          </span>
-                        </p>
-                        <div className="grid grid-cols-2 gap-3">
-                          {[
-                            { field: "tuitionFee", label: "Tuition Fee" },
-                            { field: "examFee", label: "Exam Fee" },
-                            { field: "buildingLevy", label: "Building Levy" },
-                            { field: "uniformFee", label: "Uniform Fee" },
-                            { field: "bookFee", label: "Book Fee" },
-                          ].map(({ field, label }) => (
-                            <div key={field}>
-                              <label className="block text-xs text-gray-500 mb-1">
-                                {label}
-                              </label>
-                              <input
-                                type="text"
-                                value={formatCurrency((feeForm as any)[field])}
-                                onChange={(e) =>
-                                  handleFeeChange(
-                                    field,
-                                    e.target.value.replace(/,/g, ""),
-                                  )
-                                }
-                                placeholder="0"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                              />
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="bg-white border-2 border-blue-200 rounded-lg p-4">
-                        <label className="block text-xs font-medium text-gray-600 mb-1">
-                          Total Amount (MWK) *{" "}
-                          <span className="text-gray-400">
-                            — auto-calculated or enter manually
-                          </span>
-                        </label>
-                        <input
-                          type="text"
-                          value={formatCurrency(feeForm.totalAmount)}
-                          onChange={(e) =>
-                            setFeeForm({
-                              ...feeForm,
-                              totalAmount: e.target.value.replace(/,/g, ""),
-                            })
-                          }
-                          required
-                          placeholder="eg. 150000"
-                          className="w-full px-3 py-3 border border-gray-300 rounded-lg text-lg font-bold focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                        />
-                      </div>
-
-                      {feeError && (
-                        <p className="text-red-600 text-sm">{feeError}</p>
-                      )}
-                      {feeSuccess && (
-                        <p className="text-green-600 text-sm">{feeSuccess}</p>
-                      )}
-
-                      <div className="flex gap-3">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setShowFeeForm(null);
-                            setEditingFee(null);
-                          }}
-                          className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg text-sm"
-                        >
-                          Cancel
-                        </button>
-                        <button
-                          type="submit"
-                          disabled={feeLoading}
-                          className="flex-1 flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-2 rounded-lg text-sm disabled:opacity-40 hover:bg-[var(--color-primary-dark)]"
-                        >
-                          {feeLoading && (
-                            <Loader2 size={14} className="animate-spin" />
-                          )}
-                          {feeLoading
-                            ? "Saving..."
-                            : editingFee
-                              ? "Update Fee"
-                              : "Save Fee Structure"}
-                        </button>
-                      </div>
-                    </form>
+                    <FeeStructureForm
+                      className={cls.name}
+                      classId={cls.id}
+                      existingFee={editingFee}
+                      defaultAcademicYear={activeYear || ""}
+                      defaultTerm={currentTerm || "TERM_1"}
+                      onCancel={() => {
+                        setShowFeeForm(null);
+                        setEditingFee(null);
+                      }}
+                      onSuccess={() => {
+                        setShowFeeForm(null);
+                        setEditingFee(null);
+                        fetchClasses();
+                      }}
+                    />
                   )}
                 </div>
               )}
@@ -1252,637 +332,40 @@ const ClassesPage = () => {
         )}
       </div>
 
-      {/* Payment Details Section */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
-          <div>
-            <h3 className="font-medium text-gray-800">
-              Payment Details for Parents
-            </h3>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Parents will see these details on their portal so they know where
-              to pay fees
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            {paymentDetailsSaved && (
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-medium">
-                <CheckCircle size={12} /> Saved
-              </span>
-            )}
-            {hasSavedPayment &&
-              !isEditingPayment &&
-              can("settings", "write") && (
-                <button
-                  type="button"
-                  onClick={() => setIsEditingPayment(true)}
-                  className="flex items-center gap-1.5 text-sm font-medium text-[var(--color-primary)] hover:text-[var(--color-primary-dark)] transition-colors"
-                >
-                  <Edit2 size={14} /> Edit Details
-                </button>
-              )}
-            {hasSavedPayment && isEditingPayment && (
-              <button
-                type="button"
-                onClick={handleCancelPaymentEdit}
-                className="text-sm font-medium text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                Cancel
-              </button>
-            )}
-          </div>
-        </div>
+      <PaymentDetailsCard />
 
-        {isEditingPayment ? (
-          <form onSubmit={handleSavePaymentDetails} className="p-6 space-y-6">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-sm font-semibold text-gray-700">
-                  Bank Accounts
-                </p>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsEditingPayment(true);
-                    setShowAddBank(true);
-                  }}
-                  className="flex items-center gap-1.5 text-sm text-blue-600 font-medium hover:text-blue-800"
-                >
-                  <Plus size={14} />
-                  Add Bank Account
-                </button>
-              </div>
-
-              {showAddBank && (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 mb-4 space-y-3">
-                  <p className="text-sm font-medium text-blue-800">
-                    Add New Bank Account
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">
-                        Bank Name *
-                      </label>
-                      <input
-                        value={newBank.bankName}
-                        onChange={(e) =>
-                          setNewBank({ ...newBank, bankName: e.target.value })
-                        }
-                        placeholder="eg. National Bank"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">
-                        Account Name *
-                      </label>
-                      <input
-                        value={newBank.accountName}
-                        onChange={(e) =>
-                          setNewBank({
-                            ...newBank,
-                            accountName: e.target.value,
-                          })
-                        }
-                        placeholder="eg. St Peters Private School"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">
-                        Account Number *
-                      </label>
-                      <input
-                        value={newBank.accountNumber}
-                        onChange={(e) =>
-                          setNewBank({
-                            ...newBank,
-                            accountNumber: e.target.value,
-                          })
-                        }
-                        placeholder="eg. 1234567890"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-gray-600 mb-1">
-                        Branch (optional)
-                      </label>
-                      <input
-                        value={newBank.branch}
-                        onChange={(e) =>
-                          setNewBank({ ...newBank, branch: e.target.value })
-                        }
-                        placeholder="eg. Blantyre Branch"
-                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                      />
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={handleAddBank}
-                      disabled={!newBank.bankName || !newBank.accountNumber}
-                      className="flex items-center gap-1.5 bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm disabled:opacity-40 hover:bg-[var(--color-primary-dark)]"
-                    >
-                      <Plus size={14} />
-                      Add
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowAddBank(false);
-                        setNewBank({
-                          bankName: "",
-                          accountName: "",
-                          accountNumber: "",
-                          branch: "",
-                        });
-                      }}
-                      className="px-4 py-2 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {bankAccounts.length === 0 ? (
-                <div className="border-2 border-dashed border-gray-200 rounded-xl p-6 text-center">
-                  <p className="text-sm text-gray-400">
-                    No bank accounts added yet
-                  </p>
-                  <p className="text-xs text-gray-300 mt-1">
-                    Click "Add Bank Account" to add one
-                  </p>
-                </div>
-              ) : (
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                          Bank
-                        </th>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                          Account Name
-                        </th>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                          Account Number
-                        </th>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                          Branch
-                        </th>
-                        <th className="px-4 py-3"></th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {bankAccounts.map((bank: any, index: number) => (
-                        <tr key={index} className="hover:bg-gray-50">
-                          <td className="px-4 py-3 font-medium text-gray-800">
-                            {bank.bankName}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600">
-                            {bank.accountName}
-                          </td>
-                          <td className="px-4 py-3 font-mono text-gray-700">
-                            {bank.accountNumber}
-                          </td>
-                          <td className="px-4 py-3 text-gray-500">
-                            {bank.branch || "—"}
-                          </td>
-                          <td className="px-4 py-3">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteBank(index)}
-                              className="text-red-400 hover:text-red-600 p-1 rounded hover:bg-red-50"
-                            >
-                              <Trash2 size={14} />
-                            </button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-3">
-                Mobile Money
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Airtel Money */}
-                <div className="space-y-2">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                      Airtel Money Number
-                    </label>
-                    <input
-                      value={mobileMoney.airtelMoneyNumber}
-                      onChange={(e) =>
-                        setMobileMoney({
-                          ...mobileMoney,
-                          airtelMoneyNumber: e.target.value,
-                        })
-                      }
-                      placeholder="eg. 0999 000 000"
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                      Registered Name
-                    </label>
-                    <input
-                      value={mobileMoney.airtelMoneyName}
-                      onChange={(e) =>
-                        setMobileMoney({
-                          ...mobileMoney,
-                          airtelMoneyName: e.target.value,
-                        })
-                      }
-                      placeholder="e.g. Blessings Nyirenda"
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    />
-                  </div>
-                </div>
-
-                {/* TNM Mpamba */}
-                <div className="space-y-2">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                      TNM Mpamba Number
-                    </label>
-                    <input
-                      value={mobileMoney.mpambaNumber}
-                      onChange={(e) =>
-                        setMobileMoney({
-                          ...mobileMoney,
-                          mpambaNumber: e.target.value,
-                        })
-                      }
-                      placeholder="eg. 0888 000 000"
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                      Registered Name
-                    </label>
-                    <input
-                      value={mobileMoney.mpambaName}
-                      onChange={(e) =>
-                        setMobileMoney({
-                          ...mobileMoney,
-                          mpambaName: e.target.value,
-                        })
-                      }
-                      placeholder="e.g. Blessings Nyirenda"
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-1.5">
-                Payment Instructions
-              </label>
-              <textarea
-                value={mobileMoney.paymentInstructions}
-                onChange={(e) =>
-                  setMobileMoney({
-                    ...mobileMoney,
-                    paymentInstructions: e.target.value,
-                  })
-                }
-                placeholder="eg. Use your child's Student ID as the payment reference. Send screenshot to school office after payment."
-                rows={3}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] resize-none"
-              />
-            </div>
-
-            {paymentSaveError && (
-              <div className="flex items-start gap-2 bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs">
-                <AlertCircle size={14} className="shrink-0 mt-0.5" />
-                <span>{paymentSaveError}</span>
-              </div>
-            )}
-
-            <div className="flex items-center gap-3">
-              <button
-                type="submit"
-                disabled={paymentDetailsLoading}
-                className="flex items-center gap-2 px-6 py-2.5 rounded-lg text-sm font-medium bg-[var(--color-primary)] text-white hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
-              >
-                {paymentDetailsLoading ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" /> Saving...
-                  </>
-                ) : (
-                  "Save Payment Details"
-                )}
-              </button>
-              {hasSavedPayment && (
-                <button
-                  type="button"
-                  onClick={handleCancelPaymentEdit}
-                  disabled={paymentDetailsLoading}
-                  className="px-6 py-2.5 border border-gray-200 text-gray-600 rounded-lg text-sm hover:bg-gray-50 disabled:opacity-40"
-                >
-                  Cancel
-                </button>
-              )}
-            </div>
-          </form>
-        ) : (
-          <div className="p-6 space-y-6">
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-3">
-                Bank Accounts
-              </p>
-              {bankAccounts.length === 0 ? (
-                <p className="text-sm text-gray-400">No bank accounts added</p>
-              ) : (
-                <div className="border border-gray-200 rounded-xl overflow-hidden">
-                  <table className="w-full text-sm">
-                    <thead className="bg-gray-50 border-b border-gray-200">
-                      <tr>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                          Bank
-                        </th>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                          Account Name
-                        </th>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                          Account Number
-                        </th>
-                        <th className="text-left px-4 py-3 text-xs font-medium text-gray-500 uppercase">
-                          Branch
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100">
-                      {bankAccounts.map((bank: any, index: number) => (
-                        <tr key={index}>
-                          <td className="px-4 py-3 font-medium text-gray-800">
-                            {bank.bankName}
-                          </td>
-                          <td className="px-4 py-3 text-gray-600">
-                            {bank.accountName}
-                          </td>
-                          <td className="px-4 py-3 font-mono text-gray-700">
-                            {bank.accountNumber}
-                          </td>
-                          <td className="px-4 py-3 text-gray-500">
-                            {bank.branch || "—"}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-3">
-                Mobile Money
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">
-                    Airtel Money Number
-                  </p>
-                  <p className="text-sm text-gray-800">
-                    {mobileMoney.airtelMoneyNumber || "—"}
-                  </p>
-                  {mobileMoney.airtelMoneyName && (
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {mobileMoney.airtelMoneyName}
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-1">
-                    TNM Mpamba Number
-                  </p>
-                  <p className="text-sm text-gray-800">
-                    {mobileMoney.mpambaNumber || "—"}
-                  </p>
-                  {mobileMoney.mpambaName && (
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {mobileMoney.mpambaName}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-1.5">
-                Payment Instructions
-              </p>
-              <p className="text-sm text-gray-700 whitespace-pre-wrap">
-                {mobileMoney.paymentInstructions || "—"}
-              </p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      {/* CONFIRM ACTIVATION MODAL */}
-      {confirmModal.open && (
-        <div
-          className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
-          onClick={() => setConfirmModal({ open: false, skipWarning: null })}
-        >
-          <div
-            className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-start justify-between mb-4">
-              <div className="flex items-start gap-3">
-                <div className="w-10 h-10 rounded-xl bg-blue-100 flex items-center justify-center shrink-0">
-                  <AlertCircle
-                    size={20}
-                    className="text-[var(--color-primary-dark)]"
-                  />
-                </div>
-                <div>
-                  <h3 className="text-base font-semibold text-gray-800">
-                    Confirm Activation
-                  </h3>
-                  <p className="text-xs text-gray-500 mt-0.5">
-                    This will affect the whole system
-                  </p>
-                </div>
-              </div>
-              <button
-                onClick={() =>
-                  setConfirmModal({ open: false, skipWarning: null })
-                }
-                className="p-1 text-gray-400 hover:text-gray-600 rounded"
-              >
-                <X size={16} />
-              </button>
-            </div>
-
-            <div className="space-y-3 mb-4">
-              {activeTerm ? (
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <p className="text-[11px] text-gray-500 uppercase font-medium mb-1">
-                    Currently active
-                  </p>
-                  <p className="text-sm font-semibold text-gray-800">
-                    {termLabel(activeTerm.activeTerm)} •{" "}
-                    {activeTerm.activeAcademicYear}
-                  </p>
-                  {(activeTerm.activeTermStartDate ||
-                    activeTerm.activeTermEndDate) && (
-                    <p className="text-[11px] text-gray-500 mt-0.5">
-                      {formatDate(activeTerm.activeTermStartDate)}
-                      {" — "}
-                      {formatDate(activeTerm.activeTermEndDate)}
-                    </p>
-                  )}
-                </div>
-              ) : (
-                <div className="bg-gray-50 rounded-xl p-3">
-                  <p className="text-[11px] text-gray-500 uppercase font-medium mb-1">
-                    Currently active
-                  </p>
-                  <p className="text-sm text-gray-500 italic">No active term</p>
-                </div>
-              )}
-
-              <div className="flex justify-center text-gray-300">
-                <ChevronDown size={16} />
-              </div>
-
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3">
-                <p className="text-[11px] text-[var(--color-primary-dark)] uppercase font-medium mb-1">
-                  New active term
-                </p>
-                <p className="text-sm font-semibold text-[var(--color-primary)]">
-                  {termLabel(activateForm.term)} • {activateForm.academicYear}
-                </p>
-                {(activateForm.startDate || activateForm.endDate) && (
-                  <p className="text-[11px] text-blue-600 mt-0.5">
-                    {formatDate(activateForm.startDate)}
-                    {" — "}
-                    {formatDate(activateForm.endDate)}
-                  </p>
-                )}
-              </div>
-            </div>
-
-            {confirmModal.skipWarning && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 mb-4 flex items-start gap-2">
-                <AlertTriangle
-                  size={16}
-                  className="text-yellow-600 shrink-0 mt-0.5"
-                />
-                <p className="text-xs text-yellow-800">
-                  {confirmModal.skipWarning}
-                </p>
-              </div>
-            )}
-
-            {activeTerm && (
-              <p className="text-xs text-gray-500 mb-4 leading-relaxed">
-                The previous term will be archived and available in{" "}
-                <span className="font-medium text-gray-700">Term History</span>{" "}
-                and <span className="font-medium text-gray-700">Reports</span>.
-                Student credit balances (if any) will be applied to the new term
-                automatically.
-              </p>
-            )}
-
-            <div className="flex gap-3">
-              <button
-                onClick={() =>
-                  setConfirmModal({ open: false, skipWarning: null })
-                }
-                className="flex-1 px-4 py-2.5 border border-gray-300 text-gray-700 rounded-lg text-sm hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleConfirmActivate}
-                disabled={activatingTerm}
-                className="flex-1 flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white px-4 py-2.5 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
-              >
-                {activatingTerm ? (
-                  <>
-                    <Loader2 size={14} className="animate-spin" /> Activating...
-                  </>
-                ) : (
-                  <>
-                    <CheckCircle size={14} /> Yes, Activate
-                  </>
-                )}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* DELETE CLASS MODAL */}
       {deleteModal.open && (
         <div
           className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4"
           onClick={() =>
             !deleteModal.deleting &&
-            setDeleteModal((prev) => ({ ...prev, open: false }))
+            setDeleteModal({ ...deleteModal, open: false })
           }
         >
           <div
-            className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl"
+            className="bg-white rounded-2xl w-full max-w-sm p-6 text-center"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-4">
-              <Trash2 size={22} className="text-red-600" />
-            </div>
-            <h3 className="text-base font-bold text-gray-900 text-center mb-2">
-              Delete this class?
+            <Trash2 size={24} className="text-red-600 mx-auto mb-3" />
+            <h3 className="font-bold text-gray-900 mb-2">
+              Delete {deleteModal.className}?
             </h3>
-            <p className="text-sm text-gray-500 text-center mb-4 leading-relaxed">
-              <span className="font-semibold text-gray-800">
-                {deleteModal.className}
-              </span>{" "}
-              will be removed. Students in this class must be moved to another
-              class first.
+            <p className="text-sm text-gray-500 mb-4">
+              Students must be moved to another class first.
             </p>
-            {deleteModal.error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-3 py-2 rounded-lg text-xs mb-3 text-center">
-                {deleteModal.error}
-              </div>
-            )}
             <div className="flex gap-3">
               <button
-                onClick={() =>
-                  setDeleteModal((prev) => ({ ...prev, open: false }))
-                }
-                disabled={deleteModal.deleting}
-                className="flex-1 py-2.5 border border-gray-200 text-gray-700 rounded-xl text-sm font-semibold hover:bg-gray-50 disabled:opacity-40"
+                onClick={() => setDeleteModal({ ...deleteModal, open: false })}
+                className="flex-1 py-2 border rounded-xl text-sm"
               >
                 Cancel
               </button>
               <button
                 onClick={handleDeleteClass}
                 disabled={deleteModal.deleting}
-                className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-red-600 text-white rounded-xl text-sm font-semibold hover:bg-red-700 disabled:opacity-50"
+                className="flex-1 py-2 bg-red-600 text-white rounded-xl text-sm"
               >
-                {deleteModal.deleting ? (
-                  <Loader2 size={14} className="animate-spin" />
-                ) : (
-                  <Trash2 size={14} />
-                )}
-                {deleteModal.deleting ? "Deleting..." : "Yes, Delete"}
+                {deleteModal.deleting ? "Deleting..." : "Delete"}
               </button>
             </div>
           </div>

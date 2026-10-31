@@ -5,6 +5,7 @@ const morgan = require("morgan");
 const dotenv = require("dotenv");
 const rateLimit = require("express-rate-limit");
 const cron = require("node-cron");
+const { backupDatabase } = require("./src/lib/backup");
 const {
   reconcileStalePending,
 } = require("./src/controllers/onekhusa.controller");
@@ -126,6 +127,13 @@ app.use("/api/platform/setup", authLimiter);
 app.use("/api/platform", readLimiter);
 
 app.use("/api/", readLimiter);
+
+cron.schedule("0 * * * *", () => {
+  console.log("[cron] Triggering hourly database backup...");
+  backupDatabase().catch((err) =>
+    console.error("[backup-cron] Fatal error:", err.message),
+  );
+});
 
 cron.schedule("*/5 * * * *", () => {
   reconcileStalePending().catch((err) =>

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import { CheckCircle2, Building2, Users } from "lucide-react";
 import platformApi from "../../lib/platformApi";
 import Modal from "./Modal";
 
@@ -17,6 +17,9 @@ export default function InviteSchoolModal({ open, onClose, onInvited }: Props) {
   const [email, setEmail] = useState("");
   const [schoolName, setSchoolName] = useState("");
   const [trialDays, setTrialDays] = useState<number | "">("");
+  const [adminType, setAdminType] = useState<"SINGLE_ADMIN" | "GROUP_DIRECTOR">(
+    "SINGLE_ADMIN",
+  );
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [sentTo, setSentTo] = useState<string | null>(null);
@@ -25,6 +28,7 @@ export default function InviteSchoolModal({ open, onClose, onInvited }: Props) {
     setEmail("");
     setSchoolName("");
     setTrialDays("");
+    setAdminType("SINGLE_ADMIN");
     setError("");
     setSentTo(null);
   };
@@ -39,7 +43,7 @@ export default function InviteSchoolModal({ open, onClose, onInvited }: Props) {
     setError("");
     setSubmitting(true);
     try {
-      const body: any = { email };
+      const body: any = { email, adminType };
       if (schoolName.trim()) body.schoolName = schoolName.trim();
       if (trialDays !== "" && Number(trialDays) >= 0)
         body.trialDays = Number(trialDays);
@@ -91,7 +95,9 @@ export default function InviteSchoolModal({ open, onClose, onInvited }: Props) {
           <p className="text-sm font-medium text-slate-900 mb-4">{sentTo}</p>
           <p className="text-xs text-slate-500">
             The link expires in 7 days. When they accept, they&apos;ll complete
-            the school profile themselves: name, address, logo, staff, students.
+            the school profile themselves.
+            {adminType === "GROUP_DIRECTOR" &&
+              " As a Group Director, they will also be able to add and manage additional schools under their group."}
           </p>
         </div>
       </Modal>
@@ -104,7 +110,7 @@ export default function InviteSchoolModal({ open, onClose, onInvited }: Props) {
       open={open}
       onClose={onClose}
       title="Invite a School"
-      subtitle="Enter the admin's email. They'll complete the school profile after accepting."
+      subtitle="Create a new school and invite an admin to manage it."
       size="md"
       busy={submitting}
       footer={
@@ -139,6 +145,64 @@ export default function InviteSchoolModal({ open, onClose, onInvited }: Props) {
           </div>
         )}
 
+        {/* 🎯 ADMIN TYPE SELECTOR */}
+        <div>
+          <label className="block text-xs font-medium text-slate-700 mb-2">
+            What kind of admin is this?
+          </label>
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              type="button"
+              onClick={() => setAdminType("SINGLE_ADMIN")}
+              className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                adminType === "SINGLE_ADMIN"
+                  ? "border-blue-600 bg-blue-50/50 ring-2 ring-blue-600/20"
+                  : "border-slate-200 hover:border-slate-300 bg-white"
+              }`}
+            >
+              <Building2
+                size={24}
+                className={
+                  adminType === "SINGLE_ADMIN"
+                    ? "text-blue-600"
+                    : "text-slate-400"
+                }
+              />
+              <span className="text-sm font-semibold text-slate-900 text-center">
+                Single School
+              </span>
+              <span className="text-[10px] text-slate-500 text-center leading-tight">
+                Manages only this school
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setAdminType("GROUP_DIRECTOR")}
+              className={`flex flex-col items-center justify-center gap-2 p-4 rounded-xl border-2 transition-all ${
+                adminType === "GROUP_DIRECTOR"
+                  ? "border-indigo-600 bg-indigo-50/50 ring-2 ring-indigo-600/20"
+                  : "border-slate-200 hover:border-slate-300 bg-white"
+              }`}
+            >
+              <Users
+                size={24}
+                className={
+                  adminType === "GROUP_DIRECTOR"
+                    ? "text-indigo-600"
+                    : "text-slate-400"
+                }
+              />
+              <span className="text-sm font-semibold text-slate-900 text-center">
+                Group Director
+              </span>
+              <span className="text-[10px] text-slate-500 text-center leading-tight">
+                Manages multiple schools
+              </span>
+            </button>
+          </div>
+        </div>
+
         <div>
           <label className="block text-xs font-medium text-slate-700 mb-1">
             Admin Email *
@@ -152,9 +216,6 @@ export default function InviteSchoolModal({ open, onClose, onInvited }: Props) {
             placeholder="admin@school.mw"
             className={inputCls}
           />
-          <p className="text-xs text-slate-500 mt-1">
-            The invitation link and setup instructions will be sent here.
-          </p>
         </div>
 
         <div>
@@ -164,7 +225,11 @@ export default function InviteSchoolModal({ open, onClose, onInvited }: Props) {
           <input
             value={schoolName}
             onChange={(e) => setSchoolName(e.target.value)}
-            placeholder="Leave blank to let them set it"
+            placeholder={
+              adminType === "GROUP_DIRECTOR"
+                ? "e.g., Tranptech Group (first school)"
+                : "Leave blank to let them set it"
+            }
             className={inputCls}
           />
         </div>
@@ -183,9 +248,6 @@ export default function InviteSchoolModal({ open, onClose, onInvited }: Props) {
             placeholder="Default from platform settings"
             className={inputCls}
           />
-          <p className="text-xs text-slate-500 mt-1">
-            You can extend it later if they need more time.
-          </p>
         </div>
       </form>
     </Modal>

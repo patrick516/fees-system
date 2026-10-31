@@ -20,6 +20,8 @@ import {
   Briefcase,
   Wallet,
   LifeBuoy,
+  Building2, // 🎯 Added for Group Dashboard
+  ChevronDown, // 🎯 Added for School Switcher
 } from "lucide-react";
 import { useAuthStore } from "../../../store/authStore";
 import api from "../../../lib/axios";
@@ -137,6 +139,54 @@ const Sidebar = () => {
   const [pendingCount, setPendingCount] = useState(0);
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
 
+  // 🎯 Multi-Tenant State
+  const [groupSchools, setGroupSchools] = useState<any[]>([]);
+  const [activeSchool, setActiveSchool] = useState<any>(null);
+  const [showSchoolSwitcher, setShowSchoolSwitcher] = useState(false);
+
+  const isGroupAdmin = staff?.isGroupAdmin || false;
+
+  // 🎯 Fetch group schools if user is a Group Admin
+  useEffect(() => {
+    if (!isGroupAdmin) {
+      // Normal users just see their own school
+      setActiveSchool(staff?.school);
+      return;
+    }
+
+    const loadGroupSchools = async () => {
+      try {
+        const res = await api.get("/group/schools");
+        setGroupSchools(res.data.data);
+
+        // Determine which school is currently active
+        const activeId =
+          localStorage.getItem("activeSchoolId") || staff?.schoolId;
+        const matched = res.data.data.find((s: any) => s.id === activeId);
+
+        if (matched) {
+          setActiveSchool(matched);
+        } else if (res.data.data.length > 0) {
+          // Default to first school if none selected
+          setActiveSchool(res.data.data[0]);
+          localStorage.setItem("activeSchoolId", res.data.data[0].id);
+        }
+      } catch (err) {
+        console.error("Failed to load group schools");
+      }
+    };
+    loadGroupSchools();
+  }, [isGroupAdmin, staff]);
+
+  // 🎯 Handle School Switch
+  const handleSwitchSchool = (school: any) => {
+    localStorage.setItem("activeSchoolId", school.id);
+    setActiveSchool(school);
+    setShowSchoolSwitcher(false);
+    // Hard reload to flush all contexts (safest for multi-tenant)
+    window.location.href = "/dashboard";
+  };
+
   // Check if the logged-in user has "read" permission for a resource.
   // School Admin always passes (safety fallback).
   const canRead = (resource: Resource): boolean => {
@@ -145,6 +195,7 @@ const Sidebar = () => {
     const perms = staff.role.permissions?.[resource];
     return Array.isArray(perms) && perms.includes("read");
   };
+
   // 🎯 Poll support unread count every 60s
   useEffect(() => {
     const load = async () => {
@@ -180,7 +231,9 @@ const Sidebar = () => {
     const t = setInterval(load, 60_000);
     return () => clearInterval(t);
   }, [activeYear, currentTerm]);
+
   const handleLogout = () => {
+    localStorage.removeItem("activeSchoolId"); // 🎯 Clear active school on logout
     logout();
     navigate("/login");
   };
@@ -193,10 +246,10 @@ const Sidebar = () => {
       <div className="p-6 border-b border-slate-800">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-white/20 rounded-lg flex items-center justify-center overflow-hidden">
-            {staff?.school?.logo ? (
+            {activeSchool?.logo ? (
               <img
-                src={staff.school.logo}
-                alt={staff.school.name}
+                src={activeSchool.logo}
+                alt={activeSchool.name}
                 className="w-full h-full object-contain"
               />
             ) : (
@@ -206,7 +259,7 @@ const Sidebar = () => {
           <div className="flex-1 min-w-0">
             <p className="font-bold text-sm text-white">SchoolPay</p>
             <p className="text-slate-400 text-xs truncate">
-              {staff?.school?.name}
+              {activeSchool?.name || "Loading..."}
             </p>
           </div>
           <button
@@ -217,10 +270,62 @@ const Sidebar = () => {
             <X size={20} />
           </button>
         </div>
+
+        {/* 🎯 School Switcher Dropdown for Group Admins */}
+        {isGroupAdmin && groupSchools.length > 0 && (
+          <div className="mt-4 relative">
+            <button
+              onClick={() => setShowSchoolSwitcher(!showSchoolSwitcher)}
+              className="w-full flex items-center justify-between bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-lg text-xs font-medium text-white transition-colors"
+            >
+              <span className="truncate">
+                {activeSchool?.name || "Select School"}
+              </span>
+              <ChevronDown
+                size={14}
+                className={`transition-transform ${showSchoolSwitcher ? "rotate-180" : ""}`}
+              />
+            </button>
+
+            {showSchoolSwitcher && (
+              <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                {groupSchools.map((s) => (
+                  <button
+                    key={s.id}
+                    onClick={() => handleSwitchSchool(s)}
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 ${s.id === activeSchool?.id ? "bg-slate-700 text-white font-semibold" : "text-slate-300"}`}
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-6 custom-scrollbar">
+        {/* 🎯 Group Overview Link (Only for Group Admin) */}
+        {isGroupAdmin && (
+          <div className="mb-4">
+            <NavLink
+              to="/group"
+              onClick={close}
+              className={({ isActive }) =>
+                `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
+                  isActive
+                    ? "bg-indigo-600 text-white font-semibold shadow-sm"
+                    : "text-indigo-200 hover:bg-white/10 hover:text-white bg-indigo-900/30"
+                }`
+              }
+            >
+              <Building2 size={18} />
+              <span className="flex-1 font-bold">Group Overview</span>
+            </NavLink>
+          </div>
+        )}
+
         {navSections.map((section) => {
           // Filter items based on permissions
           const visibleItems = section.items.filter((item) =>
@@ -281,7 +386,7 @@ const Sidebar = () => {
               {staff?.fullName}
             </p>
             <p className="text-slate-400 text-xs truncate">
-              {staff?.role?.name || "—"}
+              {isGroupAdmin ? "Group Director" : staff?.role?.name || "—"}
             </p>
           </div>
         </div>
@@ -309,10 +414,10 @@ const Sidebar = () => {
         </button>
         <div className="flex items-center gap-2 ml-3">
           <div className="w-7 h-7 bg-white/20 rounded-md flex items-center justify-center overflow-hidden">
-            {staff?.school?.logo ? (
+            {activeSchool?.logo ? (
               <img
-                src={staff.school.logo}
-                alt={staff.school.name}
+                src={activeSchool.logo}
+                alt={activeSchool.name}
                 className="w-full h-full object-contain"
               />
             ) : (

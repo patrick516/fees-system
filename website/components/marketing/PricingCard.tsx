@@ -77,11 +77,11 @@ export default function PricingCard({
       >
         <div className="max-w-2xl mx-auto px-6 text-center">
           <h2 className="text-3xl md:text-4xl font-bold text-gray-900 mb-3">
-            Pricing coming soon
+            Contact us for pricing
           </h2>
           <p className="text-gray-600 mb-8">
-            Our team is finalizing subscription plans. Book a free demo to
-            discuss pricing for your school.
+            Book a free demo and our team will walk you through the best plan
+            for your school's size and needs.
           </p>
           <a
             href="#demo"

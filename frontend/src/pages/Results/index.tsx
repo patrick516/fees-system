@@ -24,6 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { getCurrentAcademicYear } from "../../lib/utils";
+import api from "../../lib/axios";
 import { useActiveTerm } from "../../hooks/useActiveTerm";
 import AnalyticsTab from "./AnalyticsTab";
 
@@ -1052,7 +1053,7 @@ const ResultsPage = () => {
                             colSpan={resultsGradingSystem === "LETTER" ? 8 : 6}
                             className="px-4 py-3"
                           >
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
                               {row.subjects.map((s: any, i: number) => (
                                 <div
                                   key={i}
@@ -1092,6 +1093,48 @@ const ResultsPage = () => {
                                   </span>
                                 </div>
                               ))}
+                            </div>
+
+                            {/* 🎯 ADD THE DOWNLOAD BUTTON HERE */}
+                            <div className="flex justify-end pt-2 border-t border-gray-200">
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    const res = await api.get(
+                                      "/reports/report-card",
+                                      {
+                                        params: {
+                                          studentId: row.studentId,
+                                          term: periods.find(
+                                            (p) => p.id === selectedPeriod,
+                                          )?.term,
+                                          academicYear: periods.find(
+                                            (p) => p.id === selectedPeriod,
+                                          )?.academicYear,
+                                        },
+                                        responseType: "blob",
+                                      },
+                                    );
+                                    const url = window.URL.createObjectURL(
+                                      new Blob([res.data]),
+                                    );
+                                    const link = document.createElement("a");
+                                    link.href = url;
+                                    link.setAttribute(
+                                      "download",
+                                      `Report_${row.studentCode}.pdf`,
+                                    );
+                                    document.body.appendChild(link);
+                                    link.click();
+                                    link.remove();
+                                  } catch (err) {
+                                    alert("Failed to generate PDF");
+                                  }
+                                }}
+                                className="text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200 flex items-center gap-1 transition-colors"
+                              >
+                                📄 Download Report Card PDF
+                              </button>
                             </div>
                           </td>
                         </tr>

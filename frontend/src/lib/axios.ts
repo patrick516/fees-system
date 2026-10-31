@@ -14,6 +14,17 @@ api.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+
+  // 🎯 Multi-Tenant School Switching
+  // If the user is a Group Admin, they can switch schools.
+  // We read the selected school from localStorage and send it in the header.
+  if (typeof window !== "undefined") {
+    const activeSchoolId = localStorage.getItem("activeSchoolId");
+    if (activeSchoolId) {
+      config.headers["x-active-school-id"] = activeSchoolId;
+    }
+  }
+
   return config;
 });
 
@@ -36,7 +47,7 @@ const flushQueue = (err: any, token: string | null = null) => {
 const forceLockedRedirect = (status: string) => {
   if (typeof window === "undefined") return;
   const isAlreadyLocked = window.location.pathname.includes("subscription");
-  const isAuthPage = ["/login", "/signup", "/platform"].some((p) =>
+  const isAuthPage = ["/login", "/signup", "/platform", "/group"].some((p) =>
     window.location.pathname.startsWith(p),
   );
   if (!isAlreadyLocked && !isAuthPage) {
