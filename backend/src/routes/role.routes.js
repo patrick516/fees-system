@@ -1,5 +1,6 @@
 const express = require("express");
 const router = express.Router();
+const { downloadReportCard } = require("../controllers/reportCard.controller");
 const {
   listRoles,
   createRole,
@@ -14,5 +15,5 @@ router.get("/", listRoles);
 router.post("/", requirePermission("settings", "write"), createRole);
 router.put("/:id", requirePermission("settings", "write"), updateRole);
 router.delete("/:id", requirePermission("settings", "write"), deleteRole);
-
+router.get("/report-card", downloadReportCard);
 module.exports = router;

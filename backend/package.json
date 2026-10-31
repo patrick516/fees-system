@@ -41,6 +41,7 @@
     "nodemailer": "^7.0.11",
     "pawapay-nodejs-sdk": "^2.0.0",
     "pg": "^8.23.1",
+    "puppeteer": "^25.16.0",
     "twilio": "^5.10.7",
     "xlsx": "^0.18.5"
   },

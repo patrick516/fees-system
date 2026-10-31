@@ -79,16 +79,9 @@ const listSchools = async (req, res) => {
   }
 };
 
-// ==================== INVITE SCHOOL ====================
-// POST /api/platform/schools/invite
-// Body: { email, schoolName?, trialDays? }
-// Creates a placeholder school, seeds roles, creates the admin with:
-//   - a temp password (for immediate login)
-//   - an invitation token (for the "set your own password" link)
-// Email contains BOTH. Either path works independently.
 const inviteSchool = async (req, res) => {
   try {
-    const { email, schoolName, trialDays } = req.body;
+    const { email, schoolName, trialDays, adminType } = req.body;
 
     if (!email) {
       return res
@@ -156,7 +149,9 @@ const inviteSchool = async (req, res) => {
     );
 
     // Create everything in a transaction
+    // Create everything in a transaction
     const result = await prisma.$transaction(async (tx) => {
+      // 1. Create the School
       const school = await tx.school.create({
         data: {
           platformId: platform.id,
@@ -174,9 +169,31 @@ const inviteSchool = async (req, res) => {
 
       const roleMap = await createDefaultRolesForSchool(tx, school.id);
 
+      // 🎯 2. Check if this is a Group Director
+      let groupId = null;
+      let isGroupAdmin = false;
+
+      if (adminType === "GROUP_DIRECTOR") {
+        // Create a new Group
+        const group = await tx.schoolGroup.create({
+          data: { name: `${placeholderName} Group` },
+        });
+        groupId = group.id;
+        isGroupAdmin = true;
+
+        // Link the school to this new group
+        await tx.school.update({
+          where: { id: school.id },
+          data: { groupId: group.id },
+        });
+      }
+
+      // 3. Create the Admin Staff
       const admin = await tx.staff.create({
         data: {
           schoolId: school.id,
+          groupId: groupId,
+          isGroupAdmin: isGroupAdmin,
           roleId: roleMap["School Admin"],
           title: null,
           firstName: "School",
@@ -195,12 +212,12 @@ const inviteSchool = async (req, res) => {
       return { school, admin };
     });
 
-    // 🎯 Await the email so we know if it failed AND pass the tempPassword
+    //  Await the email so we know if it failed AND pass the tempPassword
     const emailRes = await sendPlatformSchoolInviteEmail({
       to: cleanEmail,
       name: "there",
       inviteToken,
-      tempPassword, // 🎯 THIS WAS MISSING
+      tempPassword,
       expiresInDays: INVITE_TTL_DAYS,
     });
 
