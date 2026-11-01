@@ -973,4 +973,210 @@ router.get(
   schoolController.getSubscriptionPaymentStatus,
 );
 
+router.get("/settings/head-teacher", verifyStaff, async (req, res) => {
+  try {
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: {
+        headTeacherName: true,
+        headTeacherSignatureUrl: true,
+        headTeacherStampUrl: true,
+      },
+    });
+    res.json({ success: true, data: school });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to load" });
+  }
+});
+
+router.put(
+  "/settings/head-teacher",
+  verifyStaff,
+  requirePermission("settings", "write"),
+  async (req, res) => {
+    try {
+      const { headTeacherName } = req.body;
+      const updated = await prisma.school.update({
+        where: { id: req.schoolId },
+        data: { headTeacherName },
+      });
+      res.json({ success: true, data: updated });
+    } catch (err) {
+      res.status(500).json({ success: false, message: "Failed to save" });
+    }
+  },
+);
+
+router.post(
+  "/settings/head-teacher/upload",
+  verifyStaff,
+  requirePermission("settings", "write"),
+  upload.fields([
+    { name: "signature", maxCount: 1 },
+    { name: "stamp", maxCount: 1 },
+  ]),
+  async (req, res) => {
+    try {
+      const signatureFile = req.files?.signature?.[0];
+      const stampFile = req.files?.stamp?.[0];
+      const file = signatureFile || stampFile;
+      if (!file)
+        return res.status(400).json({ success: false, message: "No file" });
+
+      if (file.size > 2 * 1024 * 1024) {
+        return res.status(400).json({ success: false, message: "Max 2MB" });
+      }
+
+      const { uploadToCloudinary } = require("../lib/cloudinary");
+      const result = await uploadToCloudinary(file.buffer, {
+        folder: `school_head_teacher/${req.schoolId}`,
+        resource_type: "image",
+      });
+
+      const data = signatureFile
+        ? { headTeacherSignatureUrl: result.secure_url }
+        : { headTeacherStampUrl: result.secure_url };
+
+      await prisma.school.update({
+        where: { id: req.schoolId },
+        data,
+      });
+
+      res.json({ success: true, data: { url: result.secure_url } });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ success: false, message: "Upload failed" });
+    }
+  },
+);
+
+router.delete(
+  "/settings/head-teacher/:field",
+  verifyStaff,
+  requirePermission("settings", "write"),
+  async (req, res) => {
+    try {
+      const field = req.params.field;
+      if (!["signature", "stamp"].includes(field)) {
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid field" });
+      }
+      const data =
+        field === "signature"
+          ? { headTeacherSignatureUrl: null }
+          : { headTeacherStampUrl: null };
+      await prisma.school.update({
+        where: { id: req.schoolId },
+        data,
+      });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, message: "Failed to remove" });
+    }
+  },
+);
+
+// HEAD TEACHER (name, signature, stamp)
+router.get("/settings/head-teacher", verifyStaff, async (req, res) => {
+  try {
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: {
+        headTeacherName: true,
+        headTeacherSignatureUrl: true,
+        headTeacherStampUrl: true,
+      },
+    });
+    res.json({ success: true, data: school });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to load" });
+  }
+});
+
+router.put(
+  "/settings/head-teacher",
+  verifyStaff,
+  requirePermission("settings", "write"),
+  async (req, res) => {
+    try {
+      const { headTeacherName } = req.body;
+      const updated = await prisma.school.update({
+        where: { id: req.schoolId },
+        data: { headTeacherName },
+        select: { headTeacherName: true },
+      });
+      res.json({ success: true, data: updated });
+    } catch (err) {
+      res.status(500).json({ success: false, message: "Failed to save" });
+    }
+  },
+);
+
+router.post(
+  "/settings/head-teacher/upload",
+  verifyStaff,
+  requirePermission("settings", "write"),
+  upload.fields([
+    { name: "signature", maxCount: 1 },
+    { name: "stamp", maxCount: 1 },
+  ]),
+  async (req, res) => {
+    try {
+      const signatureFile = req.files?.signature?.[0];
+      const stampFile = req.files?.stamp?.[0];
+      const file = signatureFile || stampFile;
+      if (!file)
+        return res.status(400).json({ success: false, message: "No file" });
+      if (file.size > 2 * 1024 * 1024)
+        return res.status(400).json({ success: false, message: "Max 2MB" });
+
+      const { uploadToCloudinary } = require("../lib/cloudinary");
+      const result = await uploadToCloudinary(file.buffer, {
+        folder: `school_head_teacher/${req.schoolId}`,
+        resource_type: "image",
+      });
+
+      const data = signatureFile
+        ? { headTeacherSignatureUrl: result.secure_url }
+        : { headTeacherStampUrl: result.secure_url };
+
+      await prisma.school.update({
+        where: { id: req.schoolId },
+        data,
+      });
+
+      res.json({ success: true, data: { url: result.secure_url } });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ success: false, message: "Upload failed" });
+    }
+  },
+);
+
+router.delete(
+  "/settings/head-teacher/:field",
+  verifyStaff,
+  requirePermission("settings", "write"),
+  async (req, res) => {
+    try {
+      const field = req.params.field;
+      if (!["signature", "stamp"].includes(field))
+        return res
+          .status(400)
+          .json({ success: false, message: "Invalid field" });
+      const data =
+        field === "signature"
+          ? { headTeacherSignatureUrl: null }
+          : { headTeacherStampUrl: null };
+      await prisma.school.update({
+        where: { id: req.schoolId },
+        data,
+      });
+      res.json({ success: true });
+    } catch (err) {
+      res.status(500).json({ success: false, message: "Failed to remove" });
+    }
+  },
+);
 module.exports = router;

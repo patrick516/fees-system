@@ -52,9 +52,9 @@ model Student {
 
   dateOfBirth DateTime
   gender      Gender
-  studentType StudentType @default(DAY) 
+  studentType StudentType @default(DAY)
   photo       String?
-  isActive    Boolean  @default(true)
+  isActive    Boolean     @default(true)
 
   parentName   String
   parentPhone  String
@@ -67,13 +67,15 @@ model Student {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  payments    FeePayment[]
-  examResults ExamResult[]
-  discounts   StudentDiscount[]
+  payments           FeePayment[]
+  examResults        ExamResult[]
+  discounts          StudentDiscount[]
+  reportCardComments ReportCardComment[]
 
   @@unique([schoolId, studentCode])
   @@map("students")
 }
+
 model TermActivation {
   id       String @id @default(uuid())
   schoolId String

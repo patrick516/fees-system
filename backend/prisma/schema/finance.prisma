@@ -28,9 +28,9 @@ model FeeStructure {
   classId  String
   class    Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
 
-  academicYear String
-  term         Term
-  currency     String  @default("MWK")
+  academicYear   String
+  term           Term
+  currency       String  @default("MWK")
   dayAmount      Decimal @db.Decimal(12, 2)
   boardingAmount Decimal @db.Decimal(12, 2)
 

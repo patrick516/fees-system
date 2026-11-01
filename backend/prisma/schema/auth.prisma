@@ -45,11 +45,11 @@ model Platform {
 
 //  SCHOOL
 model School {
-  id         String   @id @default(uuid())
-  groupId String?
-  group   SchoolGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  id         String       @id @default(uuid())
+  groupId    String?
+  group      SchoolGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
   platformId String
-  platform   Platform @relation(fields: [platformId], references: [id])
+  platform   Platform     @relation(fields: [platformId], references: [id])
 
   name         String
   slug         String? @unique
@@ -82,6 +82,9 @@ model School {
   settlementAccountName         String?
   settlementAccountNumber       String?
   settlementBranch              String?
+  headTeacherName               String?
+  headTeacherSignatureUrl       String?
+  headTeacherStampUrl           String?
   subscriptionStatus            SubscriptionStatus @default(TRIAL)
   trialEndsAt                   DateTime?
   subscriptionEndsAt            DateTime?
@@ -118,6 +121,7 @@ model School {
   employees            Employee[]
   payrollRecords       PayrollRecord[]
   supportTickets       SupportTicket[]
+  reportCardComments   ReportCardComment[]
 
   @@map("schools")
 }
@@ -164,12 +168,12 @@ model Role {
 
 //  STAFF 
 model Staff {
-  id       String @id @default(uuid())
-  schoolId String?
-  groupId String?
-  group   SchoolGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  isGroupAdmin Boolean @default(false)
-  school   School? @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  id           String       @id @default(uuid())
+  schoolId     String?
+  groupId      String?
+  group        SchoolGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  isGroupAdmin Boolean      @default(false)
+  school       School?      @relation(fields: [schoolId], references: [id], onDelete: Cascade)
 
   departmentId String?
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
@@ -215,9 +219,10 @@ model Staff {
   updatedAt DateTime @updatedAt
 
   // Relations
-  paymentsRecorded  FeePayment[]      @relation("RecordedBy")
-  paymentsVerified  FeePayment[]      @relation("VerifiedBy")
-  notificationsSent NotificationLog[]
+  paymentsRecorded          FeePayment[]        @relation("RecordedBy")
+  paymentsVerified          FeePayment[]        @relation("VerifiedBy")
+  notificationsSent         NotificationLog[]
+  reportCardCommentsEntered ReportCardComment[] @relation("CommentEnteredBy")
 
   @@index([schoolId])
   @@index([email])
@@ -394,23 +399,23 @@ model Employee {
   department   Department? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
 
   // Identity
-  honorific   String? // Mr, Mrs, Ms, Dr, Rev, Prof, Chief
-  firstName   String
-  lastName    String
-  fullName    String
-  gender      Gender? // MALE | FEMALE
-  jobTitle    String? // Groundskeeper, Teacher, Driver, Cook, etc.
-  phone       String?
-  email       String?
-  nationalId  String?
-  dateOfBirth DateTime?
-  hireDate    DateTime?
-  photo       String?
+  honorific          String? // Mr, Mrs, Ms, Dr, Rev, Prof, Chief
+  firstName          String
+  lastName           String
+  fullName           String
+  gender             Gender? // MALE | FEMALE
+  jobTitle           String? // Groundskeeper, Teacher, Driver, Cook, etc.
+  phone              String?
+  email              String?
+  nationalId         String?
+  dateOfBirth        DateTime?
+  hireDate           DateTime?
+  photo              String?
   // Salary — additions
-  basicSalary        Decimal @default(0) @db.Decimal(12, 2)
-  housingAllowance   Decimal @default(0) @db.Decimal(12, 2)
-  transportAllowance Decimal @default(0) @db.Decimal(12, 2)
-  otherAllowances    Decimal @default(0) @db.Decimal(12, 2)
+  basicSalary        Decimal   @default(0) @db.Decimal(12, 2)
+  housingAllowance   Decimal   @default(0) @db.Decimal(12, 2)
+  transportAllowance Decimal   @default(0) @db.Decimal(12, 2)
+  otherAllowances    Decimal   @default(0) @db.Decimal(12, 2)
 
   // Salary — deductions
   payeTax          Decimal @default(0) @db.Decimal(12, 2)

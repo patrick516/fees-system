@@ -19,6 +19,7 @@ import SettlementAccountCard from "../../components/Settings/SettlementAccountCa
 import OneKhusaStatusCard from "../../components/Settings/OneKhusaStatusCard";
 import SubscriptionCard from "../../components/Settings/SubscriptionCard";
 import TierStatusCard from "../../components/Settings/TierStatusCard";
+import HeadTeacherCard from "../../components/Settings/HeadTeacherCard";
 
 const SettingsPage = () => {
   const { settings, loading } = useSchoolSettings();
@@ -156,6 +157,7 @@ const SettingsPage = () => {
       <DepartmentsCard />
       <RolesCard />
       <NotificationPreferencesCard />
+      <HeadTeacherCard />
 
       {/* Edit modal */}
       <EditSchoolModal

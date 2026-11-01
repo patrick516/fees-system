@@ -106,3 +106,28 @@ model PendingExamRow {
 
   @@map("pending_exam_rows")
 }
+
+// 🎯 Per-student report card comments (per term/year)
+model ReportCardComment {
+  id        String  @id @default(uuid())
+  schoolId  String
+  school    School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  term         Term
+  academicYear String
+
+  classTeacherComment String?
+  headTeacherComment  String?
+
+  enteredById String?
+  enteredBy   Staff?  @relation("CommentEnteredBy", fields: [enteredById], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([studentId, term, academicYear])
+  @@index([schoolId])
+  @@map("report_card_comments")
+}

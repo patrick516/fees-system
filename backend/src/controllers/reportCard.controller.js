@@ -54,7 +54,6 @@ const downloadReportCard = async (req, res) => {
       where: { id: studentId, schoolId },
       include: { class: true, school: true },
     });
-
     if (!student)
       return res
         .status(404)
@@ -182,6 +181,16 @@ const downloadReportCard = async (req, res) => {
       });
       overallGrade = totalPoints;
     }
+    // Fetch report card comments if any exist for this student/term
+    const reportComment = await prisma.reportCardComment.findUnique({
+      where: {
+        studentId_term_academicYear: {
+          studentId,
+          term,
+          academicYear,
+        },
+      },
+    });
 
     const summary = {
       totalStudents: classSize,
@@ -192,8 +201,8 @@ const downloadReportCard = async (req, res) => {
       position: position,
       overallGrade: overallGrade,
       result: "PROMOTED",
-      classTeacherComment: "",
-      headTeacherComment: "",
+      classTeacherComment: reportComment?.classTeacherComment || "",
+      headTeacherComment: reportComment?.headTeacherComment || "",
     };
 
     const html = generateReportCardHTML({

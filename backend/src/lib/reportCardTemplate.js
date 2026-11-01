@@ -8,7 +8,8 @@ const generateReportCardHTML = (data) => {
       <meta charset="UTF-8">
       <style>
         body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; color: #000; font-size: 12px; }
-        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; }
+        .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; position: relative; }
+        .header-logo { position: absolute; left: 0; top: 0; height: 70px; width: 70px; object-fit: contain; }
         .header h1 { margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
         .header h2 { margin: 5px 0; font-size: 16px; color: #1e3a8a; }
         .header p { margin: 2px 0; font-size: 10px; }
@@ -24,13 +25,18 @@ const generateReportCardHTML = (data) => {
         .grading-key { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 9px; }
         .grading-key div { border: 1px solid #000; padding: 4px; text-align: center; width: 11%; }
         .comments { border: 1px solid #000; padding: 10px; margin-bottom: 15px; min-height: 50px; }
-        .footer { display: flex; justify-content: space-between; font-size: 10px; margin-top: 20px; }
-        .footer div { width: 30%; border-top: 1px solid #000; padding-top: 5px; text-align: center; }
+        .footer { display: flex; justify-content: space-between; font-size: 10px; margin-top: 20px; gap: 20px; }
+        .footer div { flex: 1; text-align: center; }
+        .footer .signature-block { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-height: 80px; }
+        .footer .signature-img { max-height: 40px; margin-bottom: 4px; }
+        .footer .stamp-img { max-height: 60px; margin-bottom: 4px; }
+        .footer .line { width: 100%; border-top: 1px solid #000; padding-top: 4px; font-size: 9px; }
       </style>
     </head>
     <body>
       <!-- HEADER -->
       <div class="header">
+        ${school.logo ? `<img src="${school.logo}" alt="Logo" class="header-logo" />` : ""}
         <p>REPUBLIC OF MALAWI</p>
         <p>MINISTRY OF EDUCATION</p>
         <h2>${school.name.toUpperCase()}</h2>
@@ -38,7 +44,7 @@ const generateReportCardHTML = (data) => {
         <h1 style="margin-top: 10px; background: #1e3a8a; color: white; padding: 5px;">STUDENT TERMLY PROGRESS REPORT</h1>
       </div>
 
-            <!-- STUDENT INFO -->
+      <!-- STUDENT INFO -->
       <div class="student-info">
         <div>
           <p><strong>Student Name:</strong> <span>${student.fullName}</span></p>
@@ -52,6 +58,7 @@ const generateReportCardHTML = (data) => {
           <p><strong>Academic Year:</strong> <span>${academicYear}</span></p>
         </div>
       </div>
+
       <!-- MARKS TABLE -->
       <table>
         <thead>
@@ -100,10 +107,10 @@ const generateReportCardHTML = (data) => {
         <tr>
           <td colspan="5">
             <strong>Result:</strong> 
-            <span>[ ${summary.result === "PROMOTED" ? "X" : " "} ] PROMOTED</span>
-            <span>[ ${summary.result === "REPEAT" ? "X" : " "} ] REPEAT</span>
-            <span>[ ${summary.result === "DISCONTINUED" ? "X" : " "} ] DISCONTINUED</span>
-            <span>[ ${summary.result === "TRIAL" ? "X" : " "} ] PROMOTED ON TRIAL</span>
+            <span>[ ${summary.result === "PROMOTED" ? "✓" : " "} ] PROMOTED</span>
+            <span>[ ${summary.result === "REPEAT" ? "✓" : " "} ] REPEAT</span>
+            <span>[ ${summary.result === "DISCONTINUED" ? "✓" : " "} ] DISCONTINUED</span>
+            <span>[ ${summary.result === "TRIAL" ? "✓" : " "} ] PROMOTED ON TRIAL</span>
           </td>
         </tr>
       </table>
@@ -124,18 +131,26 @@ const generateReportCardHTML = (data) => {
       <!-- COMMENTS -->
       <div class="comments">
         <p><strong>CLASS TEACHER'S COMMENT:</strong></p>
-        <p style="color: #555; font-style: italic;">${summary.classTeacherComment || "No comment provided."}</p>
+        <p style="color: #555; font-style: italic; white-space: pre-wrap;">${summary.classTeacherComment || ""}</p>
       </div>
       <div class="comments">
         <p><strong>HEAD TEACHER'S COMMENT:</strong></p>
-        <p style="color: #555; font-style: italic;">${summary.headTeacherComment || "No comment provided."}</p>
+        <p style="color: #555; font-style: italic; white-space: pre-wrap;">${summary.headTeacherComment || ""}</p>
       </div>
 
       <!-- FOOTER -->
       <div class="footer">
-        <div>School Stamp</div>
-        <div>Parent / Guardian Signature</div>
-        <div>Date</div>
+        <div class="signature-block">
+          ${school.headTeacherStampUrl ? `<img src="${school.headTeacherStampUrl}" alt="School Stamp" class="stamp-img" />` : ""}
+          <div class="line">School Stamp</div>
+        </div>
+        <div class="signature-block">
+          ${school.headTeacherSignatureUrl ? `<img src="${school.headTeacherSignatureUrl}" alt="Head Teacher Signature" class="signature-img" />` : ""}
+          <div class="line">${school.headTeacherName || "Head Teacher"}</div>
+        </div>
+        <div class="signature-block">
+          <div class="line">Date</div>
+        </div>
       </div>
     </body>
     </html>
