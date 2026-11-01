@@ -64,7 +64,7 @@ const isProd = process.env.NODE_ENV === "production";
 // Strict OTP limiter
 const otpLimiter = rateLimit({
   windowMs: 60 * 1000,
-  max: isProd ? 3 : 500,
+  max: isProd ? 5 : 500, // Increased from 3 to 5
   message: {
     success: false,
     message: "Too many OTP requests, please wait a minute",
@@ -77,7 +77,7 @@ const otpLimiter = rateLimit({
 // Auth limiter (general — for password changes etc.)
 const authLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isProd ? 20 : 2000,
+  max: isProd ? 200 : 2000, // 🎯 Increased from 20 to 200
   message: {
     success: false,
     message: "Too many auth attempts, please try again later",
@@ -90,7 +90,7 @@ const authLimiter = rateLimit({
 const loginLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: isProd
-    ? parseInt(process.env.LOGIN_RATE_LIMIT_PER_MIN || "10", 10)
+    ? parseInt(process.env.LOGIN_RATE_LIMIT_PER_MIN || "50", 10) // 🎯 Increased default from 10 to 50
     : 1000,
   message: {
     success: false,
@@ -104,7 +104,7 @@ const loginLimiter = rateLimit({
 // Generous limiter for everything else
 const readLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: isProd ? 1500 : 20000,
+  max: isProd ? 5000 : 20000, // 🎯 Increased from 1500 to 5000
   message: {
     success: false,
     message: "Too many requests, please try again later",
@@ -113,6 +113,7 @@ const readLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
 });
+
 app.use("/api/auth/staff/login", loginLimiter);
 app.use("/api/auth/parent/request-otp", otpLimiter);
 app.use("/api/auth/register", authLimiter);
