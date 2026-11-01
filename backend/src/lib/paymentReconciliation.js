@@ -18,9 +18,11 @@ const calculateDebtorStatus = async (
     }),
   ]);
 
-  const requiredAmount = feeStructure?.totalAmount
-    ? Number(feeStructure.totalAmount)
-    : null;
+  const feeAmount =
+    student?.studentType === "BOARDING"
+      ? feeStructure?.boardingAmount
+      : feeStructure?.dayAmount;
+  const requiredAmount = feeAmount ? Number(feeAmount) : null;
   const totalPaid = Number(paymentsAggregate._sum.amount) || 0;
   const balance = requiredAmount !== null ? requiredAmount - totalPaid : null;
   const isDebtor = balance !== null ? balance > 0 : false;

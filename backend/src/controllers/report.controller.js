@@ -56,9 +56,9 @@ const getFeesReport = async (req, res) => {
       );
       const requiredAmount = latestPayment?.requiredAmount
         ? Number(latestPayment.requiredAmount)
-        : feeStructure?.totalAmount
-          ? Number(feeStructure.totalAmount)
-          : null;
+        : student.studentType === "BOARDING"
+          ? Number(feeStructure?.boardingAmount || 0)
+          : Number(feeStructure?.dayAmount || 0);
       const balance =
         requiredAmount !== null
           ? Math.max(0, requiredAmount - totalPaid)
@@ -206,7 +206,10 @@ const getDebtorAgeingReport = async (req, res) => {
           (p) => p.term === fee.term,
         );
         const paid = termPayments.reduce((sum, p) => sum + Number(p.amount), 0);
-        const req = Number(fee.totalAmount);
+        const req =
+          student.studentType === "BOARDING"
+            ? Number(fee.boardingAmount || 0)
+            : Number(fee.dayAmount || 0);
         const balance = Math.max(0, req - paid);
 
         if (balance > 0) {
@@ -342,24 +345,26 @@ const getDailyCollectionReport = async (req, res) => {
   }
 };
 
-// ==================== 4. FINANCIAL STATEMENT (YEAR-TO-DATE) ====================
+//  4. FINANCIAL STATEMENT (YEAR-TO-DATE)
 const getFinancialStatement = async (req, res) => {
   try {
     const { academicYear } = req.query;
     const year = academicYear || new Date().getFullYear().toString();
 
-    // 1. Fetch all verified payments for the year
+    // 1. Fetch payments
     const payments = await prisma.feePayment.findMany({
       where: { schoolId: req.schoolId, status: "VERIFIED", academicYear: year },
     });
 
-    // 2. Fetch all expected fees (Fee Structures) for active classes
+    // 2. Fetch students WITH classId and studentType so we can pick the right fee
     const students = await prisma.student.findMany({
       where: { schoolId: req.schoolId, isActive: true },
-      select: { classId: true },
+      select: { id: true, classId: true, studentType: true },
     });
+
     const activeClassIds = [...new Set(students.map((s) => s.classId))];
 
+    // 3. Fetch fee structures for the year
     const feeStructures = await prisma.feeStructure.findMany({
       where: {
         schoolId: req.schoolId,
@@ -369,20 +374,27 @@ const getFinancialStatement = async (req, res) => {
       },
     });
 
-    // Calculate expected revenue (theoretical maximum)
-    let totalExpected = 0;
-    const studentCountPerClass = {};
-    students.forEach((s) => {
-      studentCountPerClass[s.classId] =
-        (studentCountPerClass[s.classId] || 0) + 1;
-    });
-
+    // 4. Map classId → fee structure (per term is aggregated at the year level)
+    const feeByClass = {};
     feeStructures.forEach((fs) => {
-      const count = studentCountPerClass[fs.classId] || 0;
-      totalExpected += Number(fs.totalAmount) * count;
+      if (!feeByClass[fs.classId]) feeByClass[fs.classId] = [];
+      feeByClass[fs.classId].push(fs);
     });
 
-    // Calculate actual revenue
+    // 5. Compute expected revenue per student, respecting studentType
+    let totalExpected = 0;
+    for (const student of students) {
+      const fsList = feeByClass[student.classId] || [];
+      for (const fs of fsList) {
+        const amount =
+          student.studentType === "BOARDING"
+            ? Number(fs.boardingAmount || 0)
+            : Number(fs.dayAmount || 0);
+        totalExpected += amount;
+      }
+    }
+
+    // 6. Actual revenue
     const grossCollected = payments.reduce(
       (sum, p) => sum + Number(p.amount),
       0,
@@ -397,11 +409,12 @@ const getFinancialStatement = async (req, res) => {
     );
     const outstanding = Math.max(0, totalExpected - grossCollected);
 
-    // Breakdown by Term
+    // 7. Breakdown by term
     const termBreakdown = { TERM_1: 0, TERM_2: 0, TERM_3: 0 };
     payments.forEach((p) => {
-      if (termBreakdown[p.term] !== undefined)
+      if (termBreakdown[p.term] !== undefined) {
         termBreakdown[p.term] += Number(p.amount);
+      }
     });
 
     return res.status(200).json({

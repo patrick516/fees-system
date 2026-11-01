@@ -152,7 +152,10 @@ const sendBulkSMS = async (req, res) => {
       if (!phone && !email) continue;
 
       const paid = paidByStudent[student.id] || 0;
-      const required = feeStructure.totalAmount;
+      const required =
+        student.studentType === "BOARDING"
+          ? Number(feeStructure.boardingAmount)
+          : Number(feeStructure.dayAmount);
       const balance = Math.max(0, required - paid);
 
       if (type === "reminder" && balance === 0) continue;

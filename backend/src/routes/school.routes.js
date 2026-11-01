@@ -75,7 +75,8 @@ router.get(
               id: true,
               term: true,
               academicYear: true,
-              totalAmount: true,
+              dayAmount: true,
+              boardingAmount: true,
               tuitionFee: true,
               examFee: true,
               buildingLevy: true,
@@ -242,7 +243,8 @@ router.post(
         classId,
         academicYear,
         term,
-        totalAmount,
+        dayAmount,
+        boardingAmount,
         tuitionFee,
         examFee,
         buildingLevy,
@@ -252,10 +254,11 @@ router.post(
         otherFeesDescription,
       } = req.body;
 
-      if (!classId || !academicYear || !term || !totalAmount) {
+      if (!classId || !academicYear || !term || !dayAmount || !boardingAmount) {
         return res.status(400).json({
           success: false,
-          message: "classId, academicYear, term and totalAmount are required",
+          message:
+            "classId, academicYear, term, dayAmount and boardingAmount are required",
         });
       }
 
@@ -277,7 +280,8 @@ router.post(
           },
         },
         update: {
-          totalAmount: parseFloat(totalAmount),
+          dayAmount: parseFloat(dayAmount),
+          boardingAmount: parseFloat(boardingAmount),
           tuitionFee: tuitionFee ? parseFloat(tuitionFee) : null,
           examFee: examFee ? parseFloat(examFee) : null,
           buildingLevy: buildingLevy ? parseFloat(buildingLevy) : null,
@@ -292,7 +296,8 @@ router.post(
           classId,
           academicYear,
           term,
-          totalAmount: parseFloat(totalAmount),
+          dayAmount: parseFloat(dayAmount),
+          boardingAmount: parseFloat(boardingAmount),
           tuitionFee: tuitionFee ? parseFloat(tuitionFee) : null,
           examFee: examFee ? parseFloat(examFee) : null,
           buildingLevy: buildingLevy ? parseFloat(buildingLevy) : null,
@@ -311,7 +316,7 @@ router.post(
           action: "FEE_STRUCTURE_SET",
           entity: "FeeStructure",
           entityId: feeStructure.id,
-          changes: { classId, term, academicYear, totalAmount },
+          changes: { classId, term, academicYear, dayAmount, boardingAmount },
         },
       });
 
@@ -321,6 +326,7 @@ router.post(
         data: feeStructure,
       });
     } catch (err) {
+      console.error("Set fee structure error:", err);
       res
         .status(500)
         .json({ success: false, message: "Failed to set fee structure" });
@@ -345,9 +351,12 @@ router.put(
       const updated = await prisma.feeStructure.update({
         where: { id: req.params.id },
         data: {
-          totalAmount: req.body.totalAmount
-            ? parseFloat(req.body.totalAmount)
-            : existing.totalAmount,
+          dayAmount: req.body.dayAmount
+            ? parseFloat(req.body.dayAmount)
+            : existing.dayAmount,
+          boardingAmount: req.body.boardingAmount
+            ? parseFloat(req.body.boardingAmount)
+            : existing.boardingAmount,
           tuitionFee: req.body.tuitionFee
             ? parseFloat(req.body.tuitionFee)
             : existing.tuitionFee,
@@ -483,14 +492,14 @@ router.get("/term-history", verifyStaff, async (req, res) => {
         const rawFee =
           s.class.feeStructures.find(
             (fs) => fs.term === a.term && fs.academicYear === a.academicYear,
-          )?.totalAmount || 0;
+          )?.dayAmount || 0;
 
-        // 🎯 Force to Number
+        //  Force to Number
         const fee = Number(rawFee);
         if (fee === 0) continue;
 
         const rawPaid = paidMap.get(`${s.id}|${a.term}|${a.academicYear}`) || 0;
-        // 🎯 Force to Number
+        //  Force to Number
         const paid = Number(rawPaid);
 
         totalRequired += fee;
@@ -641,7 +650,9 @@ router.post(
 
         const creditToApply = Math.min(
           student.creditBalance,
-          feeStructure.totalAmount,
+          student.studentType === "BOARDING"
+            ? Number(feeStructure.boardingAmount)
+            : Number(feeStructure.dayAmount),
         );
         const paymentCount = await prisma.feePayment.count({
           where: { schoolId: req.schoolId },
@@ -669,9 +680,14 @@ router.post(
             submittedBy: "BURSAR",
             status: "VERIFIED",
             notes: `Credit carried over from previous term`,
-            requiredAmount: feeStructure.totalAmount,
-            balance: feeStructure.totalAmount - creditToApply,
-            isDebtor: feeStructure.totalAmount - creditToApply > 0,
+            requiredAmount:
+              student.studentType === "BOARDING"
+                ? Number(feeStructure.boardingAmount)
+                : Number(feeStructure.dayAmount),
+            balance:
+              (student.studentType === "BOARDING"
+                ? Number(feeStructure.boardingAmount)
+                : Number(feeStructure.dayAmount)) - creditToApply,
             creditApplied: creditToApply,
             verifiedAt: new Date(),
           },
@@ -779,7 +795,11 @@ router.get(
         _sum: { amount: true },
       });
 
-      const requiredAmount = feeStructure?.totalAmount || null;
+      const feeAmount =
+        student.studentType === "BOARDING"
+          ? feeStructure?.boardingAmount
+          : feeStructure?.dayAmount;
+      const requiredAmount = feeAmount ? Number(feeAmount) : null;
       const totalPaidThisTerm = paymentsThisTerm._sum.amount || 0;
       const balanceRemaining =
         requiredAmount !== null
@@ -799,7 +819,10 @@ router.get(
           },
           feeStructure: feeStructure
             ? {
-                totalAmount: feeStructure.totalAmount,
+                totalAmount:
+                  student.studentType === "BOARDING"
+                    ? Number(feeStructure.boardingAmount)
+                    : Number(feeStructure.dayAmount),
                 tuitionFee: feeStructure.tuitionFee,
                 examFee: feeStructure.examFee,
                 buildingLevy: feeStructure.buildingLevy,

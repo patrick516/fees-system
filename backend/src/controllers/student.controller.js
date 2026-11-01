@@ -401,9 +401,10 @@ const getStudents = async (req, res) => {
         0,
       );
 
-      const baseRequired = student.class.feeStructures[0]?.totalAmount
-        ? Number(student.class.feeStructures[0].totalAmount)
-        : 0;
+      const fs = student.class.feeStructures[0];
+      const feeAmount =
+        student.studentType === "BOARDING" ? fs?.boardingAmount : fs?.dayAmount;
+      const baseRequired = feeAmount ? Number(feeAmount) : 0;
       const totalDiscount = student.discounts.reduce(
         (sum, d) => sum + Number(d.amount),
         0,
@@ -525,9 +526,11 @@ const getStudent = async (req, res) => {
           isActive: true,
         },
       });
-      baseRequired = feeStructure?.totalAmount
-        ? Number(feeStructure.totalAmount)
-        : 0;
+      const feeAmount =
+        student.studentType === "BOARDING"
+          ? feeStructure?.boardingAmount
+          : feeStructure?.dayAmount;
+      baseRequired = feeAmount ? Number(feeAmount) : 0;
 
       const discount = student.discounts.find(
         (d) => d.term === activeTerm && d.academicYear === activeYear,
@@ -1002,6 +1005,55 @@ const bulkImport = async (req, res) => {
   }
 };
 
+//  Update Student Type (DAY ↔ BOARDING)
+const updateStudentType = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { studentType } = req.body;
+
+    if (!["DAY", "BOARDING"].includes(studentType)) {
+      return res.status(400).json({
+        success: false,
+        message: "studentType must be DAY or BOARDING",
+      });
+    }
+
+    const student = await prisma.student.findFirst({
+      where: { id, schoolId: req.schoolId },
+    });
+
+    if (!student) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
+    }
+
+    await prisma.student.update({
+      where: { id },
+      data: { studentType },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        schoolId: req.schoolId,
+        staffId: req.staff.id,
+        action: "STUDENT_TYPE_CHANGED",
+        entity: "Student",
+        entityId: id,
+        targetName: student.fullName,
+        changes: { oldType: student.studentType, newType: studentType },
+      },
+    });
+
+    return res.json({ success: true, message: "Student type updated" });
+  } catch (err) {
+    console.error("Update student type error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to update student type" });
+  }
+};
+
 module.exports = {
   addStudent,
   getStudents,
@@ -1013,4 +1065,5 @@ module.exports = {
   bulkImport,
   applyDiscount,
   removeDiscount,
+  updateStudentType,
 };

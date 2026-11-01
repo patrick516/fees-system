@@ -21,6 +21,8 @@ import {
   Plus,
   Trash2,
   Loader2,
+  Home,
+  Bus,
 } from "lucide-react";
 import api from "../../lib/axios";
 import { usePermission } from "../../hooks/usePermission";
@@ -63,6 +65,7 @@ const StudentDetail = () => {
   const schoolLogo = staff?.school?.logo;
   const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [updatingType, setUpdatingType] = useState(false);
 
   // Discount Modal State
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -112,7 +115,26 @@ const StudentDetail = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
-  // 🎯 Print by opening a clean standalone window (works on mobile)
+  //  Handle changing student type (DAY ↔ BOARDING)
+  const handleTypeChange = async (newType: "DAY" | "BOARDING") => {
+    if (student.studentType === newType || updatingType) return;
+    setUpdatingType(true);
+    try {
+      await api.put(`/students/${id}/type`, { studentType: newType });
+      toast.success(
+        `Student marked as ${newType === "DAY" ? "Day Scholar" : "Boarder"}`,
+      );
+      fetchStudent(); // Refresh to show updated fees
+    } catch (err: any) {
+      toast.error(
+        err.response?.data?.message || "Failed to update student type",
+      );
+    } finally {
+      setUpdatingType(false);
+    }
+  };
+
+  //  Print by opening a clean standalone window (works on mobile)
   const handlePrint = (payment: any) => {
     const logoUrl = schoolLogo || "/images/SchoolPayLogo.jpg";
     const receiptHtml = `
@@ -352,6 +374,33 @@ const StudentDetail = () => {
             <h3 className="text-lg font-bold text-gray-800">
               {student.fullName}
             </h3>
+            {/*  Student Type Toggle */}
+            <div className="mt-2 mb-2 inline-flex bg-gray-100 p-1 rounded-lg">
+              <button
+                type="button"
+                onClick={() => handleTypeChange("DAY")}
+                disabled={updatingType}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all disabled:opacity-50 ${
+                  student.studentType === "DAY" || !student.studentType
+                    ? "bg-white text-gray-900 shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <Bus size={12} /> Day Scholar
+              </button>
+              <button
+                type="button"
+                onClick={() => handleTypeChange("BOARDING")}
+                disabled={updatingType}
+                className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-all disabled:opacity-50 ${
+                  student.studentType === "BOARDING"
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                <Home size={12} /> Boarder
+              </button>
+            </div>
             <div className="flex items-center justify-center gap-2 mt-1">
               <span className="text-sm text-gray-500">
                 {student.class.name}
@@ -552,7 +601,10 @@ const StudentDetail = () => {
                     ? Number(termDiscount.amount)
                     : 0;
 
-                  const baseRequired = Number(fee.totalAmount);
+                  const baseRequired =
+                    student.studentType === "BOARDING"
+                      ? Number(fee.boardingAmount || 0)
+                      : Number(fee.dayAmount || 0);
                   const netRequired = Math.max(
                     0,
                     baseRequired - discountAmount,

@@ -93,7 +93,10 @@ const initiatePayment = async (req, res) => {
         receiptNumber,
         submittedBy: "PARENT",
         status: "PENDING",
-        requiredAmount: feeStructure?.totalAmount || null,
+        requiredAmount:
+          student.studentType === "BOARDING"
+            ? Number(feeStructure?.boardingAmount || 0)
+            : Number(feeStructure?.dayAmount || 0),
         paymentChannel: "ONEKHUSA",
         malipoStatus: "Processing",
       },
