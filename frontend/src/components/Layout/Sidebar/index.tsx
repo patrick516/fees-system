@@ -386,8 +386,7 @@ const Sidebar = () => {
                     key={item.to}
                     to={item.to}
                     end={item.end}
-                    onClick={(e) => {
-                      //  If clicking Dashboard, go to "My School" mode
+                    onClick={() => {
                       if (item.to === "/dashboard" && !viewingAsGroup) {
                         localStorage.removeItem("activeSchoolId");
                         localStorage.removeItem("isViewingAsGroupAdmin");
