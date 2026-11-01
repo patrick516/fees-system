@@ -2,17 +2,38 @@ const jwt = require("jsonwebtoken");
 const prisma = require("../config/db");
 const { logAudit } = require("../lib/audit");
 
+const groupSchoolsCache = new Map();
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 const getActiveSchoolId = (req, staff) => {
-  // 1. If the user is a Group Admin, check if they passed a specific school in headers
   const headerSchoolId = req.headers["x-active-school-id"];
 
   if (staff.isGroupAdmin && headerSchoolId) {
-    // Security check: We will verify in the specific controllers if this school belongs to their group.
     return headerSchoolId;
   }
 
-  // 2. Default to their assigned school
   return staff.schoolId;
+};
+
+// 🎯 Shared helper: verify a Group Admin has access to the target school
+const verifyGroupAccess = async (staff, headerSchoolId) => {
+  if (!staff.isGroupAdmin || !headerSchoolId) return true;
+
+  let schoolIds = groupSchoolsCache.get(staff.groupId);
+
+  if (!schoolIds || Date.now() - (schoolIds.fetchedAt || 0) > CACHE_TTL_MS) {
+    const schools = await prisma.school.findMany({
+      where: { groupId: staff.groupId },
+      select: { id: true },
+    });
+    schoolIds = {
+      ids: schools.map((s) => s.id),
+      fetchedAt: Date.now(),
+    };
+    groupSchoolsCache.set(staff.groupId, schoolIds);
+  }
+
+  return schoolIds.ids.includes(headerSchoolId);
 };
 
 // STAFF AUTH
@@ -43,6 +64,17 @@ const verifyStaff = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: "Invalid token or account deactivated.",
+      });
+    }
+
+    const hasAccess = await verifyGroupAccess(
+      staff,
+      req.headers["x-active-school-id"],
+    );
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to access this school.",
       });
     }
 
@@ -119,6 +151,17 @@ const authenticate = async (req, res, next) => {
       }
     }
 
+    const hasAccess = await verifyGroupAccess(
+      staff,
+      req.headers["x-active-school-id"],
+    );
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to access this school.",
+      });
+    }
+
     req.staff = staff;
     req.schoolId = getActiveSchoolId(req, staff);
     next();
@@ -174,7 +217,7 @@ const verifyParent = async (req, res, next) => {
   }
 };
 
-// ==================== STAFF OR PARENT ====================
+//  STAFF OR PARENT
 const verifyStaffOrParent = async (req, res, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -224,6 +267,17 @@ const verifyStaffOrParent = async (req, res, next) => {
       return res.status(401).json({
         success: false,
         message: "Invalid token or account deactivated.",
+      });
+    }
+
+    const hasAccess = await verifyGroupAccess(
+      staff,
+      req.headers["x-active-school-id"],
+    );
+    if (!hasAccess) {
+      return res.status(403).json({
+        success: false,
+        message: "You do not have permission to access this school.",
       });
     }
 

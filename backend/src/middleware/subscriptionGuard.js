@@ -29,6 +29,11 @@ const requireActiveSubscription = async (req, res, next) => {
 
     let schoolId = req.schoolId;
 
+    //  For Group Admins viewing a child school, use the header
+    if (!schoolId && req.headers["x-active-school-id"]) {
+      schoolId = req.headers["x-active-school-id"];
+    }
+
     if (!schoolId && req.headers.authorization) {
       const token = req.headers.authorization.split(" ")[1];
       try {

@@ -184,13 +184,15 @@ const StudentDetail = () => {
               <p class="label">Date</p>
               <p class="value">${new Date(payment.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
             </div>
-            <div>
+                        <div>
               <p class="label">Received From</p>
               <p class="value">${student.parentName}</p>
               <p class="label">Student</p>
               <p class="value">${student.fullName} (${student.studentCode})</p>
               <p class="label">Class</p>
               <p class="value">${student.class.name}</p>
+              <p class="label">Student Type</p>
+              <p class="value">${student.studentType === "BOARDING" ? "Boarder" : "Day Scholar"}</p>
             </div>
           </div>
           <table>
@@ -371,9 +373,20 @@ const StudentDetail = () => {
             >
               {student.fullName.charAt(0)}
             </div>
-            <h3 className="text-lg font-bold text-gray-800">
-              {student.fullName}
-            </h3>
+            <div className="flex items-center justify-center gap-2 mb-1">
+              <h3 className="text-lg font-bold text-gray-800">
+                {student.fullName}
+              </h3>
+              {student.studentType === "BOARDING" ? (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold uppercase">
+                  Boarder
+                </span>
+              ) : (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold uppercase">
+                  Day
+                </span>
+              )}
+            </div>
             {/*  Student Type Toggle */}
             <div className="mt-2 mb-2 inline-flex bg-gray-100 p-1 rounded-lg">
               <button

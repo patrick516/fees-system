@@ -46,6 +46,7 @@ router.get("/payment-info/:schoolId", async (req, res) => {
       .json({ success: false, message: "Failed to get payment info" });
   }
 });
+
 router.post(
   "/subscription/request-manual-verification",
   verifyStaff,

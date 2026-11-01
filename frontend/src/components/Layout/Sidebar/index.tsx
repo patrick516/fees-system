@@ -147,13 +147,6 @@ const Sidebar = () => {
   );
 
   useEffect(() => {
-    const checkActive = () => {
-      setViewingAsGroup(!!localStorage.getItem("activeSchoolId"));
-    };
-    checkActive();
-  }, []);
-
-  useEffect(() => {
     if (!isGroupAdmin) {
       setActiveSchool(staff?.school);
       return;
@@ -162,23 +155,28 @@ const Sidebar = () => {
     const loadGroupSchools = async () => {
       try {
         const res = await api.get("/group/schools");
-        setGroupSchools(res.data.data);
+        const childSchools = res.data.data || [];
+        setGroupSchools(childSchools);
 
         const storedId = localStorage.getItem("activeSchoolId");
         const matched = storedId
-          ? res.data.data.find((s: any) => s.id === storedId)
+          ? childSchools.find((s: any) => s.id === storedId)
           : null;
 
         if (matched) {
+          //  Mode 2: Viewing a child school
           setActiveSchool(matched);
+          setViewingAsGroup(true);
         } else {
-          //  No stored school — show group mode (don't auto-set!)
-          setActiveSchool(
-            res.data.data.length > 0 ? res.data.data[0] : staff?.school,
-          );
+          //  Mode 1: My own school
+          setActiveSchool(staff?.school);
+          setViewingAsGroup(false);
+          localStorage.removeItem("activeSchoolId");
+          localStorage.removeItem("isViewingAsGroupAdmin");
         }
       } catch (err) {
         console.error("Failed to load group schools");
+        setActiveSchool(staff?.school);
       }
     };
     loadGroupSchools();
@@ -193,6 +191,7 @@ const Sidebar = () => {
     }
     setActiveSchool(school);
     setShowSchoolSwitcher(false);
+    setViewingAsGroup(true);
     window.location.href = "/dashboard";
   };
 
@@ -275,7 +274,8 @@ const Sidebar = () => {
           </button>
         </div>
 
-        {isGroupAdmin && groupSchools.length > 0 && (
+        {/* School Switcher Dropdown */}
+        {isGroupAdmin && (
           <div className="mt-4 relative">
             <button
               onClick={() => setShowSchoolSwitcher(!showSchoolSwitcher)}
@@ -292,11 +292,35 @@ const Sidebar = () => {
 
             {showSchoolSwitcher && (
               <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 max-h-60 overflow-y-auto">
+                {/* 🎯 My School (own school) always first */}
+                <button
+                  onClick={() => {
+                    localStorage.removeItem("activeSchoolId");
+                    localStorage.removeItem("isViewingAsGroupAdmin");
+                    setShowSchoolSwitcher(false);
+                    setViewingAsGroup(false);
+                    setActiveSchool(staff?.school);
+                    window.location.href = "/dashboard";
+                  }}
+                  className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 border-b border-slate-700 ${
+                    !viewingAsGroup
+                      ? "bg-slate-700 text-white font-semibold"
+                      : "text-slate-300"
+                  }`}
+                >
+                  🏠 {staff?.school?.name || "My School"} (My School)
+                </button>
+
+                {/* Child schools */}
                 {groupSchools.map((s) => (
                   <button
                     key={s.id}
                     onClick={() => handleSwitchSchool(s)}
-                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 ${s.id === activeSchool?.id ? "bg-slate-700 text-white font-semibold" : "text-slate-300"}`}
+                    className={`w-full text-left px-3 py-2 text-xs transition-colors hover:bg-slate-700 ${
+                      s.id === activeSchool?.id
+                        ? "bg-slate-700 text-white font-semibold"
+                        : "text-slate-300"
+                    }`}
                   >
                     {s.name}
                   </button>
@@ -309,7 +333,7 @@ const Sidebar = () => {
 
       {/* Navigation */}
       <nav className="flex-1 px-3 py-4 overflow-y-auto space-y-6 custom-scrollbar">
-        {/* 🎯 Group Overview Link (only when NOT viewing a specific school) */}
+        {/* Group Overview Link (only when NOT viewing a specific school) */}
         {isGroupAdmin && !viewingAsGroup && (
           <div className="mb-4">
             <NavLink
@@ -329,15 +353,13 @@ const Sidebar = () => {
           </div>
         )}
 
-        {/*  Back to Group button (only when viewing a specific school) */}
+        {/* Back to Group button (only when viewing a specific school) */}
         {isGroupAdmin && viewingAsGroup && (
           <div className="mb-4">
             <button
               onClick={() => {
                 localStorage.removeItem("activeSchoolId");
                 localStorage.removeItem("isViewingAsGroupAdmin");
-                sessionStorage.clear();
-                //  Hard reload — forces full component remount
                 window.location.href = "/group";
               }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-semibold text-amber-300 hover:bg-white/10 transition-colors"
@@ -364,7 +386,14 @@ const Sidebar = () => {
                     key={item.to}
                     to={item.to}
                     end={item.end}
-                    onClick={close}
+                    onClick={(e) => {
+                      //  If clicking Dashboard, go to "My School" mode
+                      if (item.to === "/dashboard" && !viewingAsGroup) {
+                        localStorage.removeItem("activeSchoolId");
+                        localStorage.removeItem("isViewingAsGroupAdmin");
+                      }
+                      close();
+                    }}
                     className={({ isActive }) =>
                       `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-colors ${
                         isActive

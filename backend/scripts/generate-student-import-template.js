@@ -1,5 +1,6 @@
 // Generates a PRE-FILLED student import template with 20 test students.
 // 5 students per class, spread across Form 1–4.
+// Includes a mix of Day Scholars and Boarders.
 //
 // Run from backend/:
 //   node scripts/generate-student-import-template.js
@@ -15,6 +16,7 @@ const HEADERS = [
   "Date of Birth",
   "Gender",
   "Class",
+  "Student Type", // 🎯 NEW COLUMN
   "Parent Name",
   "Parent Phone",
   "Parent Phone 2",
@@ -34,6 +36,7 @@ const TEST_STUDENTS = [
     "2011-04-12",
     "MALE",
     "Form 1",
+    "DAY",
     "Anna Mwale",
     "991234567",
     "",
@@ -47,6 +50,7 @@ const TEST_STUDENTS = [
     "2011-06-08",
     "FEMALE",
     "Form 1",
+    "BOARDING",
     "Peter Nkhoma",
     "992345678",
     "",
@@ -60,6 +64,7 @@ const TEST_STUDENTS = [
     "2010-11-19",
     "MALE",
     "Form 1",
+    "DAY",
     "Esnart Tembo",
     "993456789",
     "",
@@ -73,6 +78,7 @@ const TEST_STUDENTS = [
     "2011-02-27",
     "FEMALE",
     "Form 1",
+    "BOARDING",
     "James Banda",
     "994567890",
     "995678901",
@@ -86,6 +92,7 @@ const TEST_STUDENTS = [
     "2011-09-05",
     "MALE",
     "Form 1",
+    "DAY",
     "Linda Chirwa",
     "996789012",
     "",
@@ -101,6 +108,7 @@ const TEST_STUDENTS = [
     "2010-03-22",
     "FEMALE",
     "Form 2",
+    "DAY",
     "Mercy Phiri",
     "997890123",
     "",
@@ -114,6 +122,7 @@ const TEST_STUDENTS = [
     "2010-07-14",
     "MALE",
     "Form 2",
+    "BOARDING",
     "Joseph Sibande",
     "998901234",
     "",
@@ -127,6 +136,7 @@ const TEST_STUDENTS = [
     "2010-12-01",
     "FEMALE",
     "Form 2",
+    "DAY",
     "Chimwemwe Moyo",
     "999012345",
     "",
@@ -140,6 +150,7 @@ const TEST_STUDENTS = [
     "2010-05-18",
     "MALE",
     "Form 2",
+    "BOARDING",
     "Gift Kachale",
     "991122334",
     "",
@@ -153,6 +164,7 @@ const TEST_STUDENTS = [
     "2010-10-09",
     "FEMALE",
     "Form 2",
+    "DAY",
     "Steve Gondwe",
     "992233445",
     "993344556",
@@ -168,6 +180,7 @@ const TEST_STUDENTS = [
     "2009-09-30",
     "FEMALE",
     "Form 3",
+    "BOARDING",
     "Peter Kamanga",
     "994455667",
     "",
@@ -181,6 +194,7 @@ const TEST_STUDENTS = [
     "2009-11-25",
     "MALE",
     "Form 3",
+    "DAY",
     "Martha Nyirenda",
     "995566778",
     "",
@@ -194,6 +208,7 @@ const TEST_STUDENTS = [
     "2009-04-07",
     "FEMALE",
     "Form 3",
+    "BOARDING",
     "Robert Kalua",
     "996677889",
     "",
@@ -207,6 +222,7 @@ const TEST_STUDENTS = [
     "2009-08-16",
     "FEMALE",
     "Form 3",
+    "DAY",
     "Andrew Kachala",
     "997788990",
     "",
@@ -220,6 +236,7 @@ const TEST_STUDENTS = [
     "2009-01-23",
     "MALE",
     "Form 3",
+    "BOARDING",
     "Linda Nyasulu",
     "998899001",
     "",
@@ -235,6 +252,7 @@ const TEST_STUDENTS = [
     "2008-05-05",
     "FEMALE",
     "Form 4",
+    "DAY",
     "Steve Ngoma",
     "999900112",
     "991011121",
@@ -248,6 +266,7 @@ const TEST_STUDENTS = [
     "2008-02-14",
     "FEMALE",
     "Form 4",
+    "BOARDING",
     "Elton Chizuma",
     "992233114",
     "",
@@ -261,6 +280,7 @@ const TEST_STUDENTS = [
     "2008-09-21",
     "MALE",
     "Form 4",
+    "DAY",
     "Chrissy Chilenga",
     "993344225",
     "",
@@ -274,6 +294,7 @@ const TEST_STUDENTS = [
     "2008-12-03",
     "FEMALE",
     "Form 4",
+    "BOARDING",
     "Andrew Manda",
     "994455336",
     "",
@@ -287,6 +308,7 @@ const TEST_STUDENTS = [
     "2008-07-11",
     "MALE",
     "Form 4",
+    "DAY",
     "Chrissy Nkhata",
     "995566447",
     "",
@@ -309,6 +331,7 @@ ws["!cols"] = [
   { wch: 14 },
   { wch: 8 },
   { wch: 12 },
+  { wch: 14 }, // 🎯 Student Type width
   { wch: 22 },
   { wch: 16 },
   { wch: 16 },
@@ -345,6 +368,10 @@ const instructions = [
     "Class",
     "Required. Must exactly match an existing class name (e.g. Form 1, Form 4).",
   ],
+  [
+    "Student Type",
+    "Required. Must be DAY or BOARDING (uppercase). Defaults to DAY if left blank.",
+  ], // 🎯 NEW
   ["Parent Name", "Required."],
   [
     "Parent Phone",
@@ -376,10 +403,10 @@ console.log(
 );
 console.log("");
 console.log("Distribution:");
-console.log("  Form 1: 5 students");
-console.log("  Form 2: 5 students");
-console.log("  Form 3: 5 students");
-console.log("  Form 4: 5 students");
+console.log("  Form 1: 5 students (3 Day, 2 Boarding)");
+console.log("  Form 2: 5 students (3 Day, 2 Boarding)");
+console.log("  Form 3: 5 students (2 Day, 3 Boarding)");
+console.log("  Form 4: 5 students (3 Day, 2 Boarding)");
 console.log("");
 console.log("Next steps:");
 console.log("  1. Upload via Admin → Students → Bulk Import");

@@ -15,7 +15,10 @@ const listGroupSchools = async (req, res) => {
     }
 
     const schools = await prisma.school.findMany({
-      where: { groupId: req.staff.groupId },
+      where: {
+        groupId: req.staff.groupId,
+        id: { not: req.staff.schoolId },
+      },
       select: {
         id: true,
         name: true,
@@ -26,7 +29,6 @@ const listGroupSchools = async (req, res) => {
       },
       orderBy: { name: "asc" },
     });
-
     res.json({ success: true, data: schools });
   } catch (err) {
     console.error("listGroupSchools error:", err);
@@ -58,7 +60,16 @@ const addSchoolToGroup = async (req, res) => {
     }
 
     const platform = await prisma.platform.findFirst();
+    if (!platform) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Platform not configured" });
+    }
+
     const slug = `${schoolName.toLowerCase().replace(/[^a-z0-9]+/g, "-")}-${Date.now().toString(36)}`;
+
+    //  Use platform's default trial days (set by Platform Owner)
+    const trialDays = platform.defaultTrialDays || 30;
 
     // Generate invite
     const tempPassword = `SP-${crypto.randomBytes(2).toString("hex")}-${crypto.randomBytes(2).toString("hex")}`;
@@ -76,7 +87,7 @@ const addSchoolToGroup = async (req, res) => {
           city: "",
           phone: "",
           subscriptionStatus: "TRIAL",
-          trialEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+          trialEndsAt: new Date(Date.now() + trialDays * 24 * 60 * 60 * 1000),
         },
       });
 

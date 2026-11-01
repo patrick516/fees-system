@@ -1,4 +1,3 @@
-// website/store/authStore.ts
 "use client";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
@@ -10,6 +9,7 @@ interface Student {
   lastName?: string;
   fullName: string;
   studentCode: string;
+  studentType?: string;
   class: string;
   school: {
     id: string;

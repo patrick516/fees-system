@@ -24,6 +24,7 @@ const StudentsPage = () => {
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [statusFilter, setStatusFilter] = useState("");
+  const [studentTypeFilter, setStudentTypeFilter] = useState("");
 
   useEffect(() => {
     api
@@ -40,6 +41,7 @@ const StudentsPage = () => {
         limit: "15",
         ...(search && { search }),
         ...(selectedClassId && { classId: selectedClassId }),
+        ...(studentTypeFilter && { studentType: studentTypeFilter }),
         ...(statusFilter === "debtor" && { isDebtor: "true" }),
         ...(statusFilter === "paid" && { isPaidFull: "true" }),
         ...(statusFilter === "no-payment" && { noPayment: "true" }),
@@ -58,7 +60,7 @@ const StudentsPage = () => {
   useEffect(() => {
     const timeout = setTimeout(fetchStudents, 300);
     return () => clearTimeout(timeout);
-  }, [search, page, selectedClassId, statusFilter]);
+  }, [search, page, selectedClassId, statusFilter, studentTypeFilter]);
 
   const handleClassFilter = (classId: string) => {
     setSelectedClassId(classId);
@@ -188,6 +190,34 @@ const StudentsPage = () => {
           ))}
         </div>
       </div>
+      {/* 🎯 Student Type Filter */}
+      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
+        <p className="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">
+          Filter by Student Type
+        </p>
+        <div className="flex gap-2 overflow-x-auto pb-1 scrollbar-none">
+          {[
+            { value: "", label: "All Types", color: "bg-gray-800" },
+            { value: "DAY", label: "🚌 Day Scholar", color: "bg-blue-600" },
+            { value: "BOARDING", label: "🏠 Boarder", color: "bg-indigo-600" },
+          ].map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => {
+                setStudentTypeFilter(tab.value);
+                setPage(1);
+              }}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors shrink-0 ${
+                studentTypeFilter === tab.value
+                  ? `${tab.color} text-white`
+                  : "bg-gray-100 text-gray-600 hover:bg-gray-200"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Search */}
       <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
@@ -234,6 +264,9 @@ const StudentsPage = () => {
                   </th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                     Class
+                  </th>
+                  <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
+                    Type
                   </th>
                   <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase whitespace-nowrap">
                     Parent
@@ -285,6 +318,17 @@ const StudentsPage = () => {
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600 whitespace-nowrap">
                       {student.class.name}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {student.studentType === "BOARDING" ? (
+                        <span className="text-xs px-2 py-1 rounded-full bg-indigo-100 text-indigo-700 font-medium">
+                          🏠 Boarder
+                        </span>
+                      ) : (
+                        <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700 font-medium">
+                          🚌 Day
+                        </span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <p className="text-sm text-gray-600">

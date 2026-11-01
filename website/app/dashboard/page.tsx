@@ -163,13 +163,15 @@ export default function DashboardPage() {
               <p class="label">Date</p>
               <p class="value">${new Date(payment.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
             </div>
-            <div>
+                      <div>
               <p class="label">Received From</p>
               <p class="value">${student?.parentName}</p>
               <p class="label">Student</p>
               <p class="value">${student?.fullName} (${student?.studentCode})</p>
               <p class="label">Class</p>
               <p class="value">${student?.class}</p>
+              <p class="label">Student Type</p>
+              <p class="value">${(student as any)?.studentType === "BOARDING" ? "Boarder" : "Day Scholar"}</p>
             </div>
           </div>
 
@@ -405,9 +407,20 @@ export default function DashboardPage() {
                   {student?.fullName?.charAt(0)}
                 </div>
                 <div className="hidden lg:block min-w-0">
-                  <p className="font-bold text-blue-950 leading-tight">
-                    {student?.fullName}
-                  </p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-blue-950 leading-tight">
+                      {student?.fullName}
+                    </p>
+                    {(student as any)?.studentType === "BOARDING" ? (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold uppercase">
+                        Boarder
+                      </span>
+                    ) : (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold uppercase">
+                        Day
+                      </span>
+                    )}
+                  </div>
                   <p className="text-sm text-slate-500">
                     {student?.class} • {student?.academicYear}
                   </p>
@@ -446,9 +459,20 @@ export default function DashboardPage() {
               {student?.fullName?.charAt(0)}
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-bold text-blue-950 leading-tight truncate">
-                {student?.fullName}
-              </h1>
+              <div className="flex items-center gap-2">
+                <h1 className="text-xl font-bold text-blue-950 leading-tight truncate">
+                  {student?.fullName}
+                </h1>
+                {(student as any)?.studentType === "BOARDING" ? (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold uppercase shrink-0">
+                    Boarder
+                  </span>
+                ) : (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 font-semibold uppercase shrink-0">
+                    Day
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-slate-500 mt-0.5">
                 {student?.class} • {student?.academicYear}
               </p>
@@ -1024,6 +1048,12 @@ export default function DashboardPage() {
                 </p>
                 <p className="text-gray-500 mt-3 mb-1">Class</p>
                 <p className="font-medium text-gray-900">{student?.class}</p>
+                <p className="text-gray-500 mt-3 mb-1">Student Type</p>
+                <p className="font-medium text-gray-900">
+                  {(student as any)?.studentType === "BOARDING"
+                    ? "Boarder"
+                    : "Day Scholar"}
+                </p>
               </div>
             </div>
 

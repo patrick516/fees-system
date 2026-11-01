@@ -38,11 +38,12 @@ const generateReportCardHTML = (data) => {
         <h1 style="margin-top: 10px; background: #1e3a8a; color: white; padding: 5px;">STUDENT TERMLY PROGRESS REPORT</h1>
       </div>
 
-      <!-- STUDENT INFO -->
+            <!-- STUDENT INFO -->
       <div class="student-info">
         <div>
           <p><strong>Student Name:</strong> <span>${student.fullName}</span></p>
           <p><strong>Form / Class:</strong> <span>${student.class.name}</span></p>
+          <p><strong>Student Type:</strong> <span>${student.studentType === "BOARDING" ? "Boarder" : "Day Scholar"}</span></p>
           <p><strong>No. of Students:</strong> <span>${summary.totalStudents}</span></p>
         </div>
         <div>
@@ -51,7 +52,6 @@ const generateReportCardHTML = (data) => {
           <p><strong>Academic Year:</strong> <span>${academicYear}</span></p>
         </div>
       </div>
-
       <!-- MARKS TABLE -->
       <table>
         <thead>

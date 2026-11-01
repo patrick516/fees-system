@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { useAuthStore } from "../../store/authStore";
 // import { useNavigate } from "react-router-dom";
 import {
   Building2,
@@ -12,6 +13,7 @@ import api from "../../lib/axios";
 import { toast } from "../../lib/toast";
 
 const GroupDashboard = () => {
+  const { staff } = useAuthStore();
   const [schools, setSchools] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -35,7 +37,22 @@ const GroupDashboard = () => {
     setLoading(true);
     try {
       const res = await api.get("/group/schools");
-      setSchools(res.data.data || []);
+      const allSchools = res.data.data || [];
+
+      //  Filter out the director's own default school
+      // The director's own school is available via Dashboard, not Group Overview
+      //  Filter out the director's own default school
+      // We compare against BOTH staff.schoolId and staff.school.id to be safe
+      const ownSchoolId = staff?.schoolId || staff?.school?.id;
+
+      const childSchools = allSchools.filter((s: any) => {
+        // Exclude the director's own school
+        if (s.id === ownSchoolId) return false;
+        return true;
+      });
+
+      setSchools(childSchools);
+      setSchools(childSchools);
     } catch (err: any) {
       toast.error("Failed to load group schools");
     } finally {

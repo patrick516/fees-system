@@ -23,6 +23,9 @@ const validateImportRow = (row, rowNumber, classes, fallbackYear) => {
     .trim()
     .toUpperCase();
   const className = String(row["Class"] || "").trim();
+  const studentTypeRaw = String(row["Student Type"] || "")
+    .trim()
+    .toUpperCase();
   const parentName = String(row["Parent Name"] || "").trim();
   const phoneRaw = String(row["Parent Phone"] || "").trim();
   const phone2Raw = String(row["Parent Phone 2"] || "").trim();
@@ -35,6 +38,16 @@ const validateImportRow = (row, rowNumber, classes, fallbackYear) => {
   if (!gender) errors.push("Missing gender");
   if (!className) errors.push("Missing class");
   if (!parentName) errors.push("Missing parent name");
+  let studentType = "DAY";
+  if (studentTypeRaw) {
+    if (["DAY", "BOARDING"].includes(studentTypeRaw)) {
+      studentType = studentTypeRaw;
+    } else {
+      errors.push(
+        `Student Type must be DAY or BOARDING (got "${studentTypeRaw}")`,
+      );
+    }
+  }
   if (!phoneRaw) errors.push("Missing parent phone");
 
   let dob = null;
@@ -83,6 +96,7 @@ const validateImportRow = (row, rowNumber, classes, fallbackYear) => {
       gender: gender || null,
       classId: classMatch?.id || null,
       className,
+      studentType,
       parentName,
       parentPhone,
       parentPhone2,
@@ -270,23 +284,20 @@ const addStudent = async (req, res) => {
     const student = await prisma.student.create({
       data: {
         schoolId: req.schoolId,
-        classId,
+        classId: d.classId,
         studentCode,
-        firstName: fName.trim(),
-        middleName: mName?.trim() || null,
-        lastName: lName.trim(),
-        fullName: mergedFullName,
-        dateOfBirth: new Date(dateOfBirth),
-        gender,
-        parentName: parentName.trim(),
-        parentPhone: parentPhone.trim(),
-        parentPhone2: parentPhone2?.trim() || null,
-        parentEmail: parentEmail?.trim() || null,
-        academicYear: year,
-      },
-      include: {
-        class: { select: { id: true, name: true } },
-        school: { select: { id: true, name: true } },
+        firstName: d.firstName,
+        middleName: d.middleName,
+        lastName: d.lastName,
+        fullName,
+        dateOfBirth: new Date(d.dateOfBirth),
+        gender: d.gender,
+        studentType: d.studentType || "DAY",
+        parentName: d.parentName,
+        parentPhone: d.parentPhone,
+        parentPhone2: d.parentPhone2,
+        parentEmail: d.parentEmail,
+        academicYear: d.academicYear,
       },
     });
 
@@ -326,6 +337,7 @@ const getStudents = async (req, res) => {
       isPaidFull,
       noPayment,
       hasCredit,
+      studentType,
       page = 1,
       limit = 20,
     } = req.query;
@@ -341,6 +353,9 @@ const getStudents = async (req, res) => {
     const where = { schoolId: req.schoolId };
     if (classId) where.classId = classId;
     if (isActive !== undefined) where.isActive = isActive === "true";
+    if (studentType && ["DAY", "BOARDING"].includes(studentType)) {
+      where.studentType = studentType;
+    }
 
     if (search) {
       where.OR = [
