@@ -9,7 +9,7 @@ const generateReportCardHTML = (data) => {
       <style>
         body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; color: #000; font-size: 12px; }
         .header { text-align: center; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 15px; position: relative; }
-        .header-logo { position: absolute; left: 0; top: 0; height: 70px; width: 70px; object-fit: contain; }
+        .header-logo { height: 70px; width: 70px; object-fit: contain; margin: 0 auto 8px auto; display: block; }
         .header h1 { margin: 0; font-size: 18px; text-transform: uppercase; letter-spacing: 1px; }
         .header h2 { margin: 5px 0; font-size: 16px; color: #1e3a8a; }
         .header p { margin: 2px 0; font-size: 10px; }
@@ -40,7 +40,7 @@ const generateReportCardHTML = (data) => {
         <p>REPUBLIC OF MALAWI</p>
         <p>MINISTRY OF EDUCATION</p>
         <h2>${school.name.toUpperCase()}</h2>
-        <p>P.O. Box ____, Malawi | Tel: ${school.phone || "+265 ____"}</p>
+   <p>${school.address || "P.O. Box ____"} | Tel: ${school.phone || "+265 ____"}</p>
         <h1 style="margin-top: 10px; background: #1e3a8a; color: white; padding: 5px;">STUDENT TERMLY PROGRESS REPORT</h1>
       </div>
 

@@ -192,14 +192,19 @@ const EditSchoolModal = ({ open, onClose, onSaved }: Props) => {
           {/* Name */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1.5">
-              School Name
+              Address
             </label>
             <input
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
+              value={form.address}
+              onChange={(e) => setForm({ ...form, address: e.target.value })}
               required
+              placeholder="e.g. P.O. Box 45, Phalula, Mulanje"
               className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             />
+            <p className="text-[11px] text-gray-400 mt-1">
+              Include P.O. Box / Private Bag if your school uses one — this
+              prints on the report card.
+            </p>
           </div>
 
           {/* Phone + Email */}
