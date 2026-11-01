@@ -66,8 +66,6 @@ const EditSchoolModal = ({ open, onClose, onSaved }: Props) => {
       return;
     }
 
-    // Use the fresh URL that came back from the API — not the stale
-    // `settings` state (which hasn't re-rendered yet).
     if (staff && result.logo) {
       setStaff({
         ...staff,
@@ -189,22 +187,18 @@ const EditSchoolModal = ({ open, onClose, onSaved }: Props) => {
             </div>
           </div>
 
-          {/* Name */}
+          {/* School Name */}
           <div>
             <label className="block text-xs font-medium text-gray-600 mb-1.5">
-              Address
+              School Name
             </label>
             <input
-              value={form.address}
-              onChange={(e) => setForm({ ...form, address: e.target.value })}
+              value={form.name}
+              onChange={(e) => setForm({ ...form, name: e.target.value })}
               required
-              placeholder="e.g. P.O. Box 45, Phalula, Mulanje"
+              placeholder="e.g. Mulanje Secondary School"
               className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
             />
-            <p className="text-[11px] text-gray-400 mt-1">
-              Include P.O. Box / Private Bag if your school uses one — this
-              prints on the report card.
-            </p>
           </div>
 
           {/* Phone + Email */}
@@ -243,12 +237,16 @@ const EditSchoolModal = ({ open, onClose, onSaved }: Props) => {
                 value={form.address}
                 onChange={(e) => setForm({ ...form, address: e.target.value })}
                 required
+                placeholder="e.g. P.O. Box 45, Phalula, Mulanje"
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)]"
               />
+              <p className="text-[10px] text-gray-400 mt-1 leading-tight">
+                Include P.O. Box / Private Bag if used — prints on report card.
+              </p>
             </div>
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1.5">
-                City
+                City / District
               </label>
               <input
                 value={form.city}
