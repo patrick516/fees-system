@@ -129,8 +129,9 @@ app.use("/api/platform", readLimiter);
 
 app.use("/api/", readLimiter);
 
-cron.schedule("0 * * * *", () => {
-  console.log("[cron] Triggering hourly database backup...");
+//  Weekly backup — every Sunday at 23:00 (11 PM)
+cron.schedule("0 23 * * 0", () => {
+  console.log("[cron] Triggering weekly database backup (Sunday 11 PM)...");
   backupDatabase().catch((err) =>
     console.error("[backup-cron] Fatal error:", err.message),
   );
