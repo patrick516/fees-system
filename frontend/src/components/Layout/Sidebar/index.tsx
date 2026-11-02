@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { NavLink, useNavigate } from "react-router-dom";
+import { NavLink } from "react-router-dom";
 
 import {
   LayoutDashboard,
@@ -8,7 +8,6 @@ import {
   Clock,
   GraduationCap,
   MessageSquare,
-  LogOut,
   School,
   BarChart2,
   Settings,
@@ -131,8 +130,8 @@ const navSections: NavSection[] = [
 ];
 
 const Sidebar = () => {
-  const { staff, logout } = useAuthStore();
-  const navigate = useNavigate();
+  const { staff } = useAuthStore();
+
   const [open, setOpen] = useState(false);
   const [supportUnread, setSupportUnread] = useState(0);
   const [pendingCount, setPendingCount] = useState(0);
@@ -233,13 +232,6 @@ const Sidebar = () => {
     const t = setInterval(load, 60_000);
     return () => clearInterval(t);
   }, [activeYear, currentTerm]);
-
-  const handleLogout = () => {
-    localStorage.removeItem("activeSchoolId");
-    localStorage.removeItem("isViewingAsGroupAdmin");
-    logout();
-    navigate("/login");
-  };
 
   const close = () => setOpen(false);
 

@@ -17,12 +17,6 @@ const TIER_NAMES: Record<TierKey, string> = {
   LARGE: "Large School",
 };
 
-const TIER_STUDENT_LIMITS: Record<TierKey, string> = {
-  SMALL: "150",
-  MEDIUM: "400",
-  LARGE: "Unlimited",
-};
-
 const TIER_ORDER: Record<TierKey, number> = {
   SMALL: 1,
   MEDIUM: 2,
