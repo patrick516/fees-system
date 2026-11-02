@@ -5,21 +5,16 @@ import {
   AlertTriangle,
   CheckCircle2,
   Loader2,
-  X,
 } from "lucide-react";
 import api from "../../lib/axios";
+import SubscriptionPaymentModal from "../Subscription/SubscriptionPaymentModal";
+
 type TierKey = "SMALL" | "MEDIUM" | "LARGE";
 
 const TIER_NAMES: Record<TierKey, string> = {
   SMALL: "Small School",
   MEDIUM: "Medium School",
   LARGE: "Large School",
-};
-
-const TIER_PRICES: Record<TierKey, number> = {
-  SMALL: 150000,
-  MEDIUM: 250000,
-  LARGE: 400000,
 };
 
 const TIER_STUDENT_LIMITS: Record<TierKey, string> = {
@@ -34,37 +29,22 @@ const TIER_ORDER: Record<TierKey, number> = {
   LARGE: 3,
 };
 
-const TIER_KEYS: TierKey[] = ["SMALL", "MEDIUM", "LARGE"];
-
 export default function TierStatusCard() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [showUpgradeModal, setShowUpgradeModal] = useState(false);
-  const [upgrading, setUpgrading] = useState(false);
+  const [showPayModal, setShowPayModal] = useState(false);
 
-  useEffect(() => {
+  const fetchTierStatus = () => {
     api
       .get("/schools/tier-status")
       .then((res) => setData(res.data.data))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
-
-  const handleUpgrade = async () => {
-    setUpgrading(true);
-    try {
-      //  In a full implementation, this triggers a new OneKhusa payment for the difference
-      // or sends a request to the platform owner.
-      await new Promise((r) => setTimeout(r, 1200)); // Mock API call
-      setShowUpgradeModal(false);
-      // Refresh local state (mock upgrade to LARGE for demonstration)
-      setData({ ...data, tier: "LARGE", maxStudents: 99999, percentUsed: 0 });
-    } catch {
-      // handle error
-    } finally {
-      setUpgrading(false);
-    }
   };
+
+  useEffect(() => {
+    fetchTierStatus();
+  }, []);
 
   if (loading) {
     return (
@@ -76,15 +56,14 @@ export default function TierStatusCard() {
 
   if (!data) return null;
 
-  //  Safely cast the tier from the API to our union type
   const currentTier = (data.tier as TierKey) || "SMALL";
   const isNearLimit = data.percentUsed >= 90 && data.percentUsed < 100;
   const isAtLimit = data.percentUsed >= 100;
 
-  //  Filter available upgrade options
-  const upgradeOptions = TIER_KEYS.filter(
-    (key) => TIER_ORDER[key] > TIER_ORDER[currentTier],
-  );
+  // 🎯 Allow upgrade if there are higher tiers available
+  const hasUpgradeOption =
+    TIER_ORDER.SMALL < TIER_ORDER.LARGE &&
+    TIER_ORDER[currentTier] < TIER_ORDER.LARGE;
 
   return (
     <>
@@ -147,12 +126,14 @@ export default function TierStatusCard() {
                 Need more space?
               </p>
               <p className="text-[11px] text-gray-500 mt-0.5">
-                Upgrade to unlock more students.
+                {currentTier === "LARGE"
+                  ? "You are on the highest plan available."
+                  : "Upgrade to unlock more students."}
               </p>
             </div>
             <button
-              onClick={() => setShowUpgradeModal(true)}
-              disabled={upgradeOptions.length === 0}
+              onClick={() => setShowPayModal(true)}
+              disabled={!hasUpgradeOption}
               className="flex items-center gap-1.5 bg-white border border-gray-200 text-gray-700 hover:bg-gray-100 px-3 py-1.5 rounded-lg text-xs font-bold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <ArrowUpCircle size={14} /> Upgrade
@@ -161,93 +142,15 @@ export default function TierStatusCard() {
         </div>
       </div>
 
-      {/*  UPGRADE MODAL */}
-      {showUpgradeModal && (
-        <div
-          className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 backdrop-blur-sm"
-          onClick={() => !upgrading && setShowUpgradeModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex items-center justify-between px-6 pt-5 pb-4 border-b border-slate-100">
-              <h3 className="text-lg font-bold text-slate-900">
-                Upgrade Your Plan
-              </h3>
-              <button
-                onClick={() => !upgrading && setShowUpgradeModal(false)}
-                className="text-slate-400 hover:text-slate-700"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
-            <div className="px-6 py-5">
-              <p className="text-sm text-slate-600 mb-4">
-                You are currently on the{" "}
-                <strong>{TIER_NAMES[currentTier]}</strong> plan. Choose a new
-                plan to increase your student limit.
-              </p>
-
-              <div className="space-y-3">
-                {upgradeOptions.length === 0 ? (
-                  <div className="text-center py-6 text-sm text-slate-500">
-                    You are already on the highest plan available.
-                  </div>
-                ) : (
-                  upgradeOptions.map((key) => (
-                    <div
-                      key={key}
-                      className="flex items-center justify-between p-4 border border-slate-200 rounded-xl hover:border-[var(--color-primary)]/50 transition-colors cursor-pointer"
-                      onClick={handleUpgrade}
-                    >
-                      <div>
-                        <p className="text-sm font-bold text-slate-900">
-                          {TIER_NAMES[key]}
-                        </p>
-                        <p className="text-xs text-slate-500 mt-0.5">
-                          Up to {TIER_STUDENT_LIMITS[key]} students
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-[var(--color-primary)]">
-                          MWK {TIER_PRICES[key].toLocaleString()}
-                        </p>
-                        <p className="text-[10px] text-slate-400">per term</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-
-            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-end gap-2">
-              <button
-                onClick={() => setShowUpgradeModal(false)}
-                disabled={upgrading}
-                className="px-5 py-2.5 rounded-lg text-sm font-medium text-slate-600 hover:bg-slate-200/50 transition-colors disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              {upgradeOptions.length > 0 && (
-                <button
-                  onClick={handleUpgrade}
-                  disabled={upgrading}
-                  className="flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white bg-[var(--color-primary)] hover:bg-[var(--color-primary-dark)] transition-colors disabled:opacity-50"
-                >
-                  {upgrading ? (
-                    <Loader2 size={14} className="animate-spin" />
-                  ) : (
-                    <ArrowUpCircle size={14} />
-                  )}
-                  {upgrading ? "Processing..." : "Confirm Upgrade"}
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+      {/* 🎯 Real OneKhusa payment modal */}
+      <SubscriptionPaymentModal
+        isOpen={showPayModal}
+        onClose={() => {
+          setShowPayModal(false);
+          // Refresh in case webhook already fired
+          fetchTierStatus();
+        }}
+      />
     </>
   );
 }
