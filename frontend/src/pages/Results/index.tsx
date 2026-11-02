@@ -100,9 +100,8 @@ const ResultsPage = () => {
   const [, setMessage] = useState("");
   const [pendingRows, setPendingRows] = useState<any[]>([]);
   const [resolvingRowId, setResolvingRowId] = useState<string | null>(null);
-
-  //  Warn if English was missing from upload
   const [englishMissingWarning, setEnglishMissingWarning] = useState(false);
+  const [hasBoundaries, setHasBoundaries] = useState(false);
 
   const boundaries =
     boundarySystem === "POINTS" ? pointsBoundaries : letterBoundaries;
@@ -131,6 +130,9 @@ const ResultsPage = () => {
     if (b.success && b.data.length > 0) {
       if (system === "POINTS") setPointsBoundaries(b.data);
       else setLetterBoundaries(b.data);
+      if (system === boundarySystem) setHasBoundaries(true);
+    } else {
+      if (system === boundarySystem) setHasBoundaries(false);
     }
   };
 
@@ -144,6 +146,12 @@ const ResultsPage = () => {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    const currentBoundaries =
+      boundarySystem === "POINTS" ? pointsBoundaries : letterBoundaries;
+    setHasBoundaries(currentBoundaries && currentBoundaries.length > 0);
+  }, [boundarySystem, pointsBoundaries, letterBoundaries]);
 
   // When period changes, fetch the summary of uploads
   useEffect(() => {
@@ -296,6 +304,25 @@ const ResultsPage = () => {
             and control when parents see results
           </p>
         </div>
+        {!hasBoundaries && (
+          <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-start gap-3">
+            <AlertTriangle
+              className="text-amber-600 shrink-0 mt-0.5"
+              size={20}
+            />
+            <div>
+              <p className="font-medium text-amber-900 text-sm">
+                ⚠️ Grade Boundaries Not Configured
+              </p>
+              <p className="text-xs text-amber-700 mt-1">
+                You must configure the grade boundaries (
+                {boundarySystem === "POINTS" ? "Points 1-9" : "Letters A-F"})
+                below before you can enter grades for this class. Without
+                boundaries, students will not get correct points or ranks.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Grade Boundaries */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
@@ -839,18 +866,37 @@ const ResultsPage = () => {
                               (Locked)
                             </p>
 
-                            <button
-                              onClick={() => setGradeModalOpen(true)}
-                              className="flex items-center justify-center gap-2 w-full bg-[var(--color-primary)] text-white px-4 py-3 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] shadow-sm"
-                            >
-                              <Pencil size={16} />
-                              {alreadyUploaded ? "Edit Grades" : "Enter Grades"}
-                            </button>
-
-                            <p className="text-[11px] text-center mt-3 text-gray-400">
-                              Opens a grid where you can type marks for each
-                              student.
-                            </p>
+                            {!hasBoundaries ? (
+                              <>
+                                <button
+                                  disabled
+                                  className="flex items-center justify-center gap-2 w-full bg-gray-300 text-gray-500 px-4 py-3 rounded-lg text-sm font-medium cursor-not-allowed shadow-sm"
+                                >
+                                  <Pencil size={16} />
+                                  Configure Boundaries First
+                                </button>
+                                <p className="text-[11px] text-center mt-3 text-red-500 font-medium">
+                                  ⚠️ You must set up Grade Boundaries before you
+                                  can enter grades.
+                                </p>
+                              </>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => setGradeModalOpen(true)}
+                                  className="flex items-center justify-center gap-2 w-full bg-[var(--color-primary)] text-white px-4 py-3 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] shadow-sm"
+                                >
+                                  <Pencil size={16} />
+                                  {alreadyUploaded
+                                    ? "Edit Grades"
+                                    : "Enter Grades"}
+                                </button>
+                                <p className="text-[11px] text-center mt-3 text-gray-400">
+                                  Opens a grid where you can type marks for each
+                                  student.
+                                </p>
+                              </>
+                            )}
                           </div>
                         );
                       })()
