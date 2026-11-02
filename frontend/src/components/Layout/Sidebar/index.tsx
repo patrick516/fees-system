@@ -420,30 +420,6 @@ const Sidebar = () => {
           );
         })}
       </nav>
-
-      {/* User info and logout */}
-      <div className="p-4 border-t border-slate-800 bg-slate-950/50">
-        <div className="flex items-center gap-3 mb-3 px-2">
-          <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-xs font-bold shrink-0">
-            {staff?.fullName?.charAt(0) || "?"}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-white truncate">
-              {staff?.fullName}
-            </p>
-            <p className="text-slate-400 text-xs truncate">
-              {isGroupAdmin ? "Group Director" : staff?.role?.name || "—"}
-            </p>
-          </div>
-        </div>
-        <button
-          onClick={handleLogout}
-          className="flex items-center gap-3 w-full px-4 py-2 text-slate-300 hover:bg-white/10 hover:text-white rounded-lg text-sm transition-colors"
-        >
-          <LogOut size={16} />
-          Logout
-        </button>
-      </div>
     </div>
   );
 
