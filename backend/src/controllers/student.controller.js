@@ -284,20 +284,20 @@ const addStudent = async (req, res) => {
     const student = await prisma.student.create({
       data: {
         schoolId: req.schoolId,
-        classId: d.classId,
+        classId: classId,
         studentCode,
-        firstName: d.firstName,
-        middleName: d.middleName,
-        lastName: d.lastName,
-        fullName,
-        dateOfBirth: new Date(d.dateOfBirth),
-        gender: d.gender,
-        studentType: d.studentType || "DAY",
-        parentName: d.parentName,
-        parentPhone: d.parentPhone,
-        parentPhone2: d.parentPhone2,
-        parentEmail: d.parentEmail,
-        academicYear: d.academicYear,
+        firstName: fName.trim(),
+        middleName: mName?.trim() || null,
+        lastName: lName.trim(),
+        fullName: mergedFullName,
+        dateOfBirth: new Date(dateOfBirth),
+        gender: gender,
+        studentType: req.body.studentType || "DAY",
+        parentName: parentName.trim(),
+        parentPhone: parentPhone.trim(),
+        parentPhone2: parentPhone2?.trim() || null,
+        parentEmail: parentEmail?.trim() || null,
+        academicYear: year,
       },
     });
 
@@ -893,8 +893,9 @@ const bulkImport = async (req, res) => {
       error: r.errors.join(", "),
     }));
     const classCounts = {};
-    {
-      //  Find the HIGHEST existing ID instead of counting
+
+    // Initialize the sequence counter for each class
+    for (const cls of classes) {
       const lastStudent = await prisma.student.findFirst({
         where: { schoolId: req.schoolId, classId: cls.id },
         orderBy: { studentCode: "desc" },
@@ -939,6 +940,7 @@ const bulkImport = async (req, res) => {
             fullName,
             dateOfBirth: new Date(d.dateOfBirth),
             gender: d.gender,
+            studentType: d.studentType || "DAY",
             parentName: d.parentName,
             parentPhone: d.parentPhone,
             parentPhone2: d.parentPhone2,
