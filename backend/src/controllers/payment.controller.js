@@ -398,9 +398,13 @@ const verifyPayment = async (req, res) => {
           },
         },
       });
-
       if (!payment) throw new Error("NOT_FOUND");
       if (payment.status !== "PENDING") throw new Error("ALREADY_PROCESSED");
+
+      //  Enforce: Parent payments must have a receipt image
+      if (payment.submittedBy === "PARENT" && !payment.receiptImage) {
+        throw new Error("MISSING_RECEIPT");
+      }
 
       const verified = await tx.feePayment.update({
         where: { id },
@@ -492,6 +496,12 @@ const verifyPayment = async (req, res) => {
       return res
         .status(400)
         .json({ success: false, message: "Payment is already processed" });
+    if (error.message === "MISSING_RECEIPT")
+      return res.status(400).json({
+        success: false,
+        message:
+          "Cannot verify this payment — the parent did not upload a receipt image. Please reject and ask them to resubmit with proof.",
+      });
     console.error("Verify payment error:", error);
     return res
       .status(500)
