@@ -45,21 +45,20 @@ model Platform {
 
 //  SCHOOL
 model School {
-  id         String       @id @default(uuid())
-  groupId    String?
-  group      SchoolGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
-  platformId String
-  platform   Platform     @relation(fields: [platformId], references: [id])
-
+  id           String       @id @default(uuid())
+  groupId      String?
+  group        SchoolGroup? @relation(fields: [groupId], references: [id], onDelete: SetNull)
+  platformId   String
+  platform     Platform     @relation(fields: [platformId], references: [id])
   name         String
-  slug         String? @unique
+  slug         String       @unique
   address      String
   city         String
   phone        String
   email        String?
   logo         String?
   motto        String?
-  primaryColor String  @default("#1e3a8a")
+  primaryColor String       @default("#1e3a8a")
 
   isActive Boolean @default(true)
 
@@ -75,7 +74,7 @@ model School {
   activeTermStartDate           DateTime?
   activeTermEndDate             DateTime?
   notificationDefaults          Json?
-  onekhusaMerchantAccount       String?            @unique
+  onekhusaMerchantAccount       String?               @unique
   onekhusaWebhookSecretSuccess  String?
   onekhusaWebhookSecretReversed String?
   settlementBankName            String?
@@ -85,43 +84,38 @@ model School {
   headTeacherName               String?
   headTeacherSignatureUrl       String?
   headTeacherStampUrl           String?
-  subscriptionStatus            SubscriptionStatus @default(TRIAL)
+  subscriptionStatus            SubscriptionStatus    @default(TRIAL)
   trialEndsAt                   DateTime?
   subscriptionEndsAt            DateTime?
-  setupCompleted                Boolean            @default(false)
-
-  //  Legacy subscription fields (keep, do not use) 
-  subscriptionPaid Boolean   @default(false)
-  subscriptionDate DateTime?
-  nextPaymentDate  DateTime?
-
-  tier        String   @default("SMALL")
-  maxStudents Int      @default(150)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-
-  // Relations
-  staff                Staff[]
-  departments          Department[]
-  roles                Role[]
-  classes              Class[]
-  students             Student[]
-  payments             FeePayment[]
-  notificationLogs     NotificationLog[]
-  feeStructures        FeeStructure[]
-  examPeriods          ExamPeriod[]
-  subjects             Subject[]
-  gradeBoundaries      GradeBoundary[]
-  examResults          ExamResult[]
-  pendingExamRows      PendingExamRow[]
-  termActivations      TermActivation[]
-  subscriptionPayments SubscriptionPayment[]
-  notifications        Notification[]
-  studentDiscounts     StudentDiscount[]
-  employees            Employee[]
-  payrollRecords       PayrollRecord[]
-  supportTickets       SupportTicket[]
-  reportCardComments   ReportCardComment[]
+  setupCompleted                Boolean               @default(false)
+  subscriptionPaid              Boolean               @default(false)
+  subscriptionDate              DateTime?
+  nextPaymentDate               DateTime?
+  tier                          String                @default("SMALL")
+  maxStudents                   Int                   @default(150)
+  createdAt                     DateTime              @default(now())
+  updatedAt                     DateTime              @updatedAt
+  staff                         Staff[]
+  departments                   Department[]
+  roles                         Role[]
+  classes                       Class[]
+  students                      Student[]
+  payments                      FeePayment[]
+  notificationLogs              NotificationLog[]
+  feeStructures                 FeeStructure[]
+  examPeriods                   ExamPeriod[]
+  subjects                      Subject[]
+  gradeBoundaries               GradeBoundary[]
+  examResults                   ExamResult[]
+  pendingExamRows               PendingExamRow[]
+  termActivations               TermActivation[]
+  subscriptionPayments          SubscriptionPayment[]
+  notifications                 Notification[]
+  studentDiscounts              StudentDiscount[]
+  employees                     Employee[]
+  payrollRecords                PayrollRecord[]
+  supportTickets                SupportTicket[]
+  reportCardComments            ReportCardComment[]
 
   @@map("schools")
 }
@@ -483,26 +477,20 @@ model PayrollRecord {
 // ==================== SUPPORT TICKETS ====================
 
 model SupportTicket {
-  id       String @id @default(uuid())
-  schoolId String
-  school   School @relation(fields: [schoolId], references: [id], onDelete: Cascade)
-
-  // Routing
-  ticketType String // "SCHOOL_SUPPORT" | "PLATFORM_SUPPORT"
-
-  // Creator
-  creatorType  String // "PARENT" | "STAFF"
+  id           String  @id @default(uuid())
+  schoolId     String
+  school       School  @relation(fields: [schoolId], references: [id], onDelete: Cascade)
+  ticketType   String
+  creatorType  String
   creatorId    String
   creatorName  String
-  creatorEmail String? // required for STAFF tickets (email replies)
-  creatorPhone String? // required for PARENT tickets (SMS replies)
+  creatorEmail String?
+  creatorPhone String?
 
-  subject String
-  status  String @default("OPEN") // OPEN | RESOLVED | CLOSED
-
-  // Last reply tracking (for unread badges)
+  subject     String
+  status      String    @default("OPEN")
   lastReplyAt DateTime?
-  lastReplyBy String? // "CREATOR" | "RESPONDER"
+  lastReplyBy String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt

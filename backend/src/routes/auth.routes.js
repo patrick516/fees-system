@@ -22,6 +22,7 @@ const {
 } = require("../controllers/auth.controller");
 
 const { verifyStaff } = require("../middleware/auth");
+const { resolveSchool } = require("../middleware/resolveSchool");
 
 router.get("/test", (req, res) => {
   res.json({
@@ -59,10 +60,15 @@ router.post("/staff/change-password", verifyStaff, changePassword);
 router.post("/accept-invitation", acceptInvitation);
 router.get("/me", verifyStaff, getMe);
 
-router.post("/parent/login-student-id", parentLoginWithStudentId);
+//  Parent login — all routes require school context (subdomain or ?school=)
+router.post(
+  "/parent/login-student-id",
+  resolveSchool,
+  parentLoginWithStudentId,
+);
 
-router.post("/parent/request-otp", requestOTP);
+router.post("/parent/request-otp", resolveSchool, requestOTP);
 
-router.post("/parent/verify-otp", verifyOTP);
+router.post("/parent/verify-otp", resolveSchool, verifyOTP);
 
 module.exports = router;

@@ -122,6 +122,10 @@ const SMSPage = () => {
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState("");
+  const [testEmail, setTestEmail] = useState("");
+  const [testPhone, setTestPhone] = useState("");
+  const [testLoading, setTestLoading] = useState(false);
+  const [testResult, setTestResult] = useState<any>(null);
 
   const [logs, setLogs] = useState<any[]>([]);
   const [logsLoading, setLogsLoading] = useState(true);
@@ -202,6 +206,53 @@ const SMSPage = () => {
     }
   };
 
+  // 🎯 Send Test Handler
+  const handleSendTest = async () => {
+    setTestResult(null);
+    if (!testPhone && !testEmail) {
+      setTestResult({
+        success: false,
+        message: "Please enter a phone number or email to test.",
+      });
+      return;
+    }
+    if (channel !== "EMAIL" && !testPhone) {
+      setTestResult({
+        success: false,
+        message: "Enter a phone number (or switch Channel to Email).",
+      });
+      return;
+    }
+    if (channel !== "SMS" && !testEmail) {
+      setTestResult({
+        success: false,
+        message: "Enter an email (or switch Channel to SMS).",
+      });
+      return;
+    }
+
+    setTestLoading(true);
+    try {
+      const testMessage =
+        message.trim() ||
+        `This is a test message from ${window.location.hostname}. Your notifications are working!`;
+      const res = await api.post("/sms/test", {
+        phone: testPhone ? `+265${testPhone.replace(/^0/, "")}` : undefined,
+        email: testEmail || undefined,
+        channel,
+        message: testMessage,
+      });
+      setTestResult(res.data);
+      await fetchLogs(1);
+    } catch (err: any) {
+      setTestResult({
+        success: false,
+        message: err.response?.data?.message || "Test failed",
+      });
+    } finally {
+      setTestLoading(false);
+    }
+  };
   const formatDateTime = (iso: string) => {
     const d = new Date(iso);
     return d.toLocaleString("en-GB", {
@@ -421,6 +472,69 @@ const SMSPage = () => {
                   </>
                 )}
               </button>
+
+              {/* 🎯 TEST BEFORE SENDING */}
+              <div className="pt-3 border-t border-gray-100">
+                <p className="text-[11px] font-medium text-gray-500 uppercase tracking-wide mb-2">
+                  Test Before Sending
+                </p>
+                <div className="space-y-2">
+                  {(channel === "SMS" || channel === "BOTH") && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-gray-500 whitespace-nowrap">
+                        +265
+                      </span>
+                      <input
+                        type="tel"
+                        placeholder="991234567"
+                        value={testPhone}
+                        onChange={(e) =>
+                          setTestPhone(
+                            e.target.value.replace(/\D/g, "").slice(0, 9),
+                          )
+                        }
+                        className="flex-1 px-2.5 py-1.5 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                      />
+                    </div>
+                  )}
+                  {(channel === "EMAIL" || channel === "BOTH") && (
+                    <input
+                      type="email"
+                      placeholder="your@email.com"
+                      value={testEmail}
+                      onChange={(e) => setTestEmail(e.target.value)}
+                      className="w-full px-2.5 py-1.5 border border-gray-200 rounded-md text-xs focus:outline-none focus:ring-1 focus:ring-[var(--color-primary)]"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={handleSendTest}
+                    disabled={testLoading}
+                    className="w-full flex items-center justify-center gap-2 border border-[var(--color-primary)] text-[var(--color-primary)] py-1.5 rounded-md text-xs font-medium hover:bg-[var(--color-primary-light)] disabled:opacity-40"
+                  >
+                    {testLoading ? (
+                      <>
+                        <Loader2 size={12} className="animate-spin" /> Sending
+                        test...
+                      </>
+                    ) : (
+                      <>Send Test to Myself</>
+                    )}
+                  </button>
+                  {testResult && (
+                    <div
+                      className={`px-2 py-1.5 rounded-md text-[11px] border ${
+                        testResult.success
+                          ? "bg-green-50 border-green-200 text-green-700"
+                          : "bg-red-50 border-red-200 text-red-700"
+                      }`}
+                    >
+                      {testResult.success ? "✅ " : "⚠️ "}
+                      {testResult.message}
+                    </div>
+                  )}
+                </div>
+              </div>
             </div>
           ) : (
             <div className="bg-white rounded-xl p-4 shadow-sm border border-dashed border-gray-200 flex flex-col items-center justify-center text-center min-h-[160px]">

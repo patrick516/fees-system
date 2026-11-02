@@ -23,6 +23,7 @@ import {
   Loader2,
   Home,
   Bus,
+  BookOpen,
 } from "lucide-react";
 import api from "../../lib/axios";
 import { usePermission } from "../../hooks/usePermission";
@@ -66,6 +67,9 @@ const StudentDetail = () => {
   const [student, setStudent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updatingType, setUpdatingType] = useState(false);
+  const [subjects, setSubjects] = useState<any[]>([]);
+  const [loadingSubjects, setLoadingSubjects] = useState(false);
+  const [togglingSubject, setTogglingSubject] = useState<string | null>(null);
 
   // Discount Modal State
   const [showDiscountModal, setShowDiscountModal] = useState(false);
@@ -112,9 +116,61 @@ const StudentDetail = () => {
 
   useEffect(() => {
     fetchStudent();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  //  Fetch subjects once student is loaded
+  useEffect(() => {
+    if (student) {
+      fetchSubjects();
+    }
+  }, [student?.classId]);
+
+  const fetchSubjects = async () => {
+    if (!student) return;
+    setLoadingSubjects(true);
+    try {
+      // 1. Get all subjects for the student's class
+      const clsRes = await api.get(
+        `/schools/classes/${student.classId}/subjects`,
+      );
+      const allSubjects = clsRes.data.data || [];
+
+      // 2. Get this student's dropped subjects
+      const stuRes = await api.get(`/students/${id}/subjects`);
+      const droppedIds = (stuRes.data.data || []).map((s: any) => s.subjectId);
+
+      // 3. Combine them so we know which are checked/unchecked
+      const merged = allSubjects.map((sub: any) => ({
+        ...sub,
+        isTaking: !droppedIds.includes(sub.id),
+      }));
+
+      setSubjects(merged);
+    } catch (err) {
+      console.error("Failed to load subjects", err);
+    } finally {
+      setLoadingSubjects(false);
+    }
+  };
+
+  //  Toggle a subject (checked = taking, unchecked = dropped)
+  const handleToggleSubject = async (subjectId: string, isTaking: boolean) => {
+    if (togglingSubject) return;
+    setTogglingSubject(subjectId);
+    try {
+      await api.put(`/students/${id}/subjects/${subjectId}`, { isTaking });
+      setSubjects((prev) =>
+        prev.map((s) => (s.id === subjectId ? { ...s, isTaking } : s)),
+      );
+      toast.success(
+        isTaking ? "Subject added back" : "Subject marked as dropped",
+      );
+    } catch (err) {
+      toast.error("Failed to update subject");
+    } finally {
+      setTogglingSubject(null);
+    }
+  };
   //  Handle changing student type (DAY ↔ BOARDING)
   const handleTypeChange = async (newType: "DAY" | "BOARDING") => {
     if (student.studentType === newType || updatingType) return;
@@ -124,7 +180,7 @@ const StudentDetail = () => {
       toast.success(
         `Student marked as ${newType === "DAY" ? "Day Scholar" : "Boarder"}`,
       );
-      fetchStudent(); // Refresh to show updated fees
+      fetchStudent();
     } catch (err: any) {
       toast.error(
         err.response?.data?.message || "Failed to update student type",
@@ -184,7 +240,7 @@ const StudentDetail = () => {
               <p class="label">Date</p>
               <p class="value">${new Date(payment.createdAt).toLocaleString("en-GB", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" })}</p>
             </div>
-                        <div>
+            <div>
               <p class="label">Received From</p>
               <p class="value">${student.parentName}</p>
               <p class="label">Student</p>
@@ -497,7 +553,7 @@ const StudentDetail = () => {
           )}
         </div>
 
-        {/* Right — Stats + Fee Structures + Discounts */}
+        {/* Right — Stats + Fee Structures + Discounts + Subjects */}
         <div className="lg:col-span-2 space-y-4">
           {/* Quick Stats */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -760,6 +816,77 @@ const StudentDetail = () => {
                   ))}
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* 🎯 Subjects Taken / Dropped */}
+          <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden">
+            <div className="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
+              <BookOpen size={16} className="text-indigo-600" />
+              <h3 className="font-medium text-gray-800">Subjects Taken</h3>
+            </div>
+            <div className="p-5">
+              {loadingSubjects ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 size={20} className="animate-spin text-gray-300" />
+                </div>
+              ) : subjects.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-sm text-gray-500">
+                    No subjects have been added to {student.class.name} yet.
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Go to Classes → Manage Subjects to add them.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {subjects.map((sub) => (
+                    <label
+                      key={sub.id}
+                      className="flex items-center gap-3 p-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={sub.isTaking}
+                        onChange={(e) =>
+                          handleToggleSubject(sub.id, e.target.checked)
+                        }
+                        disabled={togglingSubject === sub.id}
+                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                      />
+                      <div className="flex-1">
+                        <p
+                          className={`text-sm ${sub.isTaking ? "font-medium text-gray-800" : "text-gray-400 line-through"}`}
+                        >
+                          {sub.name}
+                        </p>
+                        {sub.code && (
+                          <p className="text-[11px] text-gray-400 font-mono">
+                            {sub.code}
+                          </p>
+                        )}
+                      </div>
+                      {!sub.isTaking && (
+                        <span className="text-[10px] font-semibold uppercase text-red-500 bg-red-50 px-2 py-0.5 rounded-full">
+                          Dropped
+                        </span>
+                      )}
+                      {togglingSubject === sub.id && (
+                        <Loader2
+                          size={14}
+                          className="animate-spin text-indigo-400"
+                        />
+                      )}
+                    </label>
+                  ))}
+                </div>
+              )}
+              <p className="text-[11px] text-gray-400 mt-4 leading-tight">
+                Unchecking a subject means the student dropped it (e.g., MSCE
+                candidates dropping Physical Science). It will be hidden during
+                grade entry.
+              </p>
             </div>
           </div>
         </div>

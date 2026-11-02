@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import {
-  Upload,
   Plus,
   Loader2,
   Save,
@@ -27,6 +26,7 @@ import { getCurrentAcademicYear } from "../../lib/utils";
 import api from "../../lib/axios";
 import { useActiveTerm } from "../../hooks/useActiveTerm";
 import AnalyticsTab from "./AnalyticsTab";
+import GradeEntryModal from "../../components/Exams/GradeEntryModal";
 import { isReadOnly } from "../../lib/permissions";
 
 const defaultPointsBoundaries = [
@@ -57,8 +57,6 @@ const ResultsPage = () => {
     togglePeriodActive,
     getGradeBoundaries,
     setGradeBoundaries,
-    uploadResults,
-    uploading,
     getClassResults,
     getPendingRows,
     resolvePendingRow,
@@ -78,15 +76,15 @@ const ResultsPage = () => {
   // Summary of all classes for selected period
   const [uploadSummary, setUploadSummary] = useState<any[]>([]);
   const [loadingSummary, setLoadingSummary] = useState(false);
-
-  // Selected class to view/upload
   const [selectedClass, setSelectedClass] = useState<string | null>(null);
+  const [gradeModalOpen, setGradeModalOpen] = useState(false);
   const [classResults, setClassResults] = useState<any[]>([]);
   const [resultsGradingSystem, setResultsGradingSystem] = useState<
     "POINTS" | "LETTER"
   >("POINTS");
   const [loadingResults, setLoadingResults] = useState(false);
   const [expandedStudent, setExpandedStudent] = useState<string | null>(null);
+  const [downloadingPdf, setDownloadingPdf] = useState<string | null>(null);
 
   const [boundarySystem, setBoundarySystem] = useState<"POINTS" | "LETTER">(
     "POINTS",
@@ -98,10 +96,8 @@ const ResultsPage = () => {
     defaultLetterBoundaries,
   );
   const [editingBoundaries, setEditingBoundaries] = useState(false);
-
-  const [file, setFile] = useState<File | null>(null);
-  const [message, setMessage] = useState("");
   const [savingBoundaries, setSavingBoundaries] = useState(false);
+  const [, setMessage] = useState("");
   const [pendingRows, setPendingRows] = useState<any[]>([]);
   const [resolvingRowId, setResolvingRowId] = useState<string | null>(null);
 
@@ -198,33 +194,6 @@ const ResultsPage = () => {
     const res = await togglePeriodActive(id, !current);
     if (res.success) {
       setPeriods(periods.map((p) => (p.id === id ? res.data : p)));
-    }
-  };
-
-  const handleUpload = async () => {
-    if (!file || !selectedClass || !selectedPeriod) {
-      setMessage("Select a class, exam period, and file first");
-      return;
-    }
-    const res = await uploadResults(file, selectedClass, selectedPeriod);
-    setMessage(res.message || (res.success ? "Uploaded" : "Upload failed"));
-
-    if (res.success) {
-      // 🎯 Check if English was missing (backend sends this flag)
-      if (res.data?.englishIncluded === false) {
-        setEnglishMissingWarning(true);
-      } else {
-        setEnglishMissingWarning(false);
-      }
-
-      setFile(null);
-      setReuploadMode(false);
-      handleViewClass(selectedClass); // Refresh rankings
-      loadPendingRows(selectedClass); // Refresh pending
-
-      // Refresh the summary table
-      const sumRes = await getUploadSummary(selectedPeriod);
-      if (sumRes.success) setUploadSummary(sumRes.data || []);
     }
   };
 
@@ -842,8 +811,7 @@ const ResultsPage = () => {
                             </div>
                           );
                         }
-
-                        // Show the upload form
+                        // 🎯 Show the new "Enter Grades" UI
                         return (
                           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                             {alreadyUploaded && (
@@ -853,22 +821,15 @@ const ResultsPage = () => {
                                   className="text-amber-600 shrink-0"
                                 />
                                 <p className="text-[11px] text-amber-800">
-                                  ⚠️ Re-upload mode — existing results will be
-                                  overwritten.
+                                  ⚠️ Re-entering will overwrite existing marks.
                                 </p>
-                                <button
-                                  onClick={() => setReuploadMode(false)}
-                                  className="ml-auto text-[11px] text-amber-700 hover:text-amber-900 underline"
-                                >
-                                  Cancel
-                                </button>
                               </div>
                             )}
 
                             <h4 className="font-medium text-gray-800 text-sm mb-1">
-                              {selectedClassObj?.name} — Upload Results
+                              {selectedClassObj?.name} — Enter Grades
                             </h4>
-                            <p className="text-xs text-gray-500 mb-3">
+                            <p className="text-xs text-gray-500 mb-4">
                               Grading System:{" "}
                               <strong>
                                 {selectedClassObj?.gradingSystem === "LETTER"
@@ -878,32 +839,18 @@ const ResultsPage = () => {
                               (Locked)
                             </p>
 
-                            <input
-                              type="file"
-                              accept=".xlsx,.xls,.csv"
-                              onChange={(e) =>
-                                setFile(e.target.files?.[0] || null)
-                              }
-                              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-[var(--color-primary-light)] file:text-[var(--color-primary-dark)] hover:file:bg-[var(--color-primary-light)]/80 mb-3"
-                            />
-
                             <button
-                              onClick={handleUpload}
-                              disabled={uploading || !file}
-                              className="flex items-center justify-center gap-2 w-full bg-[var(--color-primary)] text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] disabled:opacity-40"
+                              onClick={() => setGradeModalOpen(true)}
+                              className="flex items-center justify-center gap-2 w-full bg-[var(--color-primary)] text-white px-4 py-3 rounded-lg text-sm font-medium hover:bg-[var(--color-primary-dark)] shadow-sm"
                             >
-                              {uploading ? (
-                                <Loader2 size={14} className="animate-spin" />
-                              ) : (
-                                <Upload size={14} />
-                              )}
-                              {uploading ? "Uploading..." : "Upload Sheet"}
+                              <Pencil size={16} />
+                              {alreadyUploaded ? "Edit Grades" : "Enter Grades"}
                             </button>
-                            {message && (
-                              <p className="text-xs text-center mt-2 text-gray-600">
-                                {message}
-                              </p>
-                            )}
+
+                            <p className="text-[11px] text-center mt-3 text-gray-400">
+                              Opens a grid where you can type marks for each
+                              student.
+                            </p>
                           </div>
                         );
                       })()
@@ -1137,10 +1084,12 @@ const ResultsPage = () => {
                               ))}
                             </div>
 
-                            {/* 🎯 ADD THE DOWNLOAD BUTTON HERE */}
+                            {/*  ADD THE DOWNLOAD BUTTON HERE */}
                             <div className="flex justify-end pt-2 border-t border-gray-200">
                               <button
                                 onClick={async () => {
+                                  if (downloadingPdf) return; // 🎯 Prevent double clicks
+                                  setDownloadingPdf(row.studentId);
                                   try {
                                     const res = await api.get(
                                       "/reports/report-card",
@@ -1158,7 +1107,9 @@ const ResultsPage = () => {
                                       },
                                     );
                                     const url = window.URL.createObjectURL(
-                                      new Blob([res.data]),
+                                      new Blob([res.data], {
+                                        type: "application/pdf",
+                                      }),
                                     );
                                     const link = document.createElement("a");
                                     link.href = url;
@@ -1169,13 +1120,27 @@ const ResultsPage = () => {
                                     document.body.appendChild(link);
                                     link.click();
                                     link.remove();
+                                    window.URL.revokeObjectURL(url);
                                   } catch (err) {
                                     alert("Failed to generate PDF");
+                                  } finally {
+                                    setDownloadingPdf(null);
                                   }
                                 }}
-                                className="text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200 flex items-center gap-1 transition-colors"
+                                disabled={!!downloadingPdf}
+                                className="text-xs font-semibold text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg border border-blue-200 flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                               >
-                                📄 Download Report Card PDF
+                                {downloadingPdf === row.studentId ? (
+                                  <>
+                                    <Loader2
+                                      size={14}
+                                      className="animate-spin"
+                                    />
+                                    Generating...
+                                  </>
+                                ) : (
+                                  <>📄 Download Report Card PDF</>
+                                )}
                               </button>
                             </div>
                           </td>
@@ -1190,7 +1155,19 @@ const ResultsPage = () => {
         )}
       </div>
 
-      {/* 🎯 Beautiful Re-upload Confirmation Modal */}
+      {/*  Grade Entry Modal */}
+      <GradeEntryModal
+        open={gradeModalOpen}
+        examPeriod={periods.find((p) => p.id === selectedPeriod) || null}
+        cls={selectedClassObj || null}
+        onClose={() => setGradeModalOpen(false)}
+        onSaved={() => {
+          handleViewClass(selectedClass!);
+          setReuploadMode(false);
+        }}
+      />
+
+      {/*  Beautiful Re-upload Confirmation Modal */}
       {showReuploadConfirm && currentSummary && (
         <div
           className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"

@@ -229,16 +229,15 @@ export default function LoginPage() {
                   const clean = e.target.value
                     .toUpperCase()
                     .replace(/[\u2010-\u2015]/g, "-")
-                    .replace(/\s+/g, "")
-                    .replace(/[^\w\-]/g, "");
+                    .replace(/[^A-Z0-9\-]/g, "");
                   setStudentCode(clean);
                 }}
-                placeholder="eg. SPP-F3-2026-001"
+                placeholder="eg. CISF32026003 or CIS-F3-2026-003"
                 required
                 className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm font-mono text-gray-900 placeholder-gray-400 outline-none transition-all duration-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
               />
               <p className="text-xs text-gray-400 mt-1.5">
-                Found on your child&apos;s admission letter
+                Enter the ID with or without hyphens — both work
               </p>
             </div>
 

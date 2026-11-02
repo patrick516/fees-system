@@ -15,8 +15,8 @@ import FeeStructureForm from "../../components/Classes/FeeStructureForm";
 import TermActivationCard from "../../components/Classes/TermActivationCard";
 import TermHistoryTable from "../../components/Classes/TermHistoryTable";
 import PaymentDetailsCard from "../../components/Classes/PaymentDetailsCard";
+import ClassSubjectModal from "../../components/Classes/ClassSubjectModal";
 import { isReadOnly } from "../../lib/permissions";
-
 const termLabel = (t?: string | null) =>
   t ? t.replace("_", " ").replace("TERM", "Term") : "";
 
@@ -29,6 +29,9 @@ const ClassesPage = () => {
   const [adding, setAdding] = useState(false);
   const [classForm, setClassForm] = useState({ name: "", level: "" });
   const [expandedClass, setExpandedClass] = useState<string | null>(null);
+
+  // Subjects modal state (the modal itself comes next)
+  const [subjectModalClass, setSubjectModalClass] = useState<any>(null);
 
   const [deleteModal, setDeleteModal] = useState({
     open: false,
@@ -296,37 +299,51 @@ const ClassesPage = () => {
                     </p>
                   )}
 
-                  {showFeeForm !== cls.id ? (
-                    can("payments", "write") &&
-                    !isReadOnly() && (
+                  <div className="flex gap-4 border-t border-gray-100 pt-3">
+                    {showFeeForm !== cls.id ? (
+                      can("payments", "write") &&
+                      !isReadOnly() && (
+                        <button
+                          onClick={() => {
+                            setEditingFee(null);
+                            setShowFeeForm(cls.id);
+                          }}
+                          className="flex items-center gap-2 text-[var(--color-primary)] text-sm font-medium"
+                        >
+                          <Plus size={16} /> Set Fee Structure
+                        </button>
+                      )
+                    ) : (
+                      <FeeStructureForm
+                        className={cls.name}
+                        classId={cls.id}
+                        existingFee={editingFee}
+                        defaultAcademicYear={activeYear || ""}
+                        defaultTerm={currentTerm || "TERM_1"}
+                        onCancel={() => {
+                          setShowFeeForm(null);
+                          setEditingFee(null);
+                        }}
+                        onSuccess={() => {
+                          setShowFeeForm(null);
+                          setEditingFee(null);
+                          fetchClasses();
+                        }}
+                      />
+                    )}
+
+                    {/* Manage Subjects Button */}
+                    {can("classes", "write") && !isReadOnly() && (
                       <button
                         onClick={() => {
-                          setEditingFee(null);
-                          setShowFeeForm(cls.id);
+                          setSubjectModalClass(cls);
                         }}
-                        className="flex items-center gap-2 text-[var(--color-primary)] text-sm font-medium"
+                        className="flex items-center gap-2 text-indigo-600 text-sm font-medium hover:text-indigo-800"
                       >
-                        <Plus size={16} /> Set Fee Structure
+                        <GraduationCap size={16} /> Manage Subjects
                       </button>
-                    )
-                  ) : (
-                    <FeeStructureForm
-                      className={cls.name}
-                      classId={cls.id}
-                      existingFee={editingFee}
-                      defaultAcademicYear={activeYear || ""}
-                      defaultTerm={currentTerm || "TERM_1"}
-                      onCancel={() => {
-                        setShowFeeForm(null);
-                        setEditingFee(null);
-                      }}
-                      onSuccess={() => {
-                        setShowFeeForm(null);
-                        setEditingFee(null);
-                        fetchClasses();
-                      }}
-                    />
-                  )}
+                    )}
+                  </div>
                 </div>
               )}
             </div>
@@ -373,6 +390,13 @@ const ClassesPage = () => {
           </div>
         </div>
       )}
+
+      {/*  Add the ClassSubjectModal here */}
+      <ClassSubjectModal
+        open={!!subjectModalClass}
+        cls={subjectModalClass}
+        onClose={() => setSubjectModalClass(null)}
+      />
     </div>
   );
 };

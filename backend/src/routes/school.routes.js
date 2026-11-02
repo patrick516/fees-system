@@ -169,6 +169,34 @@ router.delete(
   },
 );
 
+// 🎯 SUBJECTS (per-class)
+router.get(
+  "/classes/:classId/subjects",
+  verifyStaff,
+  schoolController.getClassSubjects,
+);
+router.post(
+  "/classes/:classId/subjects",
+  verifyStaff,
+  requirePermission("classes", "write"),
+  schoolController.addClassSubject,
+);
+router.delete(
+  "/classes/:classId/subjects/:subjectId",
+  verifyStaff,
+  requirePermission("classes", "write"),
+  schoolController.deleteClassSubject,
+);
+
+//  EXAM GRADE ENTRY GRID
+router.get("/exams/grid", verifyStaff, schoolController.getExamGrid);
+router.post(
+  "/exams/:examPeriodId/classes/:classId/grid",
+  verifyStaff,
+  requirePermission("exams", "write"),
+  schoolController.saveExamGrid,
+);
+
 router.get(
   "/fee-structures",
   verifyStaff,

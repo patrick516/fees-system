@@ -310,4 +310,62 @@ const getSmsLogs = async (req, res) => {
   }
 };
 
-module.exports = { sendBulkSMS, getSmsLogs };
+//  SEND TEST
+// POST /api/sms/test
+// Body: { phone?, email?, channel, message }
+const sendTestNotification = async (req, res) => {
+  try {
+    const { phone, email, channel = "BOTH", message } = req.body;
+
+    if (!phone && !email) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide a phone number or an email to send a test.",
+      });
+    }
+    if (!message || !message.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Message is required" });
+    }
+
+    const school = await prisma.school.findUnique({
+      where: { id: req.schoolId },
+      select: { name: true },
+    });
+
+    const result = await sendNotifications({
+      recipients: [
+        {
+          phone: phone?.trim() || null,
+          email: email?.trim() || null,
+          name: "Test Recipient",
+          message: message.trim(),
+          subject: `[TEST] Notification from ${school?.name || "SchoolPay"}`,
+        },
+      ],
+      channel,
+      type: "announcement",
+      templateKey: "announcement",
+      schoolId: req.schoolId,
+      staffId: req.staff?.id,
+      schoolName: school?.name || "SchoolPay",
+    });
+
+    const success = result.smsSent > 0 || result.emailSent > 0;
+    return res.json({
+      success,
+      message: success
+        ? `Test sent! ${result.smsSent} SMS + ${result.emailSent} email`
+        : "Test failed. Check the log.",
+      data: result,
+    });
+  } catch (err) {
+    console.error("Send test error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to send test" });
+  }
+};
+
+module.exports = { sendBulkSMS, getSmsLogs, sendTestNotification };

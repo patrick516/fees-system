@@ -845,6 +845,299 @@ const requestManualVerification = async (req, res) => {
       .json({ success: false, message: "Failed to submit request" });
   }
 };
+// ==================== SUBJECTS MANAGEMENT ====================
+
+// GET /api/schools/classes/:classId/subjects
+const getClassSubjects = async (req, res) => {
+  try {
+    const { classId } = req.params;
+
+    // Verify class belongs to this school
+    const cls = await prisma.class.findFirst({
+      where: { id: classId, schoolId: req.schoolId },
+      select: { id: true, name: true },
+    });
+    if (!cls) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Class not found" });
+    }
+
+    const subjects = await prisma.subject.findMany({
+      where: { classId, schoolId: req.schoolId, isActive: true },
+      orderBy: { name: "asc" },
+      select: {
+        id: true,
+        name: true,
+        code: true,
+        isActive: true,
+        _count: { select: { examResults: true } },
+      },
+    });
+
+    return res.json({ success: true, data: subjects });
+  } catch (err) {
+    console.error("getClassSubjects error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load subjects" });
+  }
+};
+
+// POST /api/schools/classes/:classId/subjects
+const addClassSubject = async (req, res) => {
+  try {
+    const { classId } = req.params;
+    const { name, code } = req.body;
+
+    if (!name || !name.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Subject name is required" });
+    }
+
+    const cls = await prisma.class.findFirst({
+      where: { id: classId, schoolId: req.schoolId },
+    });
+    if (!cls) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Class not found" });
+    }
+
+    const subject = await prisma.subject.create({
+      data: {
+        schoolId: req.schoolId,
+        classId,
+        name: name.trim(),
+        code: code?.trim().toUpperCase() || null,
+      },
+    });
+
+    await prisma.auditLog.create({
+      data: {
+        schoolId: req.schoolId,
+        staffId: req.staff.id,
+        action: "SUBJECT_ADDED",
+        entity: "Subject",
+        entityId: subject.id,
+        changes: { name: subject.name, classId, className: cls.name },
+      },
+    });
+
+    return res.status(201).json({ success: true, data: subject });
+  } catch (err) {
+    if (err.code === "P2002") {
+      return res.status(409).json({
+        success: false,
+        message: "A subject with this name already exists for this class",
+      });
+    }
+    console.error("addClassSubject error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to add subject" });
+  }
+};
+
+// DELETE /api/schools/classes/:classId/subjects/:subjectId
+const deleteClassSubject = async (req, res) => {
+  try {
+    const { classId, subjectId } = req.params;
+
+    const subject = await prisma.subject.findFirst({
+      where: { id: subjectId, classId, schoolId: req.schoolId },
+      include: { _count: { select: { examResults: true } } },
+    });
+    if (!subject) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Subject not found" });
+    }
+
+    // Safety: don't delete if exam results already exist
+    if (subject._count.examResults > 0) {
+      return res.status(400).json({
+        success: false,
+        message: `Cannot delete: ${subject._count.examResults} exam result(s) already recorded for this subject.`,
+      });
+    }
+
+    await prisma.subject.delete({ where: { id: subjectId } });
+
+    await prisma.auditLog.create({
+      data: {
+        schoolId: req.schoolId,
+        staffId: req.staff.id,
+        action: "SUBJECT_DELETED",
+        entity: "Subject",
+        entityId: subjectId,
+        changes: { name: subject.name },
+      },
+    });
+
+    return res.json({ success: true, message: "Subject deleted" });
+  } catch (err) {
+    console.error("deleteClassSubject error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to delete subject" });
+  }
+};
+
+// ==================== GRADE ENTRY GRID ====================
+
+// GET /api/schools/exams/:examPeriodId/classes/:classId/grid
+// GET /api/schools/exams/grid?examPeriodId=...&classId=...
+const getExamGrid = async (req, res) => {
+  try {
+    const { examPeriodId, classId } = req.query;
+
+    if (!examPeriodId || !classId) {
+      return res.status(400).json({
+        success: false,
+        message: "examPeriodId and classId are required",
+      });
+    }
+
+    // 1. Verify the exam period belongs to this school
+    const examPeriod = await prisma.examPeriod.findFirst({
+      where: { id: examPeriodId, schoolId: req.schoolId },
+      select: { id: true, name: true, term: true, academicYear: true },
+    });
+
+    if (!examPeriod) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Exam period not found" });
+    }
+
+    // 2. Fetch active students in this class
+    const students = await prisma.student.findMany({
+      where: { classId, schoolId: req.schoolId, isActive: true },
+      select: {
+        id: true,
+        studentCode: true,
+        fullName: true,
+        studentType: true,
+        // Get dropped subjects for this student
+        studentSubjects: {
+          where: { isTaking: false },
+          select: { subjectId: true },
+        },
+      },
+      orderBy: { fullName: "asc" },
+    });
+
+    // 3. Fetch active subjects for this class
+    const subjects = await prisma.subject.findMany({
+      where: { classId, schoolId: req.schoolId, isActive: true },
+      orderBy: { name: "asc" },
+      select: { id: true, name: true, code: true },
+    });
+
+    // 4. Fetch existing exam results for this exam period
+    const existingResults = await prisma.examResult.findMany({
+      where: {
+        examPeriodId,
+        studentId: { in: students.map((s) => s.id) },
+      },
+      select: {
+        studentId: true,
+        subjectId: true,
+        mark: true,
+      },
+    });
+
+    // Format existing results into a quick lookup map: `studentId|subjectId` -> mark
+    const marksMap = {};
+    for (const r of existingResults) {
+      marksMap[`${r.studentId}|${r.subjectId}`] = r.mark;
+    }
+
+    return res.json({
+      success: true,
+      data: {
+        examPeriod,
+        students,
+        subjects,
+        marksMap,
+      },
+    });
+  } catch (err) {
+    console.error("getExamGrid error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to load exam grid" });
+  }
+};
+
+const saveExamGrid = async (req, res) => {
+  try {
+    const { examPeriodId, classId } = req.params;
+    const { marks } = req.body;
+
+    if (!Array.isArray(marks)) {
+      return res
+        .status(400)
+        .json({ success: false, message: "marks must be an array" });
+    }
+
+    // Verify exam period
+    const examPeriod = await prisma.examPeriod.findFirst({
+      where: { id: examPeriodId, schoolId: req.schoolId },
+    });
+    if (!examPeriod) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Exam period not found" });
+    }
+
+    // Process upserts in a transaction for speed and safety
+    const upserts = marks
+      .filter((m) => m.mark !== null && m.mark !== undefined && m.mark !== "")
+      .map((m) => {
+        return prisma.examResult.upsert({
+          where: {
+            studentId_subjectId_examPeriodId: {
+              studentId: m.studentId,
+              subjectId: m.subjectId,
+              examPeriodId,
+            },
+          },
+          update: { mark: parseFloat(m.mark) },
+          create: {
+            schoolId: req.schoolId,
+            studentId: m.studentId,
+            subjectId: m.subjectId,
+            examPeriodId,
+            mark: parseFloat(m.mark),
+          },
+        });
+      });
+
+    await prisma.$transaction(upserts);
+
+    await prisma.auditLog.create({
+      data: {
+        schoolId: req.schoolId,
+        staffId: req.staff.id,
+        action: "EXAM_RESULTS_SAVED",
+        entity: "ExamPeriod",
+        entityId: examPeriodId,
+        changes: { classId, marksCount: upserts.length },
+      },
+    });
+
+    return res.json({ success: true, message: "Grades saved successfully" });
+  } catch (err) {
+    console.error("saveExamGrid error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to save grades" });
+  }
+};
+
 module.exports = {
   getSettings,
   updateSettings,
@@ -863,4 +1156,9 @@ module.exports = {
   getTierStatus,
   getPublicTiers,
   requestManualVerification,
+  getClassSubjects,
+  addClassSubject,
+  deleteClassSubject,
+  getExamGrid,
+  saveExamGrid,
 };

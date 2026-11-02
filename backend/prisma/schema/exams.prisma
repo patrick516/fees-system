@@ -39,7 +39,8 @@ model Subject {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  examResults ExamResult[]
+  examResults     ExamResult[]
+  studentSubjects StudentSubject[]
 
   @@unique([schoolId, classId, name])
   @@map("subjects")
@@ -107,7 +108,7 @@ model PendingExamRow {
   @@map("pending_exam_rows")
 }
 
-// 🎯 Per-student report card comments (per term/year)
+//  Per-student report card comments (per term/year)
 model ReportCardComment {
   id        String  @id @default(uuid())
   schoolId  String
@@ -130,4 +131,19 @@ model ReportCardComment {
   @@unique([studentId, term, academicYear])
   @@index([schoolId])
   @@map("report_card_comments")
+}
+
+//  Track subjects a student is taking or has dropped
+model StudentSubject {
+  id        String  @id @default(uuid())
+  studentId String
+  student   Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  subjectId String
+  subject   Subject @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+
+  // If false, the student dropped this subject (e.g., MSCE student dropped Physics)
+  isTaking Boolean @default(true)
+
+  @@unique([studentId, subjectId])
+  @@map("student_subjects")
 }

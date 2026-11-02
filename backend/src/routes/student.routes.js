@@ -9,7 +9,6 @@ const {
   getStudent,
   updateStudent,
   searchStudents,
-  getStudentByCode,
   bulkImportPreview,
   bulkImport,
   applyDiscount,
@@ -29,10 +28,6 @@ const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
 });
-
-// ==================== PUBLIC ====================
-// Parent login page — no auth
-router.get("/by-code/:code", getStudentByCode);
 
 //  DISCOUNTS
 //  Moved below imports, using the direct function names
@@ -119,6 +114,68 @@ router.put(
   verifyStaff,
   requirePermission("students", "write"),
   updateStudentType,
+);
+
+//  GET /api/students/:id/subjects
+// Returns only the subjects this student has dropped (isTaking: false)
+router.get("/:id/subjects", verifyStaff, async (req, res) => {
+  try {
+    const dropped = await prisma.studentSubject.findMany({
+      where: {
+        studentId: req.params.id,
+        isTaking: false,
+        student: { schoolId: req.schoolId },
+      },
+      select: { subjectId: true },
+    });
+    res.json({ success: true, data: dropped });
+  } catch (err) {
+    res.status(500).json({ success: false, message: "Failed to load" });
+  }
+});
+
+//  PUT /api/students/:id/subjects/:subjectId
+// Toggles whether a student is taking a subject
+router.put(
+  "/:id/subjects/:subjectId",
+  verifyStaff,
+  requirePermission("classes", "write"),
+  async (req, res) => {
+    try {
+      const { id, subjectId } = req.params;
+      const { isTaking } = req.body;
+
+      // Verify student belongs to this school
+      const student = await prisma.student.findFirst({
+        where: { id, schoolId: req.schoolId },
+      });
+      if (!student)
+        return res
+          .status(404)
+          .json({ success: false, message: "Student not found" });
+
+      if (isTaking) {
+        // If taking it again, delete the "dropped" record
+        await prisma.studentSubject.deleteMany({
+          where: { studentId: id, subjectId },
+        });
+      } else {
+        // If dropping, create/update the record
+        await prisma.studentSubject.upsert({
+          where: {
+            studentId_subjectId: { studentId: id, subjectId },
+          },
+          update: { isTaking: false },
+          create: { studentId: id, subjectId, isTaking: false },
+        });
+      }
+
+      res.json({ success: true });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ success: false, message: "Failed to update" });
+    }
+  },
 );
 
 module.exports = router;

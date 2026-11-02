@@ -816,51 +816,6 @@ const searchStudents = async (req, res) => {
   }
 };
 
-//  GET STUDENT BY CODE
-const getStudentByCode = async (req, res) => {
-  try {
-    const { code } = req.params;
-    const student = await prisma.student.findFirst({
-      where: { studentCode: code.toUpperCase() },
-      select: {
-        id: true,
-        studentCode: true,
-        firstName: true,
-        middleName: true,
-        lastName: true,
-        fullName: true,
-        dateOfBirth: true,
-        school: { select: { name: true } },
-        class: { select: { name: true } },
-      },
-    });
-
-    if (!student)
-      return res
-        .status(404)
-        .json({ success: false, message: "Student not found" });
-
-    return res.status(200).json({
-      success: true,
-      data: {
-        id: student.id,
-        studentCode: student.studentCode,
-        firstName: student.firstName,
-        middleName: student.middleName,
-        lastName: student.lastName,
-        fullName: student.fullName,
-        school: student.school.name,
-        class: student.class.name,
-      },
-    });
-  } catch (error) {
-    console.error("Get student by code error:", error);
-    return res
-      .status(500)
-      .json({ success: false, message: "Failed to find student" });
-  }
-};
-
 // ==================== BULK IMPORT ====================
 const bulkImportPreview = async (req, res) => {
   try {
@@ -898,25 +853,27 @@ const bulkImport = async (req, res) => {
       req.schoolId,
     );
     const invalidRows = results.filter((r) => !r.valid);
+    const validRows = results.filter((r) => r.valid);
 
-    if (invalidRows.length > 0) {
+    //  If ALL rows are invalid, we block the upload
+    if (validRows.length === 0) {
       return res.status(400).json({
         success: false,
-        message: `${invalidRows.length} row(s) have errors.`,
+        message: `Upload failed. All ${results.length} rows have errors.`,
         data: {
           totalRows: results.length,
-          validCount: results.length - invalidRows.length,
+          validCount: 0,
           errorCount: invalidRows.length,
           rows: results,
         },
       });
     }
-
+    //  TIER LIMIT ENFORCEMENT FOR BULK IMPORT
     // 🎯 TIER LIMIT ENFORCEMENT FOR BULK IMPORT
     const currentStudents = await prisma.student.count({
       where: { schoolId: req.schoolId, isActive: true },
     });
-    const validRowsCount = results.length - invalidRows.length;
+    const validRowsCount = validRows.length;
 
     if (
       school.maxStudents &&
@@ -930,9 +887,13 @@ const bulkImport = async (req, res) => {
     }
 
     const created = [];
-    const failed = [];
+    // Seed the failed array with the invalid rows so they are reported in the final response
+    const failed = invalidRows.map((r) => ({
+      row: r.rowNumber,
+      error: r.errors.join(", "),
+    }));
     const classCounts = {};
-    for (const cls of classes) {
+    {
       //  Find the HIGHEST existing ID instead of counting
       const lastStudent = await prisma.student.findFirst({
         where: { schoolId: req.schoolId, classId: cls.id },
@@ -950,7 +911,8 @@ const bulkImport = async (req, res) => {
       classCounts[cls.id] = startSeq;
     }
 
-    for (const r of results) {
+    //  Loop ONLY through the valid rows. Invalid ones are already in `failed`.
+    for (const r of validRows) {
       try {
         const d = r.data;
         const classObj = classes.find((c) => c.id === d.classId);
@@ -1075,7 +1037,6 @@ module.exports = {
   getStudent,
   updateStudent,
   searchStudents,
-  getStudentByCode,
   bulkImportPreview,
   bulkImport,
   applyDiscount,

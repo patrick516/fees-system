@@ -1,10 +1,9 @@
-// backend/src/controllers/onekhusa.controller.js
 const crypto = require("crypto");
 const prisma = require("../config/db");
 const onekhusa = require("../lib/onekhusa");
 const { reconcileVerifiedPayment } = require("../lib/paymentReconciliation");
 const { sendNotifications } = require("../lib/notifier");
-const { generateReceiptNumber } = require("../lib/utils");
+const { generateReceiptNumber, buildSchoolPrefix } = require("../lib/utils");
 const { computeExtendedEnd } = require("../lib/subscription");
 
 const MIN_AMOUNT = 100; // MWK
@@ -77,10 +76,16 @@ const initiatePayment = async (req, res) => {
       },
     });
 
+    //  FIX: build the school prefix and pass all 3 args
     const paymentCount = await prisma.feePayment.count({
       where: { schoolId: student.schoolId },
     });
-    const receiptNumber = generateReceiptNumber(year, paymentCount + 1);
+    const schoolPrefix = buildSchoolPrefix(student.school.name);
+    const receiptNumber = generateReceiptNumber(
+      schoolPrefix,
+      year,
+      paymentCount + 1,
+    );
 
     const payment = await prisma.feePayment.create({
       data: {

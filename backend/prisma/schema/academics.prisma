@@ -71,6 +71,7 @@ model Student {
   examResults        ExamResult[]
   discounts          StudentDiscount[]
   reportCardComments ReportCardComment[]
+  studentSubjects    StudentSubject[]
 
   @@unique([schoolId, studentCode])
   @@map("students")

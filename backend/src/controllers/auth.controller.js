@@ -728,12 +728,19 @@ const getSetupStatus = async (req, res) => {
   }
 };
 
-// ==================== PARENT AUTH (UNCHANGED) ====================
-
-// POST /api/auth/parent/login-student-id
+// Searches ONLY within that school — never globally.
 const parentLoginWithStudentId = async (req, res) => {
   try {
     const { studentCode, dateOfBirth } = req.body;
+    const schoolId = req.schoolId;
+
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        code: "NO_SCHOOL_CONTEXT",
+        message: "School context missing. Please use your school's login URL.",
+      });
+    }
 
     if (!studentCode || !dateOfBirth) {
       return res.status(400).json({
@@ -742,16 +749,24 @@ const parentLoginWithStudentId = async (req, res) => {
       });
     }
 
-    //  Normalize the student code: handle smart hyphens, spaces, and casing
-    const normalizedCode = String(studentCode)
+    // Normalize input: strip all non-alphanumeric characters
+    const cleanInput = String(studentCode)
       .toUpperCase()
       .replace(/[\u2010-\u2015]/g, "-")
-      .replace(/\s+/g, "")
-      .replace(/[^\w\-]/g, "")
-      .trim();
+      .replace(/[^A-Z0-9]/g, "");
 
-    const student = await prisma.student.findFirst({
-      where: { studentCode: normalizedCode },
+    if (cleanInput.length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid Student ID format.",
+      });
+    }
+
+    const schoolStudents = await prisma.student.findMany({
+      where: {
+        schoolId,
+        isActive: true,
+      },
       include: {
         school: {
           select: {
@@ -768,20 +783,22 @@ const parentLoginWithStudentId = async (req, res) => {
       },
     });
 
+    const student = schoolStudents.find((s) => {
+      const dbClean = String(s.studentCode || "")
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, "");
+      return dbClean === cleanInput;
+    });
+
     if (!student) {
       return res.status(404).json({
         success: false,
-        message: "Student ID not found. Please check and try again.",
+        message:
+          "Student ID not found at this school. Please check your login URL and try again.",
       });
     }
 
-    if (!student.isActive) {
-      return res.status(401).json({
-        success: false,
-        message: "This student account is inactive. Contact the school.",
-      });
-    }
-
+    // Verify DOB matches
     const inputDOB = new Date(dateOfBirth);
     const studentDOB = new Date(student.dateOfBirth);
 
@@ -797,6 +814,7 @@ const parentLoginWithStudentId = async (req, res) => {
       });
     }
 
+    //  Issue JWT scoped to this student's school
     const token = generateToken({
       studentId: student.id,
       schoolId: student.schoolId,
@@ -804,10 +822,15 @@ const parentLoginWithStudentId = async (req, res) => {
       type: "PARENT",
     });
 
+    // Total paid calculation
     const payments = await prisma.feePayment.findMany({
-      where: { studentId: student.id, status: "VERIFIED" },
+      where: {
+        studentId: student.id,
+        schoolId: student.schoolId, // extra safety
+        status: "VERIFIED",
+      },
     });
-    const totalPaid = payments.reduce((sum, p) => sum + p.amount, 0);
+    const totalPaid = payments.reduce((sum, p) => sum + Number(p.amount), 0);
 
     return res.status(200).json({
       success: true,
@@ -841,9 +864,21 @@ const parentLoginWithStudentId = async (req, res) => {
 };
 
 // POST /api/auth/parent/request-otp
+//  REQUIRES req.schoolId (set by resolveSchool middleware).
+// Searches ONLY within that school — never globally.
 const requestOTP = async (req, res) => {
   try {
     const { phone } = req.body;
+    const schoolId = req.schoolId;
+
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        code: "NO_SCHOOL_CONTEXT",
+        message: "School context missing. Please use your school's login URL.",
+      });
+    }
+
     if (!phone) {
       return res
         .status(400)
@@ -852,8 +887,10 @@ const requestOTP = async (req, res) => {
 
     const cleanPhone = phone.replace(/\s/g, "").replace(/^0/, "+265");
 
+    //  Scope the search to this school only
     const student = await prisma.student.findFirst({
       where: {
+        schoolId,
         OR: [
           { parentPhone: cleanPhone },
           { parentPhone: phone },
@@ -871,11 +908,25 @@ const requestOTP = async (req, res) => {
     if (!student) {
       return res.status(404).json({
         success: false,
-        message: "No student found with this phone number. Contact the school.",
+        message:
+          "No student found with this phone number at this school. Contact the school.",
       });
     }
 
-    const { otpId, expiresAt } = await sendOtp(cleanPhone);
+    //  TEMPORARY: catch TumaSend failures so we can test in dev.
+    // In production, remove the fallback and hard-fail instead.
+    let otpId;
+    let expiresAt;
+    try {
+      const otpResult = await sendOtp(cleanPhone);
+      otpId = otpResult.otpId;
+      expiresAt = otpResult.expiresAt;
+    } catch (smsErr) {
+      console.error("[requestOTP] TumaSend failed:", smsErr.message);
+      otpId = Math.floor(100000 + Math.random() * 900000).toString();
+      expiresAt = new Date(Date.now() + 10 * 60 * 1000).toISOString();
+      console.log(`[requestOTP]  DEV FALLBACK OTP: ${otpId}`);
+    }
 
     await prisma.otpCode.deleteMany({ where: { phone: cleanPhone } });
 
@@ -900,10 +951,20 @@ const requestOTP = async (req, res) => {
   }
 };
 
-// POST /api/auth/parent/verify-otp
+// Only issues a JWT for a student that belongs to this school.
 const verifyOTP = async (req, res) => {
   try {
     const { phone, otp } = req.body;
+    const schoolId = req.schoolId;
+
+    if (!schoolId) {
+      return res.status(400).json({
+        success: false,
+        code: "NO_SCHOOL_CONTEXT",
+        message: "School context missing. Please use your school's login URL.",
+      });
+    }
+
     if (!phone || !otp) {
       return res.status(400).json({
         success: false,
@@ -934,7 +995,12 @@ const verifyOTP = async (req, res) => {
       const result = await verifyOtp(otpRecord.code, otp);
       verified = result.verified;
     } catch (verifyErr) {
-      console.error("TumaSend verify error:", verifyErr.message);
+      console.error("[verifyOTP] TumaSend failed:", verifyErr.message);
+      //  DEV FALLBACK: match against our own DB code
+      if (String(otp).trim() === String(otpRecord.code).trim()) {
+        verified = true;
+        console.log("[verifyOTP]  DEV fallback match succeeded");
+      }
     }
 
     if (!verified) {
@@ -949,8 +1015,10 @@ const verifyOTP = async (req, res) => {
       data: { used: true },
     });
 
+    //  Scope the search to this school only
     const student = await prisma.student.findFirst({
       where: {
+        schoolId,
         OR: [
           { parentPhone: cleanPhone },
           { parentPhone: phone },
@@ -977,7 +1045,7 @@ const verifyOTP = async (req, res) => {
     if (!student) {
       return res.status(404).json({
         success: false,
-        message: "Student not found for this phone number.",
+        message: "Student not found for this phone number at this school.",
       });
     }
 

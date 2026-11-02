@@ -35,23 +35,23 @@ const EditSchoolModal = ({ open, onClose, onSaved }: Props) => {
   const [error, setError] = useState("");
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  // Load current values whenever the modal opens
   useEffect(() => {
-    if (open && settings) {
+    if (open) {
       setForm({
-        name: settings.name || "",
-        phone: settings.phone || "",
-        email: settings.email || "",
-        address: settings.address || "",
-        city: settings.city || "",
-        motto: settings.motto || "",
-        primaryColor: settings.primaryColor || "#1e3a8a",
+        name: settings?.name || "",
+        phone: settings?.phone || "",
+        email: settings?.email || "",
+        address: settings?.address || "",
+        city: settings?.city || "",
+        motto: settings?.motto || "",
+        primaryColor: settings?.primaryColor || "#1e3a8a",
       });
-      setLogoPreview(settings.logo || null);
+      setLogoPreview(settings?.logo || null);
       setError("");
       setSavedSuccess(false);
     }
-  }, [open, settings]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   const handleLogoChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];

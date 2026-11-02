@@ -7,6 +7,12 @@ const smsController = require("../controllers/sms.controller");
 router.get("/test", (req, res) => {
   res.json({ success: true, message: "Notification routes working" });
 });
+router.post(
+  "/test",
+  verifyStaff,
+  requirePermission("sms", "write"),
+  smsController.sendTestNotification,
+);
 
 router.post(
   "/bulk",
