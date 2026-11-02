@@ -23,42 +23,49 @@ const backupDatabase = async () => {
     const filename = `schoolpay_backup_${timestamp}.sql`;
     const filepath = path.join(BACKUP_DIR, filename);
 
-    // 🎯 Write to a .tmp file first — if pg_dump fails, we never touch the
-    // existing backups, so the last known good one stays intact.
+    // Write to a temp file first — if pg_dump fails, existing backups stay intact
     const tmpFile = `${filepath}.tmp`;
-    const cmd = `pg_dump -Fc -d "${dbUrl}" -f "${tmpFile}"`;
+    const cleanDbUrl = dbUrl.split("?")[0];
+    const cmd = `pg_dump -Fc -d "${cleanDbUrl}" -f "${tmpFile}"`;
     await execPromise(cmd);
 
-    // Verify the file has content (partial dumps are rejected)
+    // Verify the file has content (reject partial dumps)
     const stats = fs.statSync(tmpFile);
     if (stats.size < 1000) {
       fs.unlinkSync(tmpFile);
       throw new Error(`Backup too small: ${stats.size} bytes`);
     }
 
-    // Only now move the valid file into place
+    // Move valid file into place
     fs.renameSync(tmpFile, filepath);
     console.log(
       `[backup] ✅ Success: ${filename} (${(stats.size / 1024).toFixed(0)} KB)`,
     );
 
-    // 🎯 Keep only the 2 most recent backups (today + yesterday)
+    //  Delete stale .tmp files (leftover from failed dumps)
+    fs.readdirSync(BACKUP_DIR)
+      .filter((f) => f.endsWith(".tmp"))
+      .forEach((f) => {
+        fs.unlinkSync(path.join(BACKUP_DIR, f));
+        console.log(`[backup] 🗑️ Deleted stale temp file: ${f}`);
+      });
+
+    //  Keep only the 2 most recent .sql backups
     const files = fs
       .readdirSync(BACKUP_DIR)
-      .filter((f) => f.endsWith(".sql")) // ignore any leftover .tmp
+      .filter((f) => f.endsWith(".sql"))
       .map((f) => ({
         name: f,
         mtime: fs.statSync(path.join(BACKUP_DIR, f)).mtimeMs,
       }))
       .sort((a, b) => b.mtime - a.mtime);
 
-    // Delete anything after the 2nd
     files.slice(2).forEach((f) => {
       fs.unlinkSync(path.join(BACKUP_DIR, f.name));
       console.log(`[backup] 🗑️ Deleted old backup: ${f.name}`);
     });
   } catch (err) {
-    console.error("[backup] ❌ Failed:", err.message);
+    console.error("[backup]  Failed:", err.message);
     // Clean up temp file if the dump failed mid-write
     try {
       const timestamp = new Date().toISOString().replace(/[:.]/g, "-");

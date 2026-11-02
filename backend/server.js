@@ -129,14 +129,21 @@ app.use("/api/platform", readLimiter);
 
 app.use("/api/", readLimiter);
 
-//  Weekly backup — every Sunday at 23:00 (11 PM)
-cron.schedule("0 23 * * 0", () => {
-  console.log("[cron] Triggering weekly database backup (Sunday 11 PM)...");
-  backupDatabase().catch((err) =>
-    console.error("[backup-cron] Fatal error:", err.message),
-  );
-});
-
+// 🎯 Weekly backup — every Sunday at 23:00 Malawi time (Africa/Blantyre)
+cron.schedule(
+  "0 23 * * 0",
+  () => {
+    console.log(
+      "[cron] Triggering weekly database backup (Sunday 23:00 CAT)...",
+    );
+    backupDatabase().catch((err) =>
+      console.error("[backup-cron] Fatal error:", err.message),
+    );
+  },
+  {
+    timezone: "Africa/Blantyre",
+  },
+);
 cron.schedule("*/5 * * * *", () => {
   reconcileStalePending().catch((err) =>
     console.error("[malipo-cron] Sweep failed:", err.message),
