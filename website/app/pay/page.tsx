@@ -32,6 +32,15 @@ const BANK_METHODS = [
   "OTHER_BANK",
 ];
 
+// 🎯 Helper to format numbers with commas (e.g., 2000 -> 2,000)
+const formatAmount = (val: string) => {
+  if (!val) return "";
+  // Remove all non-digits
+  const clean = val.replace(/[^0-9]/g, "");
+  if (!clean) return "";
+  return Number(clean).toLocaleString("en-US");
+};
+
 export default function PayPage() {
   const router = useRouter();
   const { isAuthenticated, student, _hasHydrated } = useAuthStore();
@@ -395,12 +404,16 @@ export default function PayPage() {
             </span>
             <div className="w-px h-8 bg-gray-200 shrink-0" />
             <input
-              type="number"
-              value={form.amount}
-              onChange={(e) => setForm({ ...form, amount: e.target.value })}
-              placeholder="0"
-              min="1"
+              type="text"
               inputMode="numeric"
+              value={formatAmount(form.amount)}
+              onChange={(e) => {
+                const raw = e.target.value.replace(/,/g, "");
+                if (/^\d*$/.test(raw)) {
+                  setForm({ ...form, amount: raw });
+                }
+              }}
+              placeholder="0"
               className="flex-1 min-w-0 border-0 outline-none text-2xl font-bold text-gray-900 placeholder-gray-300 bg-transparent"
             />
           </div>
