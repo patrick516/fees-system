@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { X, Loader2, Save, AlertCircle } from "lucide-react";
 import api from "../../lib/axios";
 import { toast } from "../../lib/toast";
@@ -29,6 +29,9 @@ export default function GradeEntryModal({
   const [students, setStudents] = useState<any[]>([]);
   const [subjects, setSubjects] = useState<any[]>([]);
   const [marks, setMarks] = useState<Record<string, string>>({});
+
+  // 🎯 Refs for keyboard navigation
+  const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
 
   useEffect(() => {
     if (open && examPeriod && cls) {
@@ -62,7 +65,6 @@ export default function GradeEntryModal({
     subjectId: string,
     value: string,
   ) => {
-    // Only allow numbers up to 100
     const clean = value.replace(/[^0-9.]/g, "");
     if (Number(clean) > 100) return;
 
@@ -72,13 +74,105 @@ export default function GradeEntryModal({
     }));
   };
 
+  // 🎯 Move focus to a specific cell
+  const moveFocus = (studentIdx: number, subjectIdx: number) => {
+    const key = `${students[studentIdx]?.id}|${subjects[subjectIdx]?.id}`;
+    const input = inputRefs.current[key];
+    if (input) {
+      input.focus();
+      input.select();
+    }
+  };
+
+  // 🎯 Smart keyboard navigation
+  const handleKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    studentIndex: number,
+    subjectIndex: number,
+  ) => {
+    const isShift = e.shiftKey;
+
+    const goRight = () => {
+      e.preventDefault();
+      let nextSubject = subjectIndex + 1;
+      let nextStudent = studentIndex;
+      if (nextSubject >= subjects.length) {
+        nextSubject = 0;
+        nextStudent = studentIndex + 1;
+      }
+      if (nextStudent >= students.length) {
+        nextStudent = 0;
+        nextSubject = 0;
+      }
+      moveFocus(nextStudent, nextSubject);
+    };
+
+    const goLeft = () => {
+      e.preventDefault();
+      let prevSubject = subjectIndex - 1;
+      let prevStudent = studentIndex;
+      if (prevSubject < 0) {
+        prevSubject = subjects.length - 1;
+        prevStudent = studentIndex - 1;
+      }
+      if (prevStudent < 0) {
+        prevStudent = students.length - 1;
+        prevSubject = subjects.length - 1;
+      }
+      moveFocus(prevStudent, prevSubject);
+    };
+
+    const goDown = () => {
+      e.preventDefault();
+      let nextStudent = studentIndex + 1;
+      if (nextStudent >= students.length) {
+        nextStudent = 0;
+      }
+      moveFocus(nextStudent, subjectIndex);
+    };
+
+    const goUp = () => {
+      e.preventDefault();
+      let prevStudent = studentIndex - 1;
+      if (prevStudent < 0) {
+        prevStudent = students.length - 1;
+      }
+      moveFocus(prevStudent, subjectIndex);
+    };
+
+    if (e.key === "Enter") {
+      if (isShift) goLeft();
+      else goRight();
+      return;
+    }
+
+    if (e.key === "ArrowRight") {
+      goRight();
+      return;
+    }
+
+    if (e.key === "ArrowLeft") {
+      goLeft();
+      return;
+    }
+
+    if (e.key === "ArrowDown") {
+      goDown();
+      return;
+    }
+
+    if (e.key === "ArrowUp") {
+      goUp();
+      return;
+    }
+  };
+
   const handleSave = async () => {
     if (!examPeriod || !cls) return;
     setSaving(true);
 
     try {
-      // Build the payload, ignoring empty cells
-      const payload = [];
+      const payload: any[] = [];
       for (const student of students) {
         for (const subject of subjects) {
           const key = `${student.id}|${subject.id}`;
@@ -214,8 +308,7 @@ export default function GradeEntryModal({
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {students.map((student, idx) => {
-                    // Get list of dropped subject IDs for this student
+                  {students.map((student, studentIdx) => {
                     const droppedIds = student.studentSubjects.map(
                       (s: any) => s.subjectId,
                     );
@@ -226,7 +319,7 @@ export default function GradeEntryModal({
                         className="hover:bg-blue-50/30 transition-colors"
                       >
                         <td className="px-4 py-2 text-center text-gray-400 text-xs border-r border-gray-100">
-                          {idx + 1}
+                          {studentIdx + 1}
                         </td>
                         <td className="px-4 py-2 border-r border-gray-100 sticky left-0 bg-white group-hover:bg-blue-50/30">
                           <p className="font-medium text-gray-800">
@@ -236,7 +329,7 @@ export default function GradeEntryModal({
                             {student.studentCode}
                           </p>
                         </td>
-                        {subjects.map((sub) => {
+                        {subjects.map((sub, subjectIdx) => {
                           const isDropped = droppedIds.includes(sub.id);
                           const key = `${student.id}|${sub.id}`;
 
@@ -246,6 +339,9 @@ export default function GradeEntryModal({
                               className="p-1 border-r border-gray-100"
                             >
                               <input
+                                ref={(el) => {
+                                  inputRefs.current[key] = el;
+                                }}
                                 type="text"
                                 inputMode="decimal"
                                 disabled={isDropped}
@@ -256,6 +352,9 @@ export default function GradeEntryModal({
                                     sub.id,
                                     e.target.value,
                                   )
+                                }
+                                onKeyDown={(e) =>
+                                  handleKeyDown(e, studentIdx, subjectIdx)
                                 }
                                 placeholder={isDropped ? "Dropped" : "-"}
                                 className={`w-full h-9 text-center rounded border transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] ${
@@ -276,6 +375,38 @@ export default function GradeEntryModal({
               </table>
             </div>
           )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500 flex flex-wrap items-center gap-x-4 gap-y-1">
+          <span>
+            💡 <strong>Tip:</strong>
+          </span>
+          <span>
+            <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+              Enter
+            </kbd>{" "}
+            or{" "}
+            <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+              →
+            </kbd>{" "}
+            next mark
+          </span>
+          <span>
+            <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+              ←
+            </kbd>{" "}
+            previous mark
+          </span>
+          <span>
+            <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+              ↑
+            </kbd>{" "}
+            <kbd className="px-1.5 py-0.5 bg-white border border-gray-300 rounded text-[10px]">
+              ↓
+            </kbd>{" "}
+            change student
+          </span>
         </div>
       </div>
     </div>
