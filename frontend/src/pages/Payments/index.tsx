@@ -163,13 +163,13 @@ const PaymentsPage = () => {
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm font-medium text-gray-800">
-                        MWK {payment.amount.toLocaleString()}
+                        MWK {Number(payment.amount).toLocaleString()}
                       </span>
                     </td>
                     <td className="px-6 py-4">
                       {payment.platformFee ? (
                         <span className="text-sm font-medium text-red-600">
-                          - MWK {payment.platformFee.toLocaleString()}
+                          - MWK {Number(payment.platformFee).toLocaleString()}
                         </span>
                       ) : (
                         <span className="text-xs text-gray-400">—</span>
@@ -178,7 +178,9 @@ const PaymentsPage = () => {
                     <td className="px-6 py-4">
                       <span className="text-sm font-bold text-green-600">
                         MWK{" "}
-                        {(payment.netAmount || payment.amount).toLocaleString()}
+                        {Number(
+                          payment.netAmount || payment.amount,
+                        ).toLocaleString()}
                       </span>
                     </td>
                     <td className="px-6 py-4">

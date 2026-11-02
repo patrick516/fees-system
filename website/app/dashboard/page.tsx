@@ -733,7 +733,7 @@ export default function DashboardPage() {
                               </div>
                               <div>
                                 <p className="text-sm font-semibold text-slate-800">
-                                  MWK {payment.amount.toLocaleString()}
+                                  MWK {Number(payment.amount).toLocaleString()}
                                 </p>
                                 <p className="text-[11px] text-slate-400">
                                   {termLabel(payment.term)}{" "}
@@ -799,7 +799,7 @@ export default function DashboardPage() {
                     <div key={payment.id} className="px-4 py-3.5 bg-white">
                       <div className="flex items-center justify-between mb-1">
                         <span className="font-semibold text-slate-800">
-                          MWK {payment.amount.toLocaleString()}
+                          MWK {Number(payment.amount).toLocaleString()}
                         </span>
                         <span
                           className={`text-[10px] px-2 py-0.5 rounded-full font-medium ${

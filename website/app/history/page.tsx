@@ -141,9 +141,9 @@ export default function HistoryPage() {
               >
                 <div className="flex items-start justify-between mb-3">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-base font-bold text-blue-950">
-                      MWK {payment.amount.toLocaleString()}
-                    </span>
+                    <p className="text-sm font-semibold text-slate-800">
+                      MWK {Number(payment.amount).toLocaleString()}
+                    </p>
                     <span
                       className={`text-xs px-2 py-0.5 rounded-full flex items-center gap-1 ${
                         payment.status === "VERIFIED"

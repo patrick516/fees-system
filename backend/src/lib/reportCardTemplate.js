@@ -22,15 +22,38 @@ const generateReportCardHTML = (data) => {
         .text-left { text-align: left; }
         .summary-table td { text-align: left; font-weight: bold; }
         .summary-table td span { font-weight: normal; }
-        .grading-key { display: flex; justify-content: space-between; margin-bottom: 15px; font-size: 9px; }
+        .grading-key { display: flex; justify-content: space-between; margin-bottom: 20px; font-size: 9px; }
         .grading-key div { border: 1px solid #000; padding: 4px; text-align: center; width: 11%; }
-        .comments { border: 1px solid #000; padding: 10px; margin-bottom: 15px; min-height: 50px; }
-        .footer { display: flex; justify-content: space-between; font-size: 10px; margin-top: 20px; gap: 20px; }
-        .footer div { flex: 1; text-align: center; }
-        .footer .signature-block { display: flex; flex-direction: column; justify-content: flex-end; align-items: center; min-height: 80px; }
-        .footer .signature-img { max-height: 40px; margin-bottom: 4px; }
-        .footer .stamp-img { max-height: 60px; margin-bottom: 4px; }
-        .footer .line { width: 100%; border-top: 1px solid #000; padding-top: 4px; font-size: 9px; }
+        .comments { border: 1px solid #000; padding: 12px; margin-bottom: 12px; min-height: 60px; }
+        .comments p { margin: 0; font-size: 11px; }
+        .comments p.label { font-weight: bold; margin-bottom: 6px; text-transform: uppercase; font-size: 10px; color: #374151;}
+        .comments p.content { color: #444; font-style: italic; white-space: pre-wrap; }
+
+        /* 🎯 CLEAN FOOTER LAYOUT */
+        .footer { 
+          display: flex; 
+          justify-content: space-between; 
+          align-items: flex-end;
+          margin-top: 40px; 
+          padding-top: 10px;
+        }
+        .footer-block { 
+          width: 30%; 
+          text-align: center; 
+          display: flex; 
+          flex-direction: column; 
+          justify-content: flex-end; 
+          align-items: center; 
+        }
+        .footer-img-container {
+          height: 70px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          margin-bottom: 5px;
+        }
+        .footer img { max-height: 70px; max-width: 100%; object-fit: contain; }
+        .footer .line { width: 100%; border-top: 1px solid #000; padding-top: 6px; font-size: 10px; font-weight: bold; color: #111; }
       </style>
     </head>
     <body>
@@ -40,7 +63,7 @@ const generateReportCardHTML = (data) => {
         <p>REPUBLIC OF MALAWI</p>
         <p>MINISTRY OF EDUCATION</p>
         <h2>${school.name.toUpperCase()}</h2>
-   <p>${school.address || "P.O. Box ____"} | Tel: ${school.phone || "+265 ____"}</p>
+        <p>${school.address || "P.O. Box ____"} | Tel: ${school.phone || "+265 ____"}</p>
         <h1 style="margin-top: 10px; background: #1e3a8a; color: white; padding: 5px;">STUDENT TERMLY PROGRESS REPORT</h1>
       </div>
 
@@ -130,27 +153,41 @@ const generateReportCardHTML = (data) => {
 
       <!-- COMMENTS -->
       <div class="comments">
-        <p><strong>CLASS TEACHER'S COMMENT:</strong></p>
-        <p style="color: #555; font-style: italic; white-space: pre-wrap;">${summary.classTeacherComment || ""}</p>
+        <p class="label">CLASS TEACHER'S COMMENT:</p>
+        <p class="content">${summary.classTeacherComment || ""}</p>
       </div>
       <div class="comments">
-        <p><strong>HEAD TEACHER'S COMMENT:</strong></p>
-        <p style="color: #555; font-style: italic; white-space: pre-wrap;">${summary.headTeacherComment || ""}</p>
+        <p class="label">HEAD TEACHER'S COMMENT:</p>
+        <p class="content">${summary.headTeacherComment || ""}</p>
       </div>
 
       <!-- FOOTER -->
       <div class="footer">
-        <div class="signature-block">
-          ${school.headTeacherStampUrl ? `<img src="${school.headTeacherStampUrl}" alt="School Stamp" class="stamp-img" />` : ""}
+        
+        <!-- Stamp -->
+        <div class="footer-block">
+          <div class="footer-img-container">
+            ${school.headTeacherStampUrl ? `<img src="${school.headTeacherStampUrl}" alt="School Stamp" />` : ""}
+          </div>
           <div class="line">School Stamp</div>
         </div>
-        <div class="signature-block">
-          ${school.headTeacherSignatureUrl ? `<img src="${school.headTeacherSignatureUrl}" alt="Head Teacher Signature" class="signature-img" />` : ""}
+
+        <!-- Signature -->
+        <div class="footer-block">
+          <div class="footer-img-container">
+            ${school.headTeacherSignatureUrl ? `<img src="${school.headTeacherSignatureUrl}" alt="Head Teacher Signature" />` : ""}
+          </div>
           <div class="line">${school.headTeacherName || "Head Teacher"}</div>
         </div>
-        <div class="signature-block">
-          <div class="line">Date</div>
+
+        <!-- Date -->
+        <div class="footer-block">
+          <div class="footer-img-container" style="align-items: flex-end; padding-bottom: 2px;">
+            <!-- Blank space to match image heights so the lines align -->
+          </div>
+          <div class="line">Date: ${new Date().toLocaleDateString("en-GB")}</div>
         </div>
+
       </div>
     </body>
     </html>

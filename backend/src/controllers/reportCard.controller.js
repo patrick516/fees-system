@@ -209,6 +209,38 @@ const downloadReportCard = async (req, res) => {
       },
     });
 
+    // 🎯 AUTO-APPLY head teacher comment based on final grade
+    const avgMark =
+      parseFloat(overallGrade) ||
+      parseFloat(
+        myResults.length > 0 ? (totalMarks / myResults.length).toFixed(1) : 0,
+      );
+    let autoHeadTeacherComment = "";
+
+    const isExcellent =
+      (typeof overallGrade === "number" && overallGrade <= 3) ||
+      overallGrade === "A" ||
+      avgMark >= 75;
+
+    const isFail =
+      (typeof overallGrade === "number" && overallGrade >= 7) ||
+      overallGrade === "F" ||
+      avgMark < 50;
+
+    if (isExcellent) {
+      autoHeadTeacherComment =
+        student.school.commentExcellent ||
+        "Excellent performance. Keep up the outstanding work!";
+    } else if (!isFail) {
+      autoHeadTeacherComment =
+        student.school.commentGood ||
+        "Good effort. You can achieve even more next term.";
+    } else {
+      autoHeadTeacherComment =
+        student.school.commentFail ||
+        "Needs serious improvement. Please work harder next term.";
+    }
+
     const summary = {
       totalStudents: classSize,
       totalMarks,
@@ -219,7 +251,8 @@ const downloadReportCard = async (req, res) => {
       overallGrade: overallGrade,
       result: "PROMOTED",
       classTeacherComment: reportComment?.classTeacherComment || "",
-      headTeacherComment: reportComment?.headTeacherComment || "",
+      headTeacherComment:
+        reportComment?.headTeacherComment || autoHeadTeacherComment,
     };
 
     const html = generateReportCardHTML({

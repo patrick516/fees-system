@@ -146,25 +146,10 @@ export default function GradeEntryModal({
       return;
     }
 
-    if (e.key === "ArrowRight") {
-      goRight();
-      return;
-    }
-
-    if (e.key === "ArrowLeft") {
-      goLeft();
-      return;
-    }
-
-    if (e.key === "ArrowDown") {
-      goDown();
-      return;
-    }
-
-    if (e.key === "ArrowUp") {
-      goUp();
-      return;
-    }
+    if (e.key === "ArrowRight") goRight();
+    if (e.key === "ArrowLeft") goLeft();
+    if (e.key === "ArrowDown") goDown();
+    if (e.key === "ArrowUp") goUp();
   };
 
   const handleSave = async () => {
@@ -172,13 +157,13 @@ export default function GradeEntryModal({
     setSaving(true);
 
     try {
-      const payload: any[] = [];
+      const marksPayload: any[] = [];
       for (const student of students) {
         for (const subject of subjects) {
           const key = `${student.id}|${subject.id}`;
           const markVal = marks[key];
           if (markVal !== undefined && markVal !== "") {
-            payload.push({
+            marksPayload.push({
               studentId: student.id,
               subjectId: subject.id,
               mark: parseFloat(markVal),
@@ -187,17 +172,17 @@ export default function GradeEntryModal({
         }
       }
 
-      if (payload.length === 0) {
+      if (marksPayload.length === 0) {
         toast.info("No marks entered to save");
         setSaving(false);
         return;
       }
 
       await api.post(`/schools/exams/${examPeriod.id}/classes/${cls.id}/grid`, {
-        marks: payload,
+        marks: marksPayload,
       });
 
-      toast.success(`${payload.length} marks saved successfully`);
+      toast.success(`${marksPayload.length} marks saved successfully`);
       onSaved();
       onClose();
     } catch (err: any) {
@@ -219,7 +204,7 @@ export default function GradeEntryModal({
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 bg-gray-50 shrink-0">
           <div>
             <h3 className="text-base font-bold text-gray-800 flex items-center gap-2">
               Grade Entry
@@ -267,8 +252,7 @@ export default function GradeEntryModal({
                 No subjects found
               </h4>
               <p className="text-sm text-gray-500 mt-1 max-w-md">
-                You need to add subjects to {cls.name} first before you can
-                enter grades. Go to Classes → Manage Subjects.
+                Add subjects to {cls.name} first via Classes → Manage Subjects.
               </p>
             </div>
           ) : students.length === 0 ? (
@@ -378,7 +362,7 @@ export default function GradeEntryModal({
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <div className="px-6 py-3 border-t border-gray-100 bg-gray-50 text-xs text-gray-500 flex flex-wrap items-center gap-x-4 gap-y-1 shrink-0">
           <span>
             💡 <strong>Tip:</strong>
           </span>

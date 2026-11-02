@@ -112,7 +112,7 @@ const PendingPayments = () => {
                 </div>
                 <div className="text-right">
                   <p className="text-xl font-bold text-gray-800">
-                    MWK {payment.amount.toLocaleString()}
+                    MWK {Number(payment.amount).toLocaleString()}
                   </p>
                   <p className="text-sm text-gray-500">
                     {payment.term?.replace("_", " ")}

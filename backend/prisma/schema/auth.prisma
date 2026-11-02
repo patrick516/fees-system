@@ -84,6 +84,9 @@ model School {
   headTeacherName               String?
   headTeacherSignatureUrl       String?
   headTeacherStampUrl           String?
+  commentExcellent              String? @db.Text
+  commentGood                   String? @db.Text
+  commentFail                   String? @db.Text
   subscriptionStatus            SubscriptionStatus    @default(TRIAL)
   trialEndsAt                   DateTime?
   subscriptionEndsAt            DateTime?
