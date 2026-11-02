@@ -123,16 +123,16 @@ const StudentDetail = () => {
     if (student) {
       fetchSubjects();
     }
-  }, [student?.classId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [student?.class?.id]);
 
   const fetchSubjects = async () => {
     if (!student) return;
     setLoadingSubjects(true);
     try {
       // 1. Get all subjects for the student's class
-      const clsRes = await api.get(
-        `/schools/classes/${student.classId}/subjects`,
-      );
+      const classId = student.class?.id || student.classId;
+      const clsRes = await api.get(`/schools/classes/${classId}/subjects`);
       const allSubjects = clsRes.data.data || [];
 
       // 2. Get this student's dropped subjects
@@ -840,11 +840,15 @@ const StudentDetail = () => {
                   </p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
                   {subjects.map((sub) => (
                     <label
                       key={sub.id}
-                      className="flex items-center gap-3 p-2.5 rounded-lg border border-gray-100 hover:bg-gray-50 cursor-pointer transition-colors"
+                      className={`flex items-center gap-2 p-2 rounded-lg border cursor-pointer transition-colors ${
+                        sub.isTaking
+                          ? "border-gray-100 hover:bg-gray-50"
+                          : "border-red-100 bg-red-50/30"
+                      }`}
                     >
                       <input
                         type="checkbox"
@@ -853,29 +857,34 @@ const StudentDetail = () => {
                           handleToggleSubject(sub.id, e.target.checked)
                         }
                         disabled={togglingSubject === sub.id}
-                        className="w-4 h-4 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer"
+                        className="w-3.5 h-3.5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500 cursor-pointer shrink-0"
                       />
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0">
                         <p
-                          className={`text-sm ${sub.isTaking ? "font-medium text-gray-800" : "text-gray-400 line-through"}`}
+                          className={`text-xs truncate ${
+                            sub.isTaking
+                              ? "font-medium text-gray-800"
+                              : "text-gray-400 line-through"
+                          }`}
+                          title={sub.name}
                         >
                           {sub.name}
                         </p>
                         {sub.code && (
-                          <p className="text-[11px] text-gray-400 font-mono">
+                          <p className="text-[10px] text-gray-400 font-mono leading-tight">
                             {sub.code}
                           </p>
                         )}
                       </div>
                       {!sub.isTaking && (
-                        <span className="text-[10px] font-semibold uppercase text-red-500 bg-red-50 px-2 py-0.5 rounded-full">
+                        <span className="text-[9px] font-semibold uppercase text-red-500 bg-red-50 px-1.5 py-0.5 rounded shrink-0">
                           Dropped
                         </span>
                       )}
                       {togglingSubject === sub.id && (
                         <Loader2
-                          size={14}
-                          className="animate-spin text-indigo-400"
+                          size={12}
+                          className="animate-spin text-indigo-400 shrink-0"
                         />
                       )}
                     </label>

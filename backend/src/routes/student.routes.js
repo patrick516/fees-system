@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const multer = require("multer");
+const prisma = require("../config/db");
 
 //  IMPORTS (all at the top)
 const {
@@ -116,24 +117,34 @@ router.put(
   updateStudentType,
 );
 
-//  GET /api/students/:id/subjects
-// Returns only the subjects this student has dropped (isTaking: false)
 router.get("/:id/subjects", verifyStaff, async (req, res) => {
   try {
+    //  First verify the student belongs to this school (security)
+    const student = await prisma.student.findFirst({
+      where: { id: req.params.id, schoolId: req.schoolId },
+      select: { id: true },
+    });
+    if (!student) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
+    }
+
+    //  No relation filter needed — just fetch dropped subjects
     const dropped = await prisma.studentSubject.findMany({
       where: {
         studentId: req.params.id,
         isTaking: false,
-        student: { schoolId: req.schoolId },
       },
       select: { subjectId: true },
     });
+
     res.json({ success: true, data: dropped });
   } catch (err) {
+    console.error("[GET /:id/subjects] error:", err.message);
     res.status(500).json({ success: false, message: "Failed to load" });
   }
 });
-
 //  PUT /api/students/:id/subjects/:subjectId
 // Toggles whether a student is taking a subject
 router.put(
