@@ -12,13 +12,12 @@ const schoolController = require("../controllers/school.controller");
 
 const upload = multer({ storage: multer.memoryStorage() });
 
-// ==================== PUBLIC ROUTES (No Auth) ====================
-// These MUST be at the top so they aren't shadowed by /:id
 router.get("/tiers", schoolController.getPublicTiers);
 router.get("/public", schoolController.getPublicSchool);
 router.get("/public/:schoolId", schoolController.getPublicInfo);
 router.get("/lookup-by-email", schoolController.lookupByEmail);
 router.get("/by-slug/:slug", schoolController.getBySlug);
+router.get("/search", schoolController.searchPublicSchools);
 
 router.get("/payment-info/:schoolId", async (req, res) => {
   try {

@@ -226,12 +226,28 @@ app.use("/api/group", groupRoutes);
 app.use("/api/parent/support", parentSupportRoutes);
 app.use("/api/platform/support", platformSupportRoutes);
 
-// Schools routes need special handling: block everything EXCEPT the subscription pay route
+// Schools routes need special handling: public routes bypass subscription lock,
+// protected routes get the subscription check
 app.use(
   "/api/schools",
   (req, res, next) => {
-    // Allow the subscription payment endpoint even if locked
-    if (req.path === "/subscription/pay") return next();
+    // 🎯 Public routes — no auth, no subscription needed
+    // (parent login school search, branding lookups, payment info, subscription pay)
+    const publicPaths = [
+      "/search",
+      "/tiers",
+      "/public",
+      "/lookup-by-email",
+      "/by-slug",
+      "/payment-info",
+      "/subscription/pay",
+    ];
+
+    const isPublic = publicPaths.some(
+      (p) => req.path === p || req.path.startsWith(p + "/"),
+    );
+
+    if (isPublic) return next();
     requireActiveSubscription(req, res, next);
   },
   schoolRoutes,

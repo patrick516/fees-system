@@ -1138,6 +1138,31 @@ const saveExamGrid = async (req, res) => {
   }
 };
 
+// 🎯 Public school search (for parent login selector)
+// GET /api/schools/search?q=stance
+const searchPublicSchools = async (req, res) => {
+  try {
+    const { q } = req.query;
+    if (!q || String(q).trim().length < 2) {
+      return res.json({ success: true, data: [] });
+    }
+
+    const schools = await prisma.school.findMany({
+      where: {
+        isActive: true,
+        name: { contains: String(q).trim(), mode: "insensitive" },
+      },
+      select: { id: true, name: true, slug: true },
+      take: 10,
+    });
+
+    return res.json({ success: true, data: schools });
+  } catch (err) {
+    console.error("searchPublicSchools error:", err);
+    return res.status(500).json({ success: false, message: "Search failed" });
+  }
+};
+
 module.exports = {
   getSettings,
   updateSettings,
@@ -1161,4 +1186,5 @@ module.exports = {
   deleteClassSubject,
   getExamGrid,
   saveExamGrid,
+  searchPublicSchools,
 };
