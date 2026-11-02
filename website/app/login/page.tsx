@@ -1,5 +1,5 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Loader2, ChevronRight, Search, School, Check } from "lucide-react";
 import api from "../../lib/axios";
@@ -7,7 +7,7 @@ import { useAuthStore } from "../../store/authStore";
 
 type LoginMethod = "student-id" | "phone";
 
-export default function LoginPage() {
+function LoginPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { login } = useAuthStore();
@@ -598,5 +598,19 @@ export default function LoginPage() {
         SchoolPay Malawi © {new Date().getFullYear()}
       </p>
     </div>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-white">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--color-primary)]" />
+        </div>
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
   );
 }
