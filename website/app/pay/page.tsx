@@ -87,7 +87,7 @@ export default function PayPage() {
         value: "AIRTEL_MONEY",
         label: "Airtel",
         accountName: paymentInfo.airtelMoneyName || "",
-        iconUrl: "/images/AirtelMoney.webp",
+        iconUrl: "/images/AirtMoney.jpeg",
       });
     }
 
