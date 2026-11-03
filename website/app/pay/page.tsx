@@ -8,13 +8,9 @@ import {
   Loader2,
   X,
   Zap,
-  FileImage,
   Smartphone,
   AlertCircle,
   Building2,
-  Wallet,
-  Landmark,
-  ChevronRight,
 } from "lucide-react";
 import api from "../../lib/axios";
 import { useAuthStore } from "../../store/authStore";
@@ -24,18 +20,8 @@ import PayOnlineModal from "../../components/PayOnlineModal";
 
 type PayMode = "online" | "receipt";
 
-const BANK_METHODS = [
-  "NATIONAL_BANK",
-  "STANDARD_BANK",
-  "FDH_BANK",
-  "NBS_BANK",
-  "OTHER_BANK",
-];
-
-// 🎯 Helper to format numbers with commas (e.g., 2000 -> 2,000)
 const formatAmount = (val: string) => {
   if (!val) return "";
-  // Remove all non-digits
   const clean = val.replace(/[^0-9]/g, "");
   if (!clean) return "";
   return Number(clean).toLocaleString("en-US");
@@ -45,7 +31,7 @@ export default function PayPage() {
   const router = useRouter();
   const { isAuthenticated, student, _hasHydrated } = useAuthStore();
 
-  const [mode, setMode] = useState<PayMode>("receipt");
+  const [mode, setMode] = useState<PayMode | null>(null);
 
   const [form, setForm] = useState({
     amount: "",
@@ -59,7 +45,7 @@ export default function PayPage() {
 
   const [receiptFile, setReceiptFile] = useState<File | null>(null);
   const [receiptPreview, setReceiptPreview] = useState<string | null>(null);
-  const [receiptMethod, setReceiptMethod] = useState("AIRTEL_MONEY");
+  const [receiptMethod, setReceiptMethod] = useState("");
   const [bankReference, setBankReference] = useState("");
 
   const [showOnlineModal, setShowOnlineModal] = useState(false);
@@ -70,69 +56,59 @@ export default function PayPage() {
 
   const { academicYear: activeYear, activeTerm: currentTerm } = useActiveTerm();
 
+  // Build the list of available manual methods (Bank, Airtel, TNM)
+  // Build the list of available manual methods (Bank, Airtel, TNM)
   const availablePaymentMethods = useMemo(() => {
     if (!paymentInfo) return [];
     const methods = [];
 
-    //  Airtel Money — always shown if school has saved a number
-    if (paymentInfo.airtelMoneyNumber) {
-      methods.push({
-        value: "AIRTEL_MONEY",
-        label: `Airtel Money · ${paymentInfo.airtelMoneyNumber}`,
-        icon: Smartphone,
-        color: "red",
-      });
-    }
-
-    // 🎯 TNM Mpamba — always shown if school has saved a number
-    if (paymentInfo.mpambaNumber) {
-      methods.push({
-        value: "TNM_MPAMBA",
-        label: `TNM Mpamba · ${paymentInfo.mpambaNumber}`,
-        icon: Smartphone,
-        color: "amber",
-      });
-    }
-
-    // 🎯 Every bank account the school has saved
+    // 1. Banks First
     if (paymentInfo.bankAccounts && paymentInfo.bankAccounts.length > 0) {
       paymentInfo.bankAccounts.forEach((bank: any) => {
-        // Convert bankName to the enum value the backend expects
         let enumVal = bank.bankName.toUpperCase().replace(/\s+/g, "_");
-        if (!BANK_METHODS.includes(enumVal)) enumVal = "OTHER_BANK";
 
-        // Include the bank name + branch in the label so the user knows which account
-        const label = bank.branch
-          ? `${bank.bankName} · ${bank.branch}`
-          : bank.bankName;
+        let displayName = bank.bankName;
+        if (displayName.toLowerCase().includes("national bank")) {
+          displayName = "NBM";
+        }
 
         methods.push({
           value: enumVal,
-          label,
-          icon: Landmark,
-          color: "blue",
+          label: displayName,
+          accountName: bank.accountName,
+          iconUrl: bank.logoUrl || null,
         });
       });
     }
 
-    // Fallback if the school hasn't saved any payment details yet
-    if (methods.length === 0) {
+    // 2. Mobile Money
+    if (paymentInfo.airtelMoneyNumber) {
       methods.push({
-        value: "OTHER_BANK",
-        label: "Bank Transfer",
-        icon: Landmark,
-        color: "blue",
+        value: "AIRTEL_MONEY",
+        label: "Airtel",
+        accountName: paymentInfo.airtelMoneyName || "",
+        iconUrl: "/images/AirtelMoney.webp",
+      });
+    }
+
+    if (paymentInfo.mpambaNumber) {
+      methods.push({
+        value: "TNM_MPAMBA",
+        label: "Mpamba",
+        accountName: paymentInfo.mpambaName || "",
+        iconUrl: "/images/TNMPAMBA.jpeg",
       });
     }
 
     return methods;
   }, [paymentInfo]);
 
+  // Automatically select the first manual method if they choose "receipt" mode
   useEffect(() => {
-    if (availablePaymentMethods.length > 0) {
+    if (availablePaymentMethods.length > 0 && !receiptMethod) {
       setReceiptMethod(availablePaymentMethods[0].value);
     }
-  }, [availablePaymentMethods]);
+  }, [availablePaymentMethods, receiptMethod]);
 
   useEffect(() => {
     if (!_hasHydrated) return;
@@ -188,7 +164,6 @@ export default function PayPage() {
   const handleReceiptSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isUploadingRef.current) return;
-
     setError("");
 
     const amount = parseFloat(form.amount);
@@ -286,7 +261,7 @@ export default function PayPage() {
 
   return (
     <div className="min-h-screen bg-white pb-40">
-      {/* ============ HEADER (WHITE, CENTERED) ============ */}
+      {/* HEADER */}
       <header className="sticky top-0 z-20 bg-white border-b border-gray-100">
         <div className="max-w-lg mx-auto px-4 py-3 relative">
           <button
@@ -303,7 +278,7 @@ export default function PayPage() {
       </header>
 
       <div className="max-w-lg mx-auto px-4 py-4 space-y-4">
-        {/* ============ STUDENT CARD ============ */}
+        {/* STUDENT CARD */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100">
           <div className="flex items-center gap-3">
             <div className="w-14 h-14 bg-blue-50 rounded-full flex items-center justify-center text-[var(--color-primary)] font-bold text-xl shrink-0">
@@ -320,7 +295,7 @@ export default function PayPage() {
           </div>
         </div>
 
-        {/* ============ FEE SUMMARY ============ */}
+        {/* FEE SUMMARY */}
         <div>
           <h2 className="text-sm font-bold text-gray-900 mb-3 px-1">
             Term Summary
@@ -339,14 +314,7 @@ export default function PayPage() {
             !termStatusLoading &&
             termStatus.termStatus.hasFeeStructure && (
               <div className="grid grid-cols-3 gap-2">
-                {/* Required */}
                 <div className="bg-blue-50 rounded-2xl p-3 border border-blue-100">
-                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center mb-2">
-                    <ArrowLeft
-                      size={14}
-                      className="text-blue-700 rotate-[-90deg]"
-                    />
-                  </div>
                   <p className="text-[10px] font-semibold text-blue-700 uppercase tracking-wide">
                     Required
                   </p>
@@ -357,12 +325,7 @@ export default function PayPage() {
                     ).toLocaleString()}
                   </p>
                 </div>
-
-                {/* Paid */}
                 <div className="bg-emerald-50 rounded-2xl p-3 border border-emerald-100">
-                  <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center mb-2">
-                    <CheckCircle size={14} className="text-emerald-700" />
-                  </div>
                   <p className="text-[10px] font-semibold text-emerald-700 uppercase tracking-wide">
                     Paid
                   </p>
@@ -373,12 +336,7 @@ export default function PayPage() {
                     ).toLocaleString()}
                   </p>
                 </div>
-
-                {/* Balance */}
                 <div className="bg-amber-50 rounded-2xl p-3 border border-amber-100">
-                  <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center mb-2">
-                    <Wallet size={14} className="text-amber-700" />
-                  </div>
                   <p className="text-[10px] font-semibold text-amber-700 uppercase tracking-wide">
                     Balance
                   </p>
@@ -393,7 +351,7 @@ export default function PayPage() {
             )}
         </div>
 
-        {/* ============ AMOUNT INPUT ============ */}
+        {/* AMOUNT INPUT */}
         <div>
           <h2 className="text-sm font-bold text-gray-900 mb-3 px-1">
             How much are you paying?
@@ -419,7 +377,7 @@ export default function PayPage() {
           </div>
         </div>
 
-        {/* ============ ERROR ============ */}
+        {/* ERROR */}
         {error && (
           <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-2xl text-sm flex items-start gap-2">
             <AlertCircle size={16} className="shrink-0 mt-0.5" />
@@ -427,303 +385,266 @@ export default function PayPage() {
           </div>
         )}
 
-        {/* ============ PAYMENT MODE TABS ============ */}
-        <div>
-          <h2 className="text-sm font-bold text-gray-900 mb-3 px-1">
-            How did you pay?
+        {/* ============ PAYMENT FLOW ============ */}
+        <div className="space-y-3">
+          <h2 className="text-sm font-bold text-gray-900 mb-1 px-1">
+            Select Payment Method
           </h2>
-          <div className="bg-gray-100 rounded-2xl p-1 grid grid-cols-2 gap-1">
-            <button
-              onClick={() => setMode("receipt")}
-              className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                mode === "receipt"
-                  ? "bg-[var(--color-primary)] text-white shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              <FileImage size={14} /> Bank Transfer
-            </button>
-            <button
-              onClick={() => setMode("online")}
-              className={`flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-semibold transition-all ${
-                mode === "online"
-                  ? "bg-[var(--color-primary)] text-white shadow-sm"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              <Zap size={14} /> Pay Online
-            </button>
-          </div>
-        </div>
 
-        {/* ============ RECEIPT MODE ============ */}
-        {mode === "receipt" && (
-          <div className="space-y-4">
-            {/* Method selection — dynamic based on what school has saved */}
-            <div className="space-y-2">
-              {availablePaymentMethods.map((m) => {
-                const Icon = m.icon;
-                const isActive = receiptMethod === m.value;
-                return (
-                  <button
-                    key={m.value}
-                    type="button"
-                    onClick={() => setReceiptMethod(m.value)}
-                    className={`w-full flex items-center justify-between gap-3 p-4 rounded-2xl border-2 transition-all ${
-                      isActive
-                        ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white shadow-sm"
-                        : "border-gray-200 bg-white text-gray-700 hover:border-gray-300"
-                    }`}
-                  >
-                    <div className="flex items-center gap-3 min-w-0">
-                      <Icon
-                        size={20}
-                        className={isActive ? "text-white" : "text-gray-500"}
-                      />
-                      <span className="text-sm font-semibold truncate">
-                        {m.label}
-                      </span>
-                    </div>
-                    {isActive ? (
-                      <CheckCircle size={20} className="shrink-0" />
-                    ) : (
-                      <ChevronRight
-                        size={18}
-                        className="text-gray-400 shrink-0"
-                      />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* Reference input */}
-            <input
-              value={bankReference}
-              onChange={(e) => setBankReference(e.target.value)}
-              placeholder="Transaction reference (optional)"
-              className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors"
-            />
-
-            {/* Receipt upload */}
-            {!receiptPreview ? (
-              <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-2xl cursor-pointer hover:border-[var(--color-primary)] hover:bg-blue-50/30 transition-all">
-                <Upload size={22} className="text-gray-400 mb-1.5" />
-                <p className="text-sm font-semibold text-gray-600">
-                  Upload Receipt
-                </p>
-                <p className="text-[10px] text-gray-400 mt-0.5">
-                  JPG, PNG or PDF • max 5MB
-                </p>
-                <input
-                  type="file"
-                  accept="image/*,.pdf"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  capture="environment"
-                />
-              </label>
-            ) : (
-              <div className="relative">
-                {receiptFile?.type === "application/pdf" ? (
-                  <div className="w-full h-56 rounded-2xl border border-gray-200 overflow-hidden bg-gray-50">
-                    <embed
-                      src={receiptPreview || undefined}
-                      type="application/pdf"
-                      className="w-full h-full"
-                    />
-                  </div>
-                ) : (
-                  <img
-                    src={receiptPreview}
-                    alt="Receipt preview"
-                    className="w-full h-48 object-cover rounded-2xl border border-gray-200"
-                  />
-                )}
+          {/* HORIZONTAL SCROLLING LIST (SQUEEZED) */}
+          <div className="flex overflow-x-auto gap-2 pb-2 snap-x hide-scrollbar">
+            {availablePaymentMethods.map((m) => {
+              const isActive = mode === "receipt" && receiptMethod === m.value;
+              return (
                 <button
+                  key={m.value}
                   type="button"
-                  onClick={clearReceipt}
-                  className="absolute top-2 right-2 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 shadow-md"
-                  aria-label="Remove receipt"
+                  onClick={() => {
+                    setMode("receipt");
+                    setReceiptMethod(m.value);
+                  }}
+                  className={`relative flex-shrink-0 flex flex-col items-center justify-center gap-1 p-2 w-[80px] h-[84px] rounded-2xl border-2 transition-all snap-start ${
+                    isActive
+                      ? "border-[var(--color-primary)] bg-blue-50 shadow-sm"
+                      : "border-gray-200 bg-white hover:border-gray-300"
+                  }`}
                 >
-                  <X size={14} />
-                </button>
-                <p className="text-[11px] text-gray-500 mt-2 text-center truncate px-8">
-                  {receiptFile?.name}
-                </p>
-              </div>
-            )}
+                  {/* 🎯 Dynamic Logo or Fallback Icon */}
+                  {m.iconUrl ? (
+                    <img
+                      src={m.iconUrl}
+                      alt={m.label}
+                      className="w-8 h-8 object-contain mb-0.5"
+                    />
+                  ) : (
+                    <Building2 size={24} className="text-gray-500 mb-0.5" />
+                  )}
 
-            {/* 🎯 Step-by-step payment instructions */}
-            {paymentInfo && (
-              <div className="space-y-3">
-                <h3 className="text-sm font-bold text-gray-900 px-1">
-                  How to pay
-                </h3>
+                  <span
+                    className={`text-[10px] font-bold text-center leading-tight line-clamp-2 ${isActive ? "text-[var(--color-primary)]" : "text-gray-700"}`}
+                  >
+                    {m.label}
+                  </span>
 
-                {/* Airtel Money */}
-                {paymentInfo.airtelMoneyNumber && (
-                  <div className="bg-white border border-gray-200 rounded-2xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-7 h-7 rounded-lg bg-red-100 flex items-center justify-center">
-                        <Smartphone size={14} className="text-red-600" />
-                      </div>
-                      <p className="text-sm font-bold text-gray-900">
-                        Airtel Money
-                      </p>
-                    </div>
-                    <ol className="text-xs text-gray-600 space-y-1 pl-4 list-decimal">
-                      <li>
-                        Dial <strong>*211#</strong> on your phone
-                      </li>
-                      <li>
-                        Select <strong>1. Send Money</strong>
-                      </li>
-                      <li>
-                        Select <strong>OneKhusa</strong>
-                      </li>
-                      <li>
-                        Enter account number:{" "}
-                        <strong className="font-mono">
-                          {paymentInfo.airtelMoneyNumber}
-                        </strong>
-                      </li>
-                      <li>
-                        Enter amount:{" "}
-                        <strong>MWK {amountNum.toLocaleString() || "0"}</strong>
-                      </li>
-                      <li>
-                        Reference: <strong>{student?.studentCode}</strong>
-                      </li>
-                      <li>Confirm with your PIN</li>
-                    </ol>
-                  </div>
-                )}
-
-                {/* TNM Mpamba */}
-                {paymentInfo.mpambaNumber && (
-                  <div className="bg-white border border-gray-200 rounded-2xl p-4">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-7 h-7 rounded-lg bg-amber-100 flex items-center justify-center">
-                        <Smartphone size={14} className="text-amber-600" />
-                      </div>
-                      <p className="text-sm font-bold text-gray-900">
-                        TNM Mpamba
-                      </p>
-                    </div>
-                    <ol className="text-xs text-gray-600 space-y-1 pl-4 list-decimal">
-                      <li>
-                        Dial <strong>*444#</strong> on your phone
-                      </li>
-                      <li>
-                        Select <strong>1. Send Money</strong>
-                      </li>
-                      <li>
-                        Select <strong>OneKhusa</strong>
-                      </li>
-                      <li>
-                        Enter account number:{" "}
-                        <strong className="font-mono">
-                          {paymentInfo.mpambaNumber}
-                        </strong>
-                      </li>
-                      <li>
-                        Enter amount:{" "}
-                        <strong>MWK {amountNum.toLocaleString() || "0"}</strong>
-                      </li>
-                      <li>
-                        Reference: <strong>{student?.studentCode}</strong>
-                      </li>
-                      <li>Confirm with your PIN</li>
-                    </ol>
-                  </div>
-                )}
-
-                {/* Bank Transfer */}
-                {paymentInfo.bankAccounts &&
-                  paymentInfo.bankAccounts.length > 0 && (
-                    <div className="bg-white border border-gray-200 rounded-2xl p-4">
-                      <div className="flex items-center gap-2 mb-2">
-                        <div className="w-7 h-7 rounded-lg bg-blue-100 flex items-center justify-center">
-                          <Landmark size={14} className="text-blue-600" />
-                        </div>
-                        <p className="text-sm font-bold text-gray-900">
-                          Bank Transfer
-                        </p>
-                      </div>
-                      <div className="text-xs text-gray-600 space-y-1.5">
-                        {paymentInfo.bankAccounts.map(
-                          (bank: any, i: number) => (
-                            <div key={i} className="space-y-0.5">
-                              <p>
-                                <strong>{bank.bankName}</strong>
-                                {bank.branch ? ` · ${bank.branch}` : ""}
-                              </p>
-                              <p>
-                                Account:{" "}
-                                <strong className="font-mono">
-                                  {bank.accountNumber}
-                                </strong>
-                              </p>
-                            </div>
-                          ),
-                        )}
-                        <p className="pt-1 border-t border-gray-200">
-                          Reference:{" "}
-                          <strong className="font-mono">
-                            {student?.studentCode}
-                          </strong>
-                        </p>
-                        <p className="text-[11px] text-gray-500 pt-1">
-                          Upload the receipt below after transferring.
-                        </p>
-                      </div>
+                  {isActive && (
+                    <div className="absolute top-1 right-1 bg-white rounded-full">
+                      <CheckCircle
+                        size={14}
+                        className="text-[var(--color-primary)]"
+                      />
                     </div>
                   )}
-              </div>
-            )}
-          </div>
-        )}
+                </button>
+              );
+            })}
 
-        {/* ============ ONLINE MODE ============ */}
-        {mode === "online" && (
-          <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 space-y-3">
-            <div className="flex items-start gap-3">
-              <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
-                <Smartphone size={18} className="text-emerald-700" />
-              </div>
-              <div>
-                <h3 className="text-sm font-bold text-emerald-900">
-                  Instant Payment
-                </h3>
-                <p className="text-[11px] text-emerald-700 mt-0.5 leading-relaxed">
-                  Pay with Airtel Money or TNM Mpamba. You'll receive a prompt
-                  on your phone — no receipt upload needed.
+            {/* 2. PAY ONLINE LAST */}
+            <button
+              type="button"
+              onClick={() => setMode("online")}
+              className={`relative flex-shrink-0 flex flex-col items-center justify-center gap-1.5 p-2 w-[76px] h-[80px] rounded-2xl border-2 transition-all snap-start ${
+                mode === "online"
+                  ? "border-emerald-500 bg-emerald-50 shadow-sm"
+                  : "border-gray-200 bg-white hover:border-gray-300"
+              }`}
+            >
+              <img
+                src="/images/payonline.png"
+                alt="Online"
+                className="w-7 h-7 object-contain mb-0.5"
+              />
+              <span
+                className={`text-[10px] font-bold text-center leading-tight ${mode === "online" ? "text-emerald-700" : "text-gray-700"}`}
+              >
+                OnlinePay
+              </span>
+              {mode === "online" && (
+                <CheckCircle
+                  size={14}
+                  className="absolute top-1 right-1 text-emerald-500"
+                />
+              )}
+            </button>
+          </div>
+
+          {/* EMPTY STATE IF NO METHODS EXIST */}
+          {availablePaymentMethods.length === 0 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 text-center mt-2">
+              <AlertCircle size={20} className="text-amber-600 mx-auto mb-2" />
+              <p className="text-sm font-semibold text-amber-900">
+                No manual methods available
+              </p>
+              <p className="text-xs text-amber-700 mt-1">
+                Your school has not added bank or mobile money details yet.
+              </p>
+            </div>
+          )}
+        </div>
+
+        {/* 3. DYNAMIC FORMS BASED ON SELECTION */}
+        <div className="pt-2">
+          {/* IF RECEIPT MODE IS SELECTED */}
+          {mode === "receipt" && (
+            <div className="space-y-4 animate-fade-in">
+              {/* Compact Payment Details */}
+              {/* Compact Payment Details */}
+              <div className="bg-blue-50 border border-blue-100 rounded-2xl p-4">
+                <p className="text-xs font-semibold text-blue-900 mb-2">
+                  Send payment to:
+                </p>
+
+                {/* 🎯 Dynamic rendering based on selection */}
+                {availablePaymentMethods.find((m) => m.value === receiptMethod)
+                  ?.accountName && (
+                  <p className="text-sm text-blue-900 font-bold mb-1 border-b border-blue-200 pb-1">
+                    Name:{" "}
+                    {
+                      availablePaymentMethods.find(
+                        (m) => m.value === receiptMethod,
+                      )?.accountName
+                    }
+                  </p>
+                )}
+
+                {receiptMethod === "AIRTEL_MONEY" &&
+                  paymentInfo?.airtelMoneyNumber && (
+                    <p className="text-sm text-blue-800">
+                      Airtel:{" "}
+                      <strong className="font-mono bg-white px-1 rounded">
+                        {paymentInfo.airtelMoneyNumber}
+                      </strong>
+                    </p>
+                  )}
+                {receiptMethod === "TNM_MPAMBA" &&
+                  paymentInfo?.mpambaNumber && (
+                    <p className="text-sm text-blue-800">
+                      Mpamba:{" "}
+                      <strong className="font-mono bg-white px-1 rounded">
+                        {paymentInfo.mpambaNumber}
+                      </strong>
+                    </p>
+                  )}
+                {receiptMethod.includes("BANK") &&
+                  paymentInfo?.bankAccounts && (
+                    <div className="space-y-1">
+                      {paymentInfo.bankAccounts
+                        .filter(
+                          (b: any) =>
+                            b.bankName.toUpperCase().replace(/\s+/g, "_") ===
+                            receiptMethod,
+                        )
+                        .map((b: any, i: number) => (
+                          <p key={i} className="text-sm text-blue-800">
+                            Account:{" "}
+                            <strong className="font-mono bg-white px-1 rounded">
+                              {b.accountNumber}
+                            </strong>
+                          </p>
+                        ))}
+                    </div>
+                  )}
+                <p className="text-xs text-blue-700 mt-3 pt-2 border-t border-blue-200">
+                  Reference:{" "}
+                  <strong className="font-mono">{student?.studentCode}</strong>
                 </p>
               </div>
+
+              <input
+                value={bankReference}
+                onChange={(e) => setBankReference(e.target.value)}
+                placeholder="Transaction reference / Receipt No. (optional)"
+                className="w-full px-4 py-3.5 border-2 border-gray-200 rounded-2xl text-sm focus:outline-none focus:border-[var(--color-primary)] transition-colors"
+              />
+
+              {!receiptPreview ? (
+                <label className="flex flex-col items-center justify-center w-full h-28 border-2 border-dashed border-gray-300 rounded-2xl cursor-pointer hover:border-[var(--color-primary)] hover:bg-blue-50/30 transition-all">
+                  <Upload size={22} className="text-gray-400 mb-1.5" />
+                  <p className="text-sm font-semibold text-gray-600">
+                    Upload Receipt
+                  </p>
+                  <p className="text-[10px] text-gray-400 mt-0.5">
+                    JPG, PNG or PDF • max 5MB
+                  </p>
+                  <input
+                    type="file"
+                    accept="image/*,.pdf"
+                    onChange={handleFileChange}
+                    className="hidden"
+                    capture="environment"
+                  />
+                </label>
+              ) : (
+                <div className="relative">
+                  {receiptFile?.type === "application/pdf" ? (
+                    <div className="w-full h-56 rounded-2xl border border-gray-200 overflow-hidden bg-gray-50">
+                      <embed
+                        src={receiptPreview || undefined}
+                        type="application/pdf"
+                        className="w-full h-full"
+                      />
+                    </div>
+                  ) : (
+                    <img
+                      src={receiptPreview}
+                      alt="Receipt preview"
+                      className="w-full h-48 object-cover rounded-2xl border border-gray-200"
+                    />
+                  )}
+                  <button
+                    type="button"
+                    onClick={clearReceipt}
+                    className="absolute top-2 right-2 w-8 h-8 bg-red-600 text-white rounded-full flex items-center justify-center hover:bg-red-700 shadow-md"
+                  >
+                    <X size={14} />
+                  </button>
+                  <p className="text-[11px] text-gray-500 mt-2 text-center truncate px-8">
+                    {receiptFile?.name}
+                  </p>
+                </div>
+              )}
             </div>
-            <div className="space-y-1.5 pt-2 border-t border-emerald-200">
-              <div className="flex items-center gap-2 text-xs text-emerald-800">
-                <CheckCircle size={12} className="shrink-0" />
-                <span>Payment confirms automatically in seconds</span>
+          )}
+
+          {/* IF ONLINE MODE IS SELECTED */}
+          {mode === "online" && (
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 space-y-3 animate-fade-in">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                  <Smartphone size={18} className="text-emerald-700" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-emerald-900">
+                    Instant Payment
+                  </h3>
+                  <p className="text-[11px] text-emerald-700 mt-0.5 leading-relaxed">
+                    Pay instantly with Airtel Money or TNM Mpamba. Click the
+                    green button below to generate a prompt on your phone.
+                  </p>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-xs text-emerald-800">
-                <CheckCircle size={12} className="shrink-0" />
-                <span>Balance updates instantly</span>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-emerald-800">
-                <CheckCircle size={12} className="shrink-0" />
-                <span>Receipt sent via SMS & email</span>
+              <div className="space-y-1.5 pt-2 border-t border-emerald-200">
+                <div className="flex items-center gap-2 text-xs text-emerald-800">
+                  <CheckCircle size={12} className="shrink-0" />
+                  <span>Payment confirms automatically in seconds</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-emerald-800">
+                  <CheckCircle size={12} className="shrink-0" />
+                  <span>Balance updates instantly</span>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-emerald-800">
+                  <CheckCircle size={12} className="shrink-0" />
+                  <span>Receipt sent via SMS &amp; email</span>
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
-      {/* ============ STICKY BOTTOM BAR ============ */}
+      {/* STICKY BOTTOM BAR */}
       <div className="fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-gray-100 p-4">
         <div className="max-w-lg mx-auto">
-          {mode === "receipt" ? (
+          {mode === "receipt" && (
             <button
               type="button"
               onClick={handleReceiptSubmit}
@@ -740,7 +661,9 @@ export default function PayPage() {
                 </>
               )}
             </button>
-          ) : (
+          )}
+
+          {mode === "online" && (
             <button
               type="button"
               onClick={handlePayOnlineClick}
@@ -751,6 +674,15 @@ export default function PayPage() {
               {canPayOnline
                 ? `Pay MWK ${amountNum.toLocaleString()} Online`
                 : "Enter an amount to continue"}
+            </button>
+          )}
+
+          {!mode && (
+            <button
+              disabled
+              className="w-full flex items-center justify-center gap-2 bg-gray-200 text-gray-400 py-3.5 rounded-2xl font-bold text-sm cursor-not-allowed"
+            >
+              Select a payment method above
             </button>
           )}
         </div>

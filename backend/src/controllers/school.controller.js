@@ -43,7 +43,22 @@ const getSettings = async (req, res) => {
 
 const updateSettings = async (req, res) => {
   try {
-    const { name, address, city, phone, email, motto, primaryColor } = req.body;
+    const {
+      name,
+      address,
+      city,
+      phone,
+      email,
+      motto,
+      primaryColor,
+      // 🎯 Added Payment Details here
+      bankAccounts,
+      airtelMoneyNumber,
+      airtelMoneyName,
+      mpambaNumber,
+      mpambaName,
+      paymentInstructions,
+    } = req.body;
 
     // Auto-generate a slug the first time a school is saved, if it doesn't have one yet
     const existing = await prisma.school.findUnique({
@@ -78,6 +93,13 @@ const updateSettings = async (req, res) => {
         ...(email !== undefined && { email }),
         ...(motto !== undefined && { motto }),
         ...(primaryColor !== undefined && { primaryColor }),
+        ...(bankAccounts !== undefined && { bankAccounts }),
+        ...(airtelMoneyNumber !== undefined && { airtelMoneyNumber }),
+        ...(airtelMoneyName !== undefined && { airtelMoneyName }),
+        ...(mpambaNumber !== undefined && { mpambaNumber }),
+        ...(mpambaName !== undefined && { mpambaName }),
+        ...(paymentInstructions !== undefined && { paymentInstructions }),
+
         ...slugUpdate,
       },
     });
@@ -89,7 +111,21 @@ const updateSettings = async (req, res) => {
         action: "SCHOOL_SETTINGS_UPDATED",
         entity: "School",
         entityId: req.schoolId,
-        changes: { name, address, city, phone, email, motto, primaryColor },
+        changes: {
+          name,
+          address,
+          city,
+          phone,
+          email,
+          motto,
+          primaryColor,
+          bankAccounts,
+          airtelMoneyNumber,
+          airtelMoneyName,
+          mpambaNumber,
+          mpambaName,
+          paymentInstructions,
+        },
       },
     });
 
