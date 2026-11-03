@@ -693,7 +693,23 @@ const getStudentResults = async (req, res) => {
     const totalMarks = results.reduce((sum, r) => sum + r.mark, 0);
     const gradingSystem = student.class.gradingSystem;
 
-    // 🎯 Compute class ranking with tie-breaker
+    //  FIX: If points are missing, calculate them on the fly using the saved boundaries
+    if (gradingSystem === "POINTS") {
+      const boundaries = await prisma.gradeBoundary.findMany({
+        where: { schoolId: req.student.schoolId, system: "POINTS" },
+      });
+
+      if (boundaries.length > 0) {
+        results.forEach((r) => {
+          if (r.gradePoint === null || r.gradePoint === undefined) {
+            const { gradePoint, gradeLabel } = resolveGrade(r.mark, boundaries);
+            r.gradePoint = gradePoint;
+            r.gradeLabel = gradeLabel;
+          }
+        });
+      }
+    }
+    //  Compute class ranking with tie-breaker
     const classMates = await prisma.student.findMany({
       where: {
         schoolId: req.student.schoolId,

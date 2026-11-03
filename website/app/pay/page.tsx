@@ -182,10 +182,35 @@ export default function PayPage() {
       const formData = new FormData();
       formData.append("studentId", student?.id || "");
       formData.append("amount", form.amount);
-      formData.append("paymentMethod", receiptMethod);
+
+      // 🎯 FIX: Map custom bank names to "OTHER_BANK" to satisfy Prisma Enums
+      const BANK_ENUMS = [
+        "NATIONAL_BANK",
+        "STANDARD_BANK",
+        "FDH_BANK",
+        "NBS_BANK",
+      ];
+      let safePaymentMethod = receiptMethod;
+
+      if (receiptMethod !== "AIRTEL_MONEY" && receiptMethod !== "TNM_MPAMBA") {
+        if (!BANK_ENUMS.includes(receiptMethod)) {
+          safePaymentMethod = "OTHER_BANK";
+        }
+      }
+
+      formData.append("paymentMethod", safePaymentMethod); // Now it will be "OTHER_BANK"
+
       formData.append("term", form.term);
       formData.append("academicYear", form.academicYear);
       if (bankReference) formData.append("bankReference", bankReference);
+
+      const selectedMethod = availablePaymentMethods.find(
+        (m) => m.value === receiptMethod,
+      );
+      if (selectedMethod && safePaymentMethod === "OTHER_BANK") {
+        formData.append("notes", `Paid via ${selectedMethod.label}`);
+      }
+
       formData.append("receipt", receiptFile);
 
       await api.post("/payments/submit", formData, {
