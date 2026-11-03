@@ -1,421 +1,616 @@
 "use client";
-import { useEffect, useState } from "react";
-import Link from "next/link";
-import {
-  ArrowRight,
-  CheckCircle,
-  X,
-  PlayCircle,
-  Settings,
-  Rocket,
-  School,
-} from "lucide-react";
+import { useState, useRef, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Loader2, ChevronRight, Search, School, Check } from "lucide-react";
 import api from "../lib/axios";
+import { useAuthStore } from "../store/authStore";
 
-import DashboardPreview from "../components/marketing/DashboardPreview";
-import StatsTicker from "../components/marketing/StatsTicker";
-import FeaturesGrid from "../components/marketing/FeaturesGrid";
-import PricingCard, { type Tier } from "../components/marketing/PricingCard";
+type LoginMethod = "student-id" | "phone";
 
-export default function HomePage() {
-  const [showDemoModal, setShowDemoModal] = useState(false);
+function LoginPageInner() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const { login } = useAuthStore();
+
+  //  School selection state
+  const [schoolSlug, setSchoolSlug] = useState<string>("");
+  const [schoolName, setSchoolName] = useState<string>("");
+  const [schoolSearch, setSchoolSearch] = useState("");
+  const [schoolResults, setSchoolResults] = useState<any[]>([]);
+  const [searchingSchools, setSearchingSchools] = useState(false);
+  const [showSchoolPicker, setShowSchoolPicker] = useState(false);
+
+  const [method, setMethod] = useState<LoginMethod>("student-id");
   const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [selectedTier, setSelectedTier] = useState<string>("SMALL");
+  const [error, setError] = useState("");
 
-  // 🎯 Dynamic tiers fetched from backend
-  const [tiers, setTiers] = useState<Tier[]>([]);
-  const [loadingTiers, setLoadingTiers] = useState(true);
+  // Student ID login
+  const [studentCode, setStudentCode] = useState("");
+  const [dobDay, setDobDay] = useState("");
+  const [dobMonth, setDobMonth] = useState("");
+  const [dobYear, setDobYear] = useState("");
+  const dayRef = useRef<HTMLInputElement>(null);
+  const monthRef = useRef<HTMLInputElement>(null);
+  const yearRef = useRef<HTMLInputElement>(null);
 
-  const [form, setForm] = useState({
-    name: "",
-    email: "",
-    schoolName: "",
-    phone: "",
-  });
+  // Phone OTP login
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [otpSent, setOtpSent] = useState(false);
+  const [otpLoading, setOtpLoading] = useState(false);
 
-  // 🎯 Fetch tiers from backend on mount
+  // 🎯 On mount: use ?school= URL param or localStorage from last visit
   useEffect(() => {
-    api
-      .get("/schools/tiers")
-      .then((res) => setTiers(res.data.data || []))
-      .catch(() => setTiers([]))
-      .finally(() => setLoadingTiers(false));
-  }, []);
+    const urlSlug = searchParams?.get("school");
+    const storedSlug = localStorage.getItem("parent_school_slug");
+    const storedName = localStorage.getItem("parent_school_name");
+    const initialSlug = urlSlug || storedSlug || "";
 
-  // 🎯 Opens modal AND sets the correct tier
-  const openModalWithTier = (tierId: string) => {
-    setSelectedTier(tierId);
-    setSuccess(false);
-    setShowDemoModal(true);
+    if (initialSlug) {
+      setSchoolSlug(initialSlug);
+      setSchoolName(storedName || "");
+      api
+        .get(`/schools/by-slug/${initialSlug}`)
+        .then((res) => {
+          setSchoolName(res.data.data.name);
+          localStorage.setItem("parent_school_slug", initialSlug);
+          localStorage.setItem("parent_school_name", res.data.data.name);
+        })
+        .catch(() => {});
+    } else {
+      setShowSchoolPicker(true);
+    }
+  }, [searchParams]);
+
+  // 🎯 Debounced school search
+  useEffect(() => {
+    if (!schoolSearch || schoolSearch.trim().length < 2) {
+      setSchoolResults([]);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setSearchingSchools(true);
+      try {
+        const res = await api.get(
+          `/schools/search?q=${encodeURIComponent(schoolSearch.trim())}`,
+        );
+        setSchoolResults(res.data.data || []);
+      } catch {
+        setSchoolResults([]);
+      } finally {
+        setSearchingSchools(false);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [schoolSearch]);
+
+  const selectSchool = (school: any) => {
+    setSchoolSlug(school.slug);
+    setSchoolName(school.name);
+    setShowSchoolPicker(false);
+    setSchoolSearch("");
+    setSchoolResults([]);
+    localStorage.setItem("parent_school_slug", school.slug);
+    localStorage.setItem("parent_school_name", school.name);
   };
 
-  // 🎯 Get dynamic label for the selected tier (for the modal banner)
-  const getTierLabel = (tierId: string): string => {
-    const tier = tiers.find((t) => t.id === tierId);
-    if (!tier) return tierId;
-    const limit =
-      tier.maxStudents >= 99999
-        ? "Unlimited students"
-        : `Up to ${tier.maxStudents.toLocaleString()} students`;
-    return `${tier.name} (${limit})`;
+  const changeSchool = () => {
+    setShowSchoolPicker(true);
+    setSchoolSlug("");
+    setSchoolName("");
+    localStorage.removeItem("parent_school_slug");
+    localStorage.removeItem("parent_school_name");
   };
 
-  const handleBookDemo = async (e: React.FormEvent) => {
+  const onlyDigits = (v: string) => v.replace(/\D/g, "");
+
+  const handleDobDay = (raw: string) => {
+    let v = onlyDigits(raw).slice(0, 2);
+    if (v.length === 1 && Number(v) > 3) v = "0" + v;
+    if (v.length === 2 && Number(v) > 31) v = "31";
+    if (v === "00") v = "01";
+    setDobDay(v);
+    if (v.length === 2) monthRef.current?.focus();
+  };
+
+  const handleDobMonth = (raw: string) => {
+    let v = onlyDigits(raw).slice(0, 2);
+    if (v.length === 1 && Number(v) > 1) v = "0" + v;
+    if (v.length === 2 && Number(v) > 12) v = "12";
+    if (v === "00") v = "01";
+    setDobMonth(v);
+    if (v.length === 2) yearRef.current?.focus();
+  };
+
+  const handleDobYear = (raw: string) => {
+    setDobYear(onlyDigits(raw).slice(0, 4));
+  };
+
+  const dobBackspace = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    current: string,
+    prev?: React.RefObject<HTMLInputElement | null>,
+  ) => {
+    if (e.key === "Backspace" && current === "") prev?.current?.focus();
+  };
+
+  const handleStudentIdLogin = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
+
+    if (!schoolSlug) {
+      setError("Please select your school first.");
+      return;
+    }
+
+    const d = Number(dobDay);
+    const m = Number(dobMonth);
+    const y = Number(dobYear);
+    const dobDate = new Date(y, m - 1, d);
+    const dobValid =
+      dobDay.length === 2 &&
+      dobMonth.length === 2 &&
+      dobYear.length === 4 &&
+      y >= 1950 &&
+      dobDate.getFullYear() === y &&
+      dobDate.getMonth() === m - 1 &&
+      dobDate.getDate() === d &&
+      dobDate <= new Date();
+
+    if (!dobValid) {
+      setError("Please enter a valid date of birth (DD-MM-YYYY)");
+      return;
+    }
+
     setLoading(true);
     try {
-      await api.post("/school-requests", {
-        ...form,
-        tier: selectedTier,
-      });
-      setSuccess(true);
-    } catch (err) {
-      alert("Something went wrong. Please try again.");
+      const res = await api.post(
+        `/auth/parent/login-student-id?school=${schoolSlug}`,
+        {
+          studentCode: studentCode.toUpperCase().trim(),
+          dateOfBirth: `${dobYear}-${dobMonth}-${dobDay}`,
+        },
+      );
+      const { token, student } = res.data.data;
+      login(token, student);
+      router.push("/dashboard");
+    } catch (err: any) {
+      setError(
+        err.response?.data?.message ||
+          "Login failed. Please check your details.",
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  // Default tier for hero "Book a Demo" — use popular or first
-  const defaultTier = (): string => {
-    if (tiers.length === 0) return "SMALL";
-    const explicit = tiers.find((t) => t.popular === true);
-    if (explicit) return explicit.id;
-    if (tiers.length > 1) return tiers[Math.floor(tiers.length / 2)].id;
-    return tiers[0].id;
+  const handleRequestOTP = async () => {
+    if (!phone.trim()) return;
+    if (!schoolSlug) {
+      setError("Please select your school first.");
+      return;
+    }
+    setError("");
+    setOtpLoading(true);
+    try {
+      await api.post(`/auth/parent/request-otp?school=${schoolSlug}`, {
+        phone: `+265${phone}`,
+      });
+      setOtpSent(true);
+    } catch (err: any) {
+      setError(
+        err.response?.data?.message ||
+          "Failed to send code. Check your number.",
+      );
+    } finally {
+      setOtpLoading(false);
+    }
+  };
+
+  const handleVerifyOTP = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    setLoading(true);
+    try {
+      const res = await api.post(
+        `/auth/parent/verify-otp?school=${schoolSlug}`,
+        {
+          phone: `+265${phone}`,
+          otp,
+        },
+      );
+      const { token, student } = res.data.data;
+      login(token, student);
+      router.push("/dashboard");
+    } catch (err: any) {
+      setError(
+        err.response?.data?.message || "Invalid code. Please try again.",
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="min-h-screen bg-white font-sans overflow-x-hidden">
-      {/* Navbar */}
-      <nav className="bg-white/90 backdrop-blur-md border-b border-gray-100 px-6 py-3 flex justify-between items-center sticky top-0 z-50">
-        <div className="flex items-center gap-3">
-          <img
-            src="/images/SchoolPayLogo.jpg"
-            alt="SchoolPay"
-            className="h-10 w-10 object-contain rounded-lg shadow-sm"
-          />
-          <span className="text-xl font-bold text-gray-900 tracking-tight">
-            SchoolPay
-          </span>
-        </div>
-        <div className="flex items-center gap-6">
-          <Link
-            href="#features"
-            className="text-sm font-medium text-gray-600 hover:text-gray-900 hidden md:block"
-          >
-            Features
-          </Link>
-          <Link
-            href="#pricing"
-            className="text-sm font-medium text-gray-600 hover:text-gray-900 hidden md:block"
-          >
-            Pricing
-          </Link>
-          <Link
-            href="/login"
-            className="text-sm font-semibold text-[var(--color-primary)] bg-[var(--color-primary-light)] px-5 py-2 rounded-full hover:bg-[var(--color-primary)] hover:text-white transition-all"
-          >
-            Parent Login
-          </Link>
-        </div>
-      </nav>
-
-      {/* Hero */}
-      <header className="max-w-6xl mx-auto px-6 pt-16 pb-8 text-center relative z-10">
-        <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-blue-50 text-blue-700 font-medium text-xs mb-5 border border-blue-100 shadow-sm">
-          <span className="w-2 h-2 rounded-full bg-blue-600 animate-pulse" />
-          Trusted by schools across Malawi
-        </div>
-        <h1 className="text-4xl md:text-6xl font-extrabold text-gray-900 tracking-tight leading-[1.1] mb-5">
-          Simple, secure <br />
-          <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--color-primary)] to-blue-500">
-            school fee management
-          </span>
+    <div className="min-h-screen bg-white flex flex-col items-center justify-center px-4 py-10">
+      {/* Logo */}
+      <div className="mb-6 flex flex-col items-center animate-fade-in">
+        <img
+          src="/images/SchoolPayLogo.jpg"
+          alt="SchoolPay"
+          className="h-20 w-20 object-contain rounded-2xl bg-white p-2 shadow-lg mb-4"
+        />
+        <h1 className="text-3xl font-bold text-gray-900 tracking-tight">
+          SchoolPay
         </h1>
-        <p className="text-base md:text-lg text-gray-600 max-w-2xl mx-auto mb-8 leading-relaxed">
-          Collect fees online, track debtors instantly, and generate financial
-          reports with one click. Built specifically for Malawian schools.
+        <p className="text-sm text-gray-400 mt-1">
+          Parent &amp; Guardian Portal
         </p>
-        <div className="flex flex-col sm:flex-row justify-center gap-3">
-          <button
-            onClick={() => openModalWithTier(defaultTier())}
-            className="flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-[var(--color-primary-dark)] transition-all shadow-lg hover:shadow-xl hover:-translate-y-0.5"
-          >
-            Book a Free Demo <ArrowRight size={18} />
-          </button>
-          <a
-            href="https://fees-system-one.vercel.app/login"
-            className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-8 py-3.5 rounded-xl text-base font-semibold hover:bg-gray-50 transition-all shadow-sm"
-          >
-            School Admin Login
-          </a>
-        </div>
-      </header>
-
-      <div className="relative z-10 pb-16 px-4">
-        <DashboardPreview />
       </div>
 
-      <StatsTicker />
-
-      {/* 🎯 Free Pilot Banner - UPDATED COPY */}
-      <section className="bg-[var(--color-primary-light)] border-b border-[var(--color-primary)]/20 py-10">
-        <div className="max-w-5xl mx-auto px-6 flex flex-col md:flex-row items-center justify-between gap-6">
-          <div>
-            <h2 className="text-2xl font-bold text-[var(--color-primary-dark)] mb-2">
-              Try SchoolPay free for one full term.
-            </h2>
-            <p className="text-sm text-[var(--color-primary)] max-w-2xl leading-relaxed">
-              Claim your school portal and take full control. Set up your
-              classes, fee structures, and student lists in minutes using our
-              guided onboarding wizard. Use the full system completely free for
-              one term. If it's not for you, export your data and walk away.
-            </p>
-          </div>
-          <button
-            onClick={() => openModalWithTier(defaultTier())}
-            className="shrink-0 bg-white text-[var(--color-primary)] px-6 py-3 rounded-xl font-bold shadow-sm hover:shadow-md transition-all border border-gray-200"
-          >
-            Claim Your Pilot
-          </button>
-        </div>
-      </section>
-
-      <FeaturesGrid />
-
-      {/* How it works */}
-      <section className="py-16 bg-gray-50 border-t border-gray-100">
-        <div className="max-w-7xl mx-auto px-6">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-3">
-              How it works
-            </h2>
-            <p className="text-gray-600">
-              From demo to live in a few simple steps.
-            </p>
-          </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6">
-            {[
-              {
-                step: "1",
-                title: "30-Minute Demo",
-                desc: "We visit your school (or do a video call) to show you how it works.",
-                icon: PlayCircle,
-              },
-              {
-                step: "2",
-                title: "Get Your Portal",
-                desc: "We invite your admin email to the platform. You log in and set up your own classes, fees, and students.",
-                icon: Settings,
-              },
-              {
-                step: "3",
-                title: "Free Pilot Term",
-                desc: "Use the full system free for one full term. No commitment.",
-                icon: School,
-              },
-              {
-                step: "4",
-                title: "Go Live",
-                desc: "If you love it, you continue on the termly plan. We handle the rest.",
-                icon: Rocket,
-              },
-            ].map((item, i) => (
-              <div
-                key={i}
-                className="bg-white p-4 md:p-6 rounded-xl border border-gray-100 shadow-sm relative"
-              >
-                <div className="absolute -top-3 -left-3 w-8 h-8 bg-[var(--color-primary)] text-white rounded-full flex items-center justify-center font-bold text-sm border-4 border-white shadow-sm">
-                  {item.step}
-                </div>
-                <item.icon
-                  size={24}
-                  className="text-[var(--color-primary)] mb-4 mt-2"
+      <div className="w-full max-w-sm bg-white border border-gray-200 rounded-2xl p-6 animate-fade-in-up">
+        {/* 🎯 School selector */}
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+            Your Child&apos;s School
+          </label>
+          {schoolSlug && !showSchoolPicker ? (
+            <div className="flex items-center justify-between px-3 py-2.5 bg-blue-50 border border-blue-300 rounded-xl">
+              <div className="flex items-center gap-2 min-w-0">
+                <School
+                  size={16}
+                  className="text-[var(--color-primary)] shrink-0"
                 />
-                <h3 className="font-bold text-gray-900 mb-2">{item.title}</h3>
-                <p className="text-xs text-gray-600 leading-relaxed">
-                  {item.desc}
-                </p>
+                <span className="text-sm font-medium text-[var(--color-primary-dark)] truncate">
+                  {schoolName || schoolSlug}
+                </span>
               </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/*  Dynamic Pricing Section */}
-      <PricingCard
-        tiers={tiers}
-        loading={loadingTiers}
-        onSelectTier={openModalWithTier}
-      />
-
-      {/* Footer */}
-      <footer className="bg-gray-900 text-gray-400 py-10 text-center text-sm border-t border-gray-800">
-        <div className="flex justify-center items-center gap-3 mb-3">
-          <div className="h-10 w-10 rounded-lg bg-white p-1 flex items-center justify-center shadow-sm">
-            <img
-              src="/images/SchoolPayLogo.jpg"
-              alt="SchoolPay"
-              className="h-full w-full object-contain"
-            />
-          </div>
-          <span className="text-white font-bold text-lg">SchoolPay</span>
-        </div>
-        <p>
-          © {new Date().getFullYear()} Tranptech Group. All rights reserved.
-        </p>
-        <p className="mt-1">A product of Tranptech Systems. Built in Malawi.</p>
-        <div className="flex justify-center gap-4 mt-4 text-xs">
-          <a href="#" className="hover:text-white transition-colors">
-            Privacy Policy
-          </a>
-          <a href="#" className="hover:text-white transition-colors">
-            Terms of Service
-          </a>
-          <a
-            href="mailto:kulinjipatricks@gmail.com"
-            className="hover:text-white transition-colors"
-          >
-            Contact Support
-          </a>
-        </div>
-      </footer>
-
-      {/* 🎯 MODAL */}
-      {showDemoModal && (
-        <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 backdrop-blur-sm"
-          onClick={() => setShowDemoModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl w-full max-w-md p-6 shadow-2xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {success ? (
-              <div className="text-center py-8">
-                <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle size={32} className="text-green-600" />
+              <button
+                type="button"
+                onClick={changeSchool}
+                className="text-xs text-[var(--color-primary)] hover:underline shrink-0"
+              >
+                Change
+              </button>
+            </div>
+          ) : (
+            <div className="relative">
+              <div className="flex items-center gap-2 px-3 py-2.5 border border-gray-300 rounded-xl focus-within:border-[var(--color-primary)] focus-within:ring-2 focus-within:ring-[var(--color-primary)]">
+                <Search size={16} className="text-gray-400 shrink-0" />
+                <input
+                  type="text"
+                  value={schoolSearch}
+                  onChange={(e) => setSchoolSearch(e.target.value)}
+                  placeholder="Type your school name (e.g. Stance)"
+                  className="flex-1 bg-transparent text-sm outline-none text-gray-900 placeholder-gray-400"
+                  autoFocus
+                />
+                {searchingSchools && (
+                  <Loader2
+                    size={14}
+                    className="animate-spin text-gray-400 shrink-0"
+                  />
+                )}
+              </div>
+              {schoolSearch.length >= 2 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-xl shadow-lg max-h-56 overflow-y-auto z-10">
+                  {schoolResults.length === 0 && !searchingSchools ? (
+                    <p className="px-4 py-3 text-xs text-gray-500">
+                      No schools found. Try a different name.
+                    </p>
+                  ) : (
+                    schoolResults.map((s) => (
+                      <button
+                        key={s.id}
+                        type="button"
+                        onClick={() => selectSchool(s)}
+                        className="w-full flex items-center gap-2 px-4 py-2.5 hover:bg-gray-50 text-left border-b border-gray-100 last:border-b-0"
+                      >
+                        <Check size={14} className="text-gray-300 shrink-0" />
+                        <span className="text-sm text-gray-800">{s.name}</span>
+                      </button>
+                    ))
+                  )}
                 </div>
-                <h3 className="text-xl font-bold text-gray-900 mb-2">
-                  Request Received!
-                </h3>
-                <p className="text-sm text-gray-500 mb-6">
-                  We've got your details for the{" "}
-                  <strong>{getTierLabel(selectedTier)}</strong> plan. Our team
-                  will review it and email your school login link{" "}
-                  <strong>within 24 hours</strong>.
-                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Login forms — only show when school selected */}
+        {schoolSlug && (
+          <>
+            <div className="relative flex bg-gray-100 rounded-xl p-1 mb-6">
+              <span
+                className={`absolute top-1 bottom-1 w-[calc(50%-0.25rem)] rounded-lg bg-white shadow-sm transition-transform duration-300 ease-out ${
+                  method === "student-id"
+                    ? "translate-x-0"
+                    : "translate-x-[calc(100%+0.5rem)]"
+                }`}
+                aria-hidden
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  setMethod("student-id");
+                  setError("");
+                }}
+                className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
+                  method === "student-id"
+                    ? "text-[var(--color-primary)]"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Student ID
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setMethod("phone");
+                  setError("");
+                }}
+                className={`relative z-10 flex-1 py-2 text-sm font-medium rounded-lg transition-colors duration-300 ${
+                  method === "phone"
+                    ? "text-[var(--color-primary)]"
+                    : "text-gray-500 hover:text-gray-700"
+                }`}
+              >
+                Phone Number
+              </button>
+            </div>
+
+            <div
+              className={`overflow-hidden transition-all duration-300 ease-out ${
+                error ? "max-h-40 opacity-100 mb-4" : "max-h-0 opacity-0 mb-0"
+              }`}
+            >
+              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
+                {error}
+              </div>
+            </div>
+
+            {method === "student-id" && (
+              <form
+                onSubmit={handleStudentIdLogin}
+                className="space-y-4 animate-fade-in"
+                key="student-id"
+              >
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Student ID
+                  </label>
+                  <input
+                    type="text"
+                    value={studentCode}
+                    onChange={(e) => {
+                      const clean = e.target.value
+                        .toUpperCase()
+                        .replace(/[\u2010-\u2015]/g, "-")
+                        .replace(/[^A-Z0-9\-]/g, "");
+                      setStudentCode(clean);
+                    }}
+                    placeholder="eg. CISF32026003 or CIS-F3-2026-003"
+                    required
+                    className="w-full px-4 py-3 border border-gray-300 rounded-xl text-sm font-mono text-gray-900 placeholder-gray-400 outline-none transition-all duration-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                  />
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    Enter the ID with or without hyphens — both work
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Child&apos;s Date of Birth
+                  </label>
+                  <div className="w-full flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-xl text-sm transition-all duration-300 focus-within:ring-2 focus-within:ring-[var(--color-primary)] focus-within:border-transparent">
+                    <input
+                      ref={dayRef}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="DD"
+                      value={dobDay}
+                      onChange={(e) => handleDobDay(e.target.value)}
+                      maxLength={2}
+                      autoComplete="off"
+                      className="w-14 py-1 text-center text-base bg-transparent border-0 outline-none ring-0 focus:ring-0 text-gray-900 placeholder-gray-400"
+                    />
+                    <span className="text-gray-400">-</span>
+                    <input
+                      ref={monthRef}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="MM"
+                      value={dobMonth}
+                      onChange={(e) => handleDobMonth(e.target.value)}
+                      onKeyDown={(e) => dobBackspace(e, dobMonth, dayRef)}
+                      maxLength={2}
+                      autoComplete="off"
+                      className="w-14 py-1 text-center text-base bg-transparent border-0 outline-none ring-0 focus:ring-0 text-gray-900 placeholder-gray-400"
+                    />
+                    <span className="text-gray-400">-</span>
+                    <input
+                      ref={yearRef}
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="YYYY"
+                      value={dobYear}
+                      onChange={(e) => handleDobYear(e.target.value)}
+                      onKeyDown={(e) => dobBackspace(e, dobYear, monthRef)}
+                      maxLength={4}
+                      autoComplete="off"
+                      className="w-20 py-1 text-center text-base bg-transparent border-0 outline-none ring-0 focus:ring-0 text-gray-900 placeholder-gray-400"
+                    />
+                  </div>
+                </div>
+
                 <button
-                  onClick={() => {
-                    setShowDemoModal(false);
-                    setSuccess(false);
-                    setForm({ name: "", email: "", schoolName: "", phone: "" });
-                  }}
-                  className="w-full bg-[var(--color-primary)] text-white py-3 rounded-xl font-semibold"
+                  type="submit"
+                  disabled={loading}
+                  className="group w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-3 rounded-xl font-medium text-sm transition-all duration-300 hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Done
+                  {loading ? (
+                    <>
+                      <Loader2 size={16} className="animate-spin" /> Signing
+                      in...
+                    </>
+                  ) : (
+                    <>
+                      View My Child&apos;s Account
+                      <ChevronRight
+                        size={16}
+                        className="transition-transform duration-300 group-hover:translate-x-0.5"
+                      />
+                    </>
+                  )}
                 </button>
-              </div>
-            ) : (
-              <>
-                <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-lg font-bold text-gray-900">
-                    Request Your School Account
-                  </h3>
-                  <button
-                    onClick={() => setShowDemoModal(false)}
-                    className="text-gray-400 hover:text-gray-700"
-                  >
-                    <X size={20} />
-                  </button>
-                </div>
-
-                {/* 🎯 Dynamic tier banner */}
-                <div className="bg-[var(--color-primary-light)] border border-[var(--color-primary)]/20 p-3 rounded-xl mb-4">
-                  <p className="text-[10px] font-semibold text-[var(--color-primary-dark)] uppercase tracking-wide mb-0.5">
-                    Selected Plan
-                  </p>
-                  <p className="text-sm font-bold text-[var(--color-primary)]">
-                    {getTierLabel(selectedTier)}
-                  </p>
-                </div>
-
-                <p className="text-xs text-gray-500 mb-4">
-                  Fill in your details below. Once submitted, our team will
-                  review your request and email your login link{" "}
-                  <strong>within 24 hours</strong>.
-                </p>
-
-                <form onSubmit={handleBookDemo} className="space-y-3">
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Your Name *
-                    </label>
-                    <input
-                      required
-                      value={form.name}
-                      onChange={(e) =>
-                        setForm({ ...form, name: e.target.value })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      School Name *
-                    </label>
-                    <input
-                      required
-                      value={form.schoolName}
-                      onChange={(e) =>
-                        setForm({ ...form, schoolName: e.target.value })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Email Address *
-                    </label>
-                    <input
-                      type="email"
-                      required
-                      value={form.email}
-                      onChange={(e) =>
-                        setForm({ ...form, email: e.target.value })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-gray-700 mb-1">
-                      Phone Number *
-                    </label>
-                    <input
-                      type="tel"
-                      required
-                      value={form.phone}
-                      onChange={(e) =>
-                        setForm({ ...form, phone: e.target.value })
-                      }
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-[var(--color-primary)] text-white py-3 rounded-xl font-semibold mt-2 disabled:opacity-50"
-                  >
-                    {loading ? "Sending Request..." : "Submit Request"}
-                  </button>
-                </form>
-              </>
+              </form>
             )}
-          </div>
-        </div>
-      )}
+
+            {method === "phone" && (
+              <div className="space-y-4 animate-fade-in" key="phone">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                    Phone Number
+                  </label>
+                  <div className="flex gap-2">
+                    <div
+                      className={`flex-1 flex items-stretch border rounded-xl overflow-hidden transition-all duration-200 ${
+                        otpSent
+                          ? "bg-gray-50 border-gray-200"
+                          : "bg-white border-gray-300 focus-within:border-[var(--color-primary)] focus-within:shadow-[0_0_0_3px_var(--color-primary-ring)]"
+                      }`}
+                    >
+                      <span
+                        className={`flex items-center pl-4 pr-1 text-sm font-medium select-none ${
+                          otpSent ? "text-gray-500" : "text-gray-700"
+                        }`}
+                      >
+                        +265
+                      </span>
+                      <input
+                        type="tel"
+                        inputMode="numeric"
+                        value={phone}
+                        onChange={(e) =>
+                          setPhone(
+                            e.target.value.replace(/\D/g, "").slice(0, 9),
+                          )
+                        }
+                        placeholder="991234567"
+                        disabled={otpSent}
+                        className={`flex-1 pr-4 py-3 bg-transparent text-sm outline-none ring-0 focus:ring-0 focus:outline-none rounded-none ${
+                          otpSent
+                            ? "text-gray-500 cursor-not-allowed"
+                            : "text-gray-900 placeholder-gray-300"
+                        }`}
+                      />
+                    </div>
+                    {!otpSent && (
+                      <button
+                        type="button"
+                        onClick={handleRequestOTP}
+                        disabled={otpLoading || phone.length < 9}
+                        className="px-4 py-3 bg-[var(--color-primary)] text-white rounded-xl text-sm font-medium transition-all duration-300 hover:bg-[var(--color-primary-dark)] disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap flex items-center justify-center min-w-[92px]"
+                      >
+                        {otpLoading ? (
+                          <Loader2 size={16} className="animate-spin" />
+                        ) : (
+                          "Send Code"
+                        )}
+                      </button>
+                    )}
+                  </div>
+                  <p className="text-xs text-gray-400 mt-1.5">
+                    Use the phone number registered with the school
+                  </p>
+                </div>
+
+                <div
+                  className={`overflow-hidden transition-all duration-500 ease-out ${
+                    otpSent ? "max-h-[500px] opacity-100" : "max-h-0 opacity-0"
+                  }`}
+                >
+                  <form onSubmit={handleVerifyOTP} className="space-y-4 pt-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                        Verification Code
+                      </label>
+                      <input
+                        type="text"
+                        value={otp}
+                        onChange={(e) =>
+                          setOtp(e.target.value.replace(/\D/g, ""))
+                        }
+                        placeholder="Enter 6-digit code"
+                        maxLength={6}
+                        required
+                        autoFocus
+                        className="w-full px-4 py-3 border border-gray-300 rounded-xl text-center text-lg font-mono tracking-[0.5em] text-gray-900 placeholder-gray-300 outline-none transition-all duration-300 focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent"
+                      />
+                      <p className="text-xs text-gray-400 mt-1.5 text-center">
+                        Code sent to +265{phone}
+                      </p>
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={loading || otp.length < 6}
+                      className="group w-full flex items-center justify-center gap-2 bg-[var(--color-primary)] text-white py-3 rounded-xl font-medium text-sm transition-all duration-300 hover:bg-[var(--color-primary-dark)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 size={16} className="animate-spin" />{" "}
+                          Verifying...
+                        </>
+                      ) : (
+                        <>
+                          Verify &amp; Continue
+                          <ChevronRight
+                            size={16}
+                            className="transition-transform duration-300 group-hover:translate-x-0.5"
+                          />
+                        </>
+                      )}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtpSent(false);
+                        setOtp("");
+                        setPhone("");
+                      }}
+                      className="w-full text-sm text-gray-500 hover:text-gray-800 transition-colors duration-300"
+                    >
+                      Use a different number
+                    </button>
+                  </form>
+                </div>
+              </div>
+            )}
+
+            <p className="text-center text-xs text-gray-400 mt-6">
+              Having trouble? Contact your school office.
+            </p>
+          </>
+        )}
+      </div>
+
+      <p className="text-xs text-gray-400 mt-6">
+        SchoolPay Malawi © {new Date().getFullYear()}
+      </p>
     </div>
+  );
+}
+//testing the file
+export default function LoginPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-white">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-[var(--color-primary)]" />
+        </div>
+      }
+    >
+      <LoginPageInner />
+    </Suspense>
   );
 }
