@@ -555,12 +555,22 @@ const getStudent = async (req, res) => {
 
     const netRequired = Math.max(0, baseRequired - currentDiscount);
     let outstandingBalance = 0;
+    let calculatedCredit = 0;
     let isDebtor = false;
 
     if (netRequired > 0) {
-      outstandingBalance = Math.max(0, netRequired - totalPaid);
-      isDebtor = outstandingBalance > 0;
+      if (totalPaid > netRequired) {
+        // 🎯 Calculate the overpayment as credit
+        calculatedCredit = totalPaid - netRequired;
+        outstandingBalance = 0;
+      } else {
+        outstandingBalance = Math.max(0, netRequired - totalPaid);
+        isDebtor = outstandingBalance > 0;
+      }
     }
+
+    // 🎯 Combine DB credit with newly calculated overpayment
+    const totalCredit = Number(student.creditBalance || 0) + calculatedCredit;
 
     const feeStructures = await prisma.feeStructure.findMany({
       where: {
@@ -575,6 +585,7 @@ const getStudent = async (req, res) => {
       success: true,
       data: {
         ...student,
+        creditBalance: totalCredit,
         summary: {
           totalPaid,
           pendingCount: pendingPayments.length,
@@ -584,6 +595,7 @@ const getStudent = async (req, res) => {
           baseRequired,
           currentDiscount,
           netRequired,
+          creditBalance: totalCredit,
         },
         feeStructures,
       },

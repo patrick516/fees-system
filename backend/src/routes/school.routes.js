@@ -828,12 +828,28 @@ router.get(
           ? feeStructure?.boardingAmount
           : feeStructure?.dayAmount;
       const requiredAmount = feeAmount ? Number(feeAmount) : null;
-      const totalPaidThisTerm = paymentsThisTerm._sum.amount || 0;
-      const balanceRemaining =
-        requiredAmount !== null
-          ? Math.max(0, requiredAmount - totalPaidThisTerm)
-          : null;
+
+      const totalPaidThisTerm = Number(paymentsThisTerm._sum.amount || 0);
+
+      // 🎯 CALCULATE THE REAL OVERPAYMENT
+      let calculatedCredit = 0;
+      let balanceRemaining = null;
+
+      if (requiredAmount !== null) {
+        if (totalPaidThisTerm > requiredAmount) {
+          // They overpaid! The excess is the credit.
+          calculatedCredit = totalPaidThisTerm - requiredAmount;
+          balanceRemaining = 0;
+        } else {
+          // They haven't fully paid, no credit yet
+          balanceRemaining = Math.max(0, requiredAmount - totalPaidThisTerm);
+        }
+      }
+
       const isFullyPaid = balanceRemaining === 0;
+
+      // 🎯 Combine the stored DB credit with the newly calculated overpayment
+      const totalCredit = Number(student.creditBalance || 0) + calculatedCredit;
 
       res.json({
         success: true,
@@ -843,7 +859,7 @@ router.get(
             fullName: student.fullName,
             studentCode: student.studentCode,
             className: student.class.name,
-            creditBalance: student.creditBalance,
+            creditBalance: totalCredit, // Show total credit
           },
           feeStructure: feeStructure
             ? {
@@ -861,12 +877,13 @@ router.get(
             totalPaidThisTerm,
             balanceRemaining,
             isFullyPaid,
-            creditBalance: student.creditBalance,
+            creditBalance: totalCredit,
             hasFeeStructure: !!feeStructure,
           },
         },
       });
     } catch (err) {
+      console.error("student-term-status error:", err);
       res
         .status(500)
         .json({ success: false, message: "Failed to get student term status" });
