@@ -428,11 +428,20 @@ const getStudents = async (req, res) => {
 
       let outstandingBalance = 0;
       let isDebtorStudent = false;
+      let calculatedCredit = 0;
 
       if (netRequired > 0) {
-        outstandingBalance = Math.max(0, netRequired - totalPaid);
-        isDebtorStudent = outstandingBalance > 0;
+        if (totalPaid > netRequired) {
+          calculatedCredit = totalPaid - netRequired;
+          outstandingBalance = 0;
+        } else {
+          outstandingBalance = Math.max(0, netRequired - totalPaid);
+          isDebtorStudent = outstandingBalance > 0;
+        }
       }
+
+      // Combine the stored credit with the newly calculated one
+      const totalCredit = Number(student.creditBalance || 0) + calculatedCredit;
 
       return {
         ...student,
@@ -440,7 +449,7 @@ const getStudents = async (req, res) => {
         requiredAmount: netRequired,
         isDebtor: isDebtorStudent,
         outstandingBalance,
-        creditBalance: Number(student.creditBalance) || 0,
+        creditBalance: totalCredit,
         payments: undefined,
         discounts: undefined,
         class: { id: student.class.id, name: student.class.name },
