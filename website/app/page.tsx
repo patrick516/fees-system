@@ -281,7 +281,7 @@ function LoginPageInner() {
                   type="text"
                   value={schoolSearch}
                   onChange={(e) => setSchoolSearch(e.target.value)}
-                  placeholder="Type your school name (e.g. Stance)"
+                  placeholder="Type your school name "
                   className="flex-1 bg-transparent text-sm outline-none text-gray-900 placeholder-gray-400"
                   autoFocus
                 />
