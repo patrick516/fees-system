@@ -6,7 +6,7 @@ const { sendPlatformSchoolInviteEmail } = require("../lib/mailer");
 
 const INVITE_TTL_DAYS = 7;
 
-// 🎯 Fallback tiers if the platform hasn't configured any yet
+// Fallback tiers if the platform hasn't configured any yet
 const FALLBACK_TIERS = [
   { id: "SMALL", name: "Small School", maxStudents: 150, price: 150000 },
   { id: "MEDIUM", name: "Medium School", maxStudents: 400, price: 250000 },

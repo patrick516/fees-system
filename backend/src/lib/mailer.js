@@ -12,7 +12,8 @@ const LOGO_HEADER = `
     <img src="https://fees-system-one.vercel.app/images/SchoolPayLogo.jpg" alt="SchoolPay" width="64" height="64" style="border-radius: 12px; object-fit: contain;" />
   </div>
 `;
-//  Helper to guess a name from an email if one wasn't provided
+
+// Helper to guess a name from an email if one wasn't provided
 const guessNameFromEmail = (email) => {
   if (!email) return "there";
   let prefix = email.split("@")[0];
@@ -26,9 +27,8 @@ const guessNameFromEmail = (email) => {
   return "there";
 };
 
-//  Add this new bulletproof helper right below it
+// Add this new bulletproof helper right below it
 const resolveName = (providedName, email) => {
-  // If no name provided, or it's just spaces, or it says "undefined" or "there" (from a broken form)
   if (
     !providedName ||
     providedName.trim() === "" ||
@@ -119,7 +119,9 @@ const sendInvitationEmail = async ({
   tempPassword,
   inviteToken,
 }) => {
-  const acceptUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/accept-invite?token=${inviteToken}`;
+  const baseUrl =
+    process.env.CLIENT_URL || "https://fees-system-one.vercel.app";
+  const acceptUrl = `${baseUrl}/accept-invite?token=${inviteToken}`;
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #f8fafc;">
       <div style="background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
@@ -170,63 +172,76 @@ const sendInvitationEmail = async ({
 const sendPlatformSchoolInviteEmail = async ({
   to,
   name,
+  schoolName,
   inviteToken,
   tempPassword,
   expiresInDays = 7,
 }) => {
-  const acceptUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/accept-invite?token=${inviteToken}`;
+  const baseUrl =
+    process.env.CLIENT_URL || "https://fees-system-one.vercel.app";
+  const acceptUrl = `${baseUrl}/accept-invite?token=${inviteToken}`;
+
+  // Smart fallback: If a school name was provided, use it. Otherwise, just say "your account".
+  const schoolGreeting = schoolName
+    ? `<strong>${schoolName}</strong>'s account`
+    : "your account";
+
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #f8fafc;">
       <div style="background: #ffffff; border-radius: 16px; padding: 32px; box-shadow: 0 2px 8px rgba(0,0,0,0.04);">
         
         ${LOGO_HEADER}
 
-        <h2 style="margin: 0 0 8px; color: #1e293b; font-size: 20px;">You're invited to SchoolPay</h2>
-        <p style="margin: 0 0 20px; color: #64748b; font-size: 14px; line-height: 1.5;">
-          Hi ${name || guessNameFromEmail(to)},
+        <h2 style="margin: 0 0 16px; color: #1e293b; font-size: 20px;">Welcome to SchoolPay – Your Account is Ready!</h2>
+        
+        <p style="margin: 0 0 16px; color: #475569; font-size: 14px; line-height: 1.6;">
+          Dear ${name || guessNameFromEmail(to)},
         </p>
-        <p style="margin: 0 0 20px; color: #64748b; font-size: 14px; line-height: 1.5;">
-          You've been invited to set up and manage a school on <strong>SchoolPay</strong>.
-          Click the button below to accept the invitation.
+        
+        <p style="margin: 0 0 16px; color: #475569; font-size: 14px; line-height: 1.6;">
+          I am pleased to inform you that ${schoolGreeting} on SchoolPay has been successfully created! You can now log in and start managing your school fees, students, and staff with ease.
         </p>
 
-        <div style="text-align: center; margin-bottom: 24px;">
-          <a href="${acceptUrl}" style="display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 14px 28px; border-radius: 8px; font-size: 15px; font-weight: 600;">
-            Accept Invitation →
-          </a>
-        </div>
-
-        <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; margin-bottom: 20px;">
-          <p style="margin: 0 0 8px; color: #475569; font-size: 12px; text-transform: uppercase; font-weight: 700; letter-spacing: 0.5px;">
-            Your Temporary Password
+        <h3 style="margin: 24px 0 12px; color: #1e293b; font-size: 16px;">Here are your login details:</h3>
+        
+        <div style="background: #f1f5f9; border-radius: 12px; padding: 16px; margin-bottom: 24px;">
+          <p style="margin: 0 0 8px; color: #475569; font-size: 13px; line-height: 1.5;">
+            <strong>Login URL:</strong> <a href="https://fees-system-one.vercel.app/login" style="color: #1e3a8a;">https://fees-system-one.vercel.app/login</a>
+          </p>
+          <p style="margin: 0 0 8px; color: #475569; font-size: 13px; line-height: 1.5;">
+            <strong>Email:</strong> ${to}
           </p>
           <p style="margin: 0 0 12px; color: #475569; font-size: 13px; line-height: 1.5;">
-            When you click the button above, you will be prompted to enter this temporary password to secure your account:
+            <strong>Temporary Password:</strong> <span style="font-family: 'Courier New', monospace; font-size: 15px; font-weight: 700; color: #1e3a8a;">${tempPassword}</span>
           </p>
-          <p style="margin: 0; font-size: 18px; font-weight: 700; color: #1e3a8a; font-family: 'Courier New', monospace; letter-spacing: 1px; text-align: center;">
-            ${tempPassword}
-          </p>
+          <div style="text-align: center; margin-top: 16px;">
+            <a href="${acceptUrl}" style="display: inline-block; background: #1e3a8a; color: #ffffff; text-decoration: none; padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 600;">
+              Log In & Set Password →
+            </a>
+          </div>
         </div>
 
-        <p style="margin: 0 0 8px; color: #64748b; font-size: 13px; line-height: 1.5;">
-          <strong>Login email:</strong> ${to}
-        </p>
-
         <p style="margin: 24px 0 0; color: #94a3b8; font-size: 11px; line-height: 1.5;">
-          This invitation and temporary password expire in ${expiresInDays} days.
-          If the button doesn't work, paste this into your browser:<br>
+          This invitation and temporary password expire in ${expiresInDays} days. If the button doesn't work, paste this into your browser:<br>
           <span style="color: #64748b; word-break: break-all;">${acceptUrl}</span>
         </p>
       </div>
-      <p style="text-align: center; color: #94a3b8; font-size: 11px; margin-top: 16px;">
-        ${SENDER_NAME} • Automated message, please do not reply
-      </p>
+      
+      <div style="text-align: center; margin-top: 24px;">
+        <img src="https://fees-system-one.vercel.app/images/SchoolPayLogo.jpg" alt="SchoolPay" width="40" height="40" style="border-radius: 8px; object-fit: contain; margin-bottom: 8px;" />
+        <p style="color: #94a3b8; font-size: 12px; font-weight: 600; margin: 0 0 4px;">
+          Best regards,<br>SchoolPay Team
+        </p>
+        <p style="color: #cbd5e1; font-size: 11px; margin: 0;">
+          Automated message, please do not reply
+        </p>
+      </div>
     </div>
   `;
   return sendEmail({
     to,
     toName: name,
-    subject: "You're invited to SchoolPay",
+    subject: "Welcome to SchoolPay – Your Account is Ready!",
     htmlContent: html,
   });
 };
@@ -238,7 +253,9 @@ const sendPasswordResetEmail = async ({
   resetToken,
   expiresInMinutes = 30,
 }) => {
-  const resetUrl = `${process.env.CLIENT_URL || "http://localhost:5173"}/reset-password?token=${resetToken}`;
+  const baseUrl =
+    process.env.CLIENT_URL || "https://fees-system-one.vercel.app";
+  const resetUrl = `${baseUrl}/reset-password?token=${resetToken}`;
 
   const html = `
     <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 520px; margin: 0 auto; padding: 32px 24px; background: #f8fafc;">
@@ -287,7 +304,6 @@ const sendSupportReplyEmail = async ({
   subject,
   replyPreview,
 }) => {
-  // 🎯 School admins log in at /login (not /platform/login)
   const loginUrl = `${process.env.CLIENT_URL || "https://fees-system-one.vercel.app"}/login`;
   const preview =
     replyPreview.length > 200
