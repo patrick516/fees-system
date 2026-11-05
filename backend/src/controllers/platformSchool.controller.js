@@ -529,8 +529,8 @@ const deleteSchool = async (req, res) => {
   }
 };
 
-// ==================== RESEND INVITE ====================
-// POST /api/platform/schools/:id/resend-invite
+//  RESEND INVITE
+
 const resendInvite = async (req, res) => {
   try {
     const school = await prisma.school.findFirst({
@@ -617,7 +617,137 @@ const resendInvite = async (req, res) => {
   }
 };
 
-// ==================== SEND PASSWORD RESET ====================
+// ==================== UPDATE ADMIN EMAIL ====================
+// PUT /api/platform/schools/:id/update-admin-email
+const updateAdminEmail = async (req, res) => {
+  try {
+    const { newEmail, resendInvite } = req.body;
+
+    if (!newEmail) {
+      return res
+        .status(400)
+        .json({ success: false, message: "New email is required" });
+    }
+    const cleanEmail = String(newEmail).toLowerCase().trim();
+
+    // 1. Check if the new email is already in use by anyone else
+    const [existingStaff, existingPlatformAdmin] = await Promise.all([
+      prisma.staff.findUnique({ where: { email: cleanEmail } }),
+      prisma.platformAdmin.findUnique({ where: { email: cleanEmail } }),
+    ]);
+    if (existingStaff || existingPlatformAdmin) {
+      return res.status(409).json({
+        success: false,
+        message: "That email is already registered in the system",
+      });
+    }
+
+    // 2. Find the school and its current admin
+    const school = await prisma.school.findFirst({
+      where: { id: req.params.id, platformId: req.platformId },
+      include: {
+        staff: {
+          where: { role: { name: "School Admin" } },
+          take: 1,
+          orderBy: { createdAt: "asc" },
+        },
+      },
+    });
+
+    if (!school) {
+      return res
+        .status(404)
+        .json({ success: false, message: "School not found" });
+    }
+
+    const admin = school.staff[0];
+    if (!admin) {
+      return res
+        .status(400)
+        .json({ success: false, message: "No admin found for this school" });
+    }
+
+    // 3. Update the email
+    await prisma.staff.update({
+      where: { id: admin.id },
+      data: { email: cleanEmail },
+    });
+
+    // 4. If requested, resend the invitation to the new email
+    // 4. If requested, handle the invite logic
+    if (resendInvite) {
+      const crypto = require("crypto");
+      const bcrypt = require("bcryptjs");
+      const { sendPlatformSchoolInviteEmail } = require("../lib/mailer");
+
+      // If they have NEVER logged in, generate a new temp password & resend invite
+      if (!admin.lastLogin) {
+        const chars =
+          "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+        const pick = () => chars[crypto.randomInt(0, chars.length)];
+        const block = () => Array.from({ length: 4 }, pick).join("");
+        const tempPassword = `SP-${block()}-${block()}-${block()}`;
+        const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+        const inviteToken = crypto.randomBytes(32).toString("hex");
+        const inviteExpires = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+        await prisma.staff.update({
+          where: { id: admin.id },
+          data: {
+            passwordHash,
+            invitationToken: inviteToken,
+            invitationExpires: inviteExpires,
+            invitedAt: new Date(),
+            mustChangePassword: true,
+          },
+        });
+
+        await sendPlatformSchoolInviteEmail({
+          to: cleanEmail,
+          name: admin.firstName || "there",
+          schoolName: school.name !== "Pending Setup" ? school.name : null,
+          inviteToken,
+          tempPassword,
+          expiresInDays: 7,
+        });
+      } else {
+        //  If they HAVE logged in before, just send a password reset link
+        // to the new email so they can log in and keep working.
+        const resetToken = crypto.randomBytes(32).toString("hex");
+        const expiresAt = new Date(Date.now() + 30 * 60 * 1000);
+
+        await prisma.staff.update({
+          where: { id: admin.id },
+          data: {
+            passwordResetToken: resetToken,
+            passwordResetExpires: expiresAt,
+          },
+        });
+
+        const { sendPasswordResetEmail } = require("../lib/mailer");
+        await sendPasswordResetEmail({
+          to: cleanEmail,
+          name: admin.fullName || "there",
+          resetToken,
+          expiresInMinutes: 30,
+        });
+      }
+    }
+
+    return res.json({
+      success: true,
+      message: `Admin email updated to ${cleanEmail}`,
+    });
+  } catch (err) {
+    console.error("updateAdminEmail error:", err);
+    return res
+      .status(500)
+      .json({ success: false, message: "Failed to update email" });
+  }
+};
+
+//  SEND PASSWORD RESET
 // POST /api/platform/schools/:id/reset-password
 const sendPasswordReset = async (req, res) => {
   try {
@@ -705,4 +835,5 @@ module.exports = {
   deleteSchool,
   resendInvite,
   sendPasswordReset,
+  updateAdminEmail,
 };

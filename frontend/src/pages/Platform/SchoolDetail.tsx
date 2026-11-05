@@ -9,8 +9,10 @@ import {
   Pencil,
   CheckCircle2,
   Building2,
+  Edit2,
 } from "lucide-react";
 import platformApi from "../../lib/platformApi";
+import { toast } from "../../lib/toast";
 
 interface SchoolDetail {
   id: string;
@@ -111,6 +113,29 @@ export default function PlatformSchoolDetail() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
+  // 🎯 State for editing admin email
+  const [isEditingEmail, setIsEditingEmail] = useState(false);
+  const [newEmail, setNewEmail] = useState("");
+  const [resendInvite, setResendInvite] = useState(true);
+  const [savingEmail, setSavingEmail] = useState(false);
+
+  const handleUpdateEmail = async () => {
+    if (!newEmail) return toast.error("Email is required");
+    setSavingEmail(true);
+    try {
+      const res = await platformApi.put(
+        `/platform/schools/${id}/update-admin-email`,
+        { newEmail, resendInvite },
+      );
+      toast.success(res.data.message);
+      setIsEditingEmail(false);
+      load(); // Reload the school data
+    } catch (err: any) {
+      toast.error(err.response?.data?.message || "Failed to update email");
+    } finally {
+      setSavingEmail(false);
+    }
+  };
   const saveOneKhusa = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingKhusa(true);
@@ -225,12 +250,63 @@ export default function PlatformSchoolDetail() {
         <div className="overflow-x-auto">
           <div className="flex divide-x divide-slate-100 min-w-max w-full">
             <div className="px-5 py-4 flex-1">
-              <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                Admin Email
-              </p>
-              <p className="text-sm text-slate-900">
-                {school.admin?.email || "—"}
-              </p>
+              <div className="flex items-center justify-between mb-1">
+                <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide">
+                  Admin Email
+                </p>
+                {!isEditingEmail && (
+                  <button
+                    onClick={() => {
+                      setNewEmail(school.admin?.email || "");
+                      setIsEditingEmail(true);
+                    }}
+                    className="text-blue-600 hover:text-blue-800 p-1"
+                    title="Edit Email"
+                  >
+                    <Edit2 size={12} />
+                  </button>
+                )}
+              </div>
+
+              {isEditingEmail ? (
+                <div className="mt-2 space-y-2">
+                  <input
+                    type="email"
+                    value={newEmail}
+                    onChange={(e) => setNewEmail(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600"
+                    placeholder="new@school.com"
+                  />
+                  <label className="flex items-center gap-2 text-[11px] text-slate-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={resendInvite}
+                      onChange={(e) => setResendInvite(e.target.checked)}
+                      className="rounded"
+                    />
+                    Resend invite to new email
+                  </label>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleUpdateEmail}
+                      disabled={savingEmail}
+                      className="px-3 py-1 bg-blue-600 text-white text-xs font-medium rounded-lg disabled:opacity-50 hover:bg-blue-700"
+                    >
+                      {savingEmail ? "Saving..." : "Save"}
+                    </button>
+                    <button
+                      onClick={() => setIsEditingEmail(false)}
+                      className="px-3 py-1 border border-slate-300 text-slate-700 text-xs font-medium rounded-lg hover:bg-slate-50"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm text-slate-900">
+                  {school.admin?.email || "—"}
+                </p>
+              )}
             </div>
             <div className="px-5 py-4 flex-1">
               <p className="text-[11px] font-semibold text-slate-500 uppercase tracking-wide mb-1">

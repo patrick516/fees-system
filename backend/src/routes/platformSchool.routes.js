@@ -38,6 +38,13 @@ router.post(
   controller.unlockSettlement,
 );
 router.post("/:id/resend-invite", requireOwner, controller.resendInvite);
+router.put(
+  "/:id/update-admin-email",
+  requireOwner,
+  controller.updateAdminEmail,
+);
+router.post("/:id/reset-password", requireOwner, controller.sendPasswordReset);
+router.delete("/:id", requireOwner, controller.deleteSchool);
 router.post("/:id/reset-password", requireOwner, controller.sendPasswordReset);
 router.delete("/:id", requireOwner, controller.deleteSchool);
 module.exports = router;
