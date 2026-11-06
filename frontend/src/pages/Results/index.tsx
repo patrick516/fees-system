@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { Fragment, useState, useEffect } from "react";
 import {
   Plus,
   Loader2,
@@ -150,7 +150,7 @@ const ResultsPage = () => {
   useEffect(() => {
     const currentBoundaries =
       boundarySystem === "POINTS" ? pointsBoundaries : letterBoundaries;
-    setHasBoundaries(currentBoundaries && currentBoundaries.length > 0);
+    setHasBoundaries(!!currentBoundaries && currentBoundaries.length > 0);
   }, [boundarySystem, pointsBoundaries, letterBoundaries]);
 
   // When period changes, fetch the summary of uploads
@@ -183,11 +183,53 @@ const ResultsPage = () => {
   };
 
   const handleSaveBoundaries = async () => {
+    if (savingBoundaries) return;
     setSavingBoundaries(true);
-    const res = await setGradeBoundaries(boundaries, boundarySystem);
-    setMessage(res.success ? "Grade boundaries saved" : res.message);
-    setSavingBoundaries(false);
-    if (res.success) setEditingBoundaries(false);
+
+    // Force numbers to prevent NaN backend errors
+    const cleanedBoundaries = boundaries.map((b) => ({
+      minPercent: Number(b.minPercent) || 0,
+      maxPercent: Number(b.maxPercent) || 0,
+      gradePoint: b.gradePoint ? Number(b.gradePoint) : undefined,
+      gradeLabel: b.gradeLabel || "",
+    }));
+
+    try {
+      const res: any = await setGradeBoundaries(
+        cleanedBoundaries,
+        boundarySystem,
+      );
+
+      // Accept either { success } or a raw axios response ({ data: { success } })
+      const ok = res?.success === true || res?.data?.success === true;
+
+      if (ok) {
+        setMessage("Grade boundaries saved");
+
+        // Update local state instantly with the cleaned (numeric) values
+        if (boundarySystem === "POINTS") {
+          setPointsBoundaries(cleanedBoundaries);
+        } else {
+          setLetterBoundaries(cleanedBoundaries);
+        }
+        setHasBoundaries(cleanedBoundaries.length > 0);
+
+        // Switch back to the read-only horizontal table
+        setEditingBoundaries(false);
+      } else {
+        alert(
+          "Failed to save boundaries: " +
+            (res?.message || res?.data?.message || "Unknown error"),
+        );
+      }
+    } catch (err: any) {
+      alert(
+        "Failed to save boundaries: " +
+          (err?.response?.data?.message || err?.message || "Unknown error"),
+      );
+    } finally {
+      setSavingBoundaries(false);
+    }
   };
 
   const handleCreatePeriod = async () => {
@@ -244,7 +286,7 @@ const ResultsPage = () => {
       setClassResults(res.data);
       setResultsGradingSystem(res.gradingSystem || "POINTS");
 
-      // 🎯 Check if any student has englishIncluded: false
+      // Check if any student has englishIncluded: false
       const anyMissingEnglish = res.data?.some(
         (r: any) => r.englishIncluded === false,
       );
@@ -257,13 +299,13 @@ const ResultsPage = () => {
     loadPendingRows(classId);
   };
 
-  // 🎯 Confirms re-upload after showing beautiful modal
+  // Confirms re-upload after showing the modal
   const confirmReupload = () => {
     setShowReuploadConfirm(false);
     setReuploadMode(true);
   };
 
-  // 🎯 Get current class summary for reupload modal
+  // Get current class summary for reupload modal
   const currentSummary = uploadSummary.find((s) => s.classId === selectedClass);
 
   return (
@@ -447,55 +489,76 @@ const ResultsPage = () => {
                 </button>
                 <button
                   onClick={() => setEditingBoundaries(false)}
-                  className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200"
+                  disabled={savingBoundaries}
+                  className="flex items-center gap-2 bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-200 disabled:opacity-40"
                 >
                   <X size={14} /> Cancel
                 </button>
               </div>
             </>
           ) : (
-            <div className="overflow-hidden rounded-lg border border-gray-100">
+            /* VIEW MODE — clean horizontal read-only table */
+            <div className="overflow-x-auto rounded-lg border border-gray-100">
               <table className="w-full text-sm">
                 <thead className="bg-gray-50">
-                  <tr className="text-left text-gray-500">
-                    {boundarySystem === "POINTS" && (
-                      <th className="px-4 py-2 font-medium">Point</th>
-                    )}
-                    {boundarySystem === "LETTER" && (
-                      <th className="px-4 py-2 font-medium">Grade</th>
-                    )}
-                    <th className="px-4 py-2 font-medium">Min %</th>
-                    <th className="px-4 py-2 font-medium">Max %</th>
-                    {boundarySystem === "POINTS" && (
-                      <th className="px-4 py-2 font-medium">Label</th>
-                    )}
+                  <tr className="text-gray-500">
+                    <th className="px-4 py-2 text-left font-medium whitespace-nowrap">
+                      {boundarySystem === "POINTS" ? "Point" : "Grade"}
+                    </th>
+                    {boundaries.map((b, i) => (
+                      <th
+                        key={i}
+                        className="px-4 py-2 text-center font-semibold text-gray-700 whitespace-nowrap"
+                      >
+                        {boundarySystem === "POINTS"
+                          ? b.gradePoint
+                          : b.gradeLabel || "—"}
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {boundaries.map((b, i) => (
-                    <tr key={i} className="border-t border-gray-100">
-                      {boundarySystem === "POINTS" ? (
-                        <td className="px-4 py-2 font-medium text-gray-700">
-                          Point {b.gradePoint}
-                        </td>
-                      ) : (
-                        <td className="px-4 py-2 font-medium text-gray-700">
-                          {b.gradeLabel}
-                        </td>
-                      )}
-                      <td className="px-4 py-2 text-gray-600">
+                  <tr className="border-t border-gray-100">
+                    <td className="px-4 py-2 text-left font-medium text-gray-500 whitespace-nowrap">
+                      Min %
+                    </td>
+                    {boundaries.map((b, i) => (
+                      <td
+                        key={i}
+                        className="px-4 py-2 text-center text-gray-600"
+                      >
                         {b.minPercent}%
                       </td>
-                      <td className="px-4 py-2 text-gray-600">
+                    ))}
+                  </tr>
+                  <tr className="border-t border-gray-100">
+                    <td className="px-4 py-2 text-left font-medium text-gray-500 whitespace-nowrap">
+                      Max %
+                    </td>
+                    {boundaries.map((b, i) => (
+                      <td
+                        key={i}
+                        className="px-4 py-2 text-center text-gray-600"
+                      >
                         {b.maxPercent}%
                       </td>
-                      {boundarySystem === "POINTS" && (
-                        <td className="px-4 py-2 text-gray-500">
+                    ))}
+                  </tr>
+                  {boundarySystem === "POINTS" && (
+                    <tr className="border-t border-gray-100">
+                      <td className="px-4 py-2 text-left font-medium text-gray-500 whitespace-nowrap">
+                        Label
+                      </td>
+                      {boundaries.map((b, i) => (
+                        <td
+                          key={i}
+                          className="px-4 py-2 text-center text-gray-500"
+                        >
                           {b.gradeLabel || "—"}
                         </td>
-                      )}
+                      ))}
                     </tr>
-                  ))}
+                  )}
                 </tbody>
               </table>
             </div>
@@ -827,7 +890,7 @@ const ResultsPage = () => {
                                 <p className="text-[11px] text-green-700">
                                   Re-uploading will overwrite existing results.
                                 </p>
-                                {/* 🎯 Opens the beautiful confirmation modal */}
+                                {/* Opens the confirmation modal */}
                                 <button
                                   onClick={() => setShowReuploadConfirm(true)}
                                   className="text-xs font-semibold text-red-600 hover:text-red-800 px-3 py-1.5 rounded-lg border border-red-200 hover:border-red-300 hover:bg-red-50 transition-colors flex items-center gap-1.5"
@@ -838,7 +901,7 @@ const ResultsPage = () => {
                             </div>
                           );
                         }
-                        // 🎯 Show the new "Enter Grades" UI
+                        // Show the "Enter Grades" UI
                         return (
                           <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
                             {alreadyUploaded && (
@@ -1023,9 +1086,8 @@ const ResultsPage = () => {
                 </thead>
                 <tbody>
                   {classResults.map((row) => (
-                    <>
+                    <Fragment key={row.studentId}>
                       <tr
-                        key={row.studentId}
                         onClick={() =>
                           setExpandedStudent(
                             expandedStudent === row.studentId
@@ -1088,11 +1150,12 @@ const ResultsPage = () => {
                             colSpan={resultsGradingSystem === "LETTER" ? 8 : 6}
                             className="px-4 py-3"
                           >
-                            <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mb-3">
+                            {/* Horizontal scrolling subjects */}
+                            <div className="flex overflow-x-auto gap-2 mb-3 pb-2 hide-scrollbar">
                               {row.subjects.map((s: any, i: number) => (
                                 <div
                                   key={i}
-                                  className={`flex items-center justify-between border rounded-lg px-3 py-2 text-xs ${
+                                  className={`flex-shrink-0 flex flex-col items-center justify-center border rounded-lg px-3 py-2 text-xs min-w-[120px] ${
                                     s.isEnglish
                                       ? "bg-purple-50 border-purple-200"
                                       : s.countedInTotal === false
@@ -1101,7 +1164,7 @@ const ResultsPage = () => {
                                   }`}
                                 >
                                   <span
-                                    className={`flex items-center gap-1 ${s.isEnglish ? "font-semibold text-purple-800" : "text-gray-600"}`}
+                                    className={`flex items-center gap-1 mb-1 ${s.isEnglish ? "font-semibold text-purple-800" : "text-gray-600"}`}
                                   >
                                     {s.isEnglish && (
                                       <Star
@@ -1112,29 +1175,29 @@ const ResultsPage = () => {
                                     {s.subject}
                                   </span>
                                   <span
-                                    className={`font-medium ${s.isEnglish ? "text-purple-800" : "text-gray-800"}`}
+                                    className={`font-bold text-sm ${s.isEnglish ? "text-purple-800" : "text-gray-800"}`}
                                   >
                                     {s.mark}%{" "}
-                                    <span className="text-gray-400">
+                                    <span className="text-xs font-normal text-gray-400">
                                       {resultsGradingSystem === "LETTER"
                                         ? `(${s.gradeLabel})`
-                                        : `(Pt ${s.gradePoint})`}
+                                        : `(Pt ${s.gradePoint || "null"})`}
                                     </span>
-                                    {s.countedInTotal === false && (
-                                      <span className="ml-1 text-[9px] text-gray-400">
-                                        not counted
-                                      </span>
-                                    )}
                                   </span>
+                                  {s.countedInTotal === false && (
+                                    <span className="text-[9px] text-gray-400 mt-0.5">
+                                      not counted
+                                    </span>
+                                  )}
                                 </div>
                               ))}
                             </div>
 
-                            {/*  ADD THE DOWNLOAD BUTTON HERE */}
+                            {/* Download report card button */}
                             <div className="flex justify-end pt-2 border-t border-gray-200">
                               <button
                                 onClick={async () => {
-                                  if (downloadingPdf) return; // 🎯 Prevent double clicks
+                                  if (downloadingPdf) return; // Prevent double clicks
                                   setDownloadingPdf(row.studentId);
                                   try {
                                     const res = await api.get(
@@ -1192,7 +1255,7 @@ const ResultsPage = () => {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   ))}
                 </tbody>
               </table>
@@ -1201,7 +1264,7 @@ const ResultsPage = () => {
         )}
       </div>
 
-      {/*  Grade Entry Modal */}
+      {/* Grade Entry Modal */}
       <GradeEntryModal
         open={gradeModalOpen}
         examPeriod={periods.find((p) => p.id === selectedPeriod) || null}
@@ -1213,7 +1276,7 @@ const ResultsPage = () => {
         }}
       />
 
-      {/*  Beautiful Re-upload Confirmation Modal */}
+      {/* Re-upload Confirmation Modal */}
       {showReuploadConfirm && currentSummary && (
         <div
           className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"

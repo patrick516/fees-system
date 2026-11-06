@@ -4,7 +4,7 @@ const { uploadToCloudinary } = require("../lib/cloudinary");
 
 // Look up the grade (point and/or label) for a given percentage mark
 const resolveGrade = (mark, boundaries) => {
-  // 🎯 Add +0.99 to the maxPercent to handle decimals (e.g., 69.9%)
+  //  Add +0.99 to the maxPercent to handle decimals (e.g., 69.9%)
   const match = boundaries.find(
     (b) => mark >= b.minPercent && mark <= b.maxPercent + 0.99,
   );
@@ -14,18 +14,25 @@ const resolveGrade = (mark, boundaries) => {
   };
 };
 
-// 🎯 Map Letter grades to Aggregate Points for tie-breaking
+//  Map Letter grades to Aggregate Points for tie-breaking
 const letterToAggregate = (label) => {
   const map = { A: 1, B: 2, C: 3, D: 4, F: 5 };
   return map[label] || 5; // Default to 5 for unknowns
 };
 
-// 🎯 Helper: Check if a subject is English
+//  Helper: Bulletproof English check (handles "Eng", "English Language", "ENG ", etc.)
 const isEnglish = (subjectName) => {
-  return subjectName.toLowerCase().trim().includes("english");
+  if (!subjectName) return false;
+  const clean = subjectName.toLowerCase().trim();
+  return (
+    clean === "english" ||
+    clean === "eng" ||
+    clean.includes("english") ||
+    clean.startsWith("eng") // catches "eng lit", "eng lang"
+  );
 };
 
-// 🎯 Helper: Compute Best 6 with English compulsory (for POINTS system)
+//  Helper: Compute Best 6 with English compulsory (for POINTS system)
 // Returns { best6, totalPoints, englishIncluded }
 const computeBest6 = (results) => {
   if (results.length === 0) {
